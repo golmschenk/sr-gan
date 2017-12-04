@@ -44,8 +44,12 @@ def run_dnn():
         loss.backward()
         optimizer.step()
 
+    predicted_labels = net(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
+    train_loss = np.mean(np.abs(predicted_labels - train_labels))
+    print(train_loss)
     predicted_labels = net(Variable(torch.from_numpy(test_examples.astype(np.float32)))).data.numpy()
     test_loss = np.mean(np.abs(predicted_labels - test_labels))
+    print(test_loss)
     return test_loss
 
 
