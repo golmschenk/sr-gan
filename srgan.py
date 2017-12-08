@@ -11,8 +11,6 @@ from torch.optim import Adam, RMSprop
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
-from clear_logs import clear_logs
-
 
 class SummaryWriter(SummaryWriter_):
     def __init__(self, *args, **kwargs):
@@ -29,8 +27,8 @@ class SummaryWriter(SummaryWriter_):
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime("y%Ym%md%dh%Hm%Ms%S")
-    dnn_summary_writer = SummaryWriter('logs/dnn NoG e1000 o100 SL {}'.format(datetime_string))
-    gan_summary_writer = SummaryWriter('logs/gan NoG e1000 o100 SL {}'.format(datetime_string))
+    dnn_summary_writer = SummaryWriter('logs/dnn 5S RMSP {}'.format(datetime_string))
+    gan_summary_writer = SummaryWriter('logs/gan 5S RMSP {}'.format(datetime_string))
     dnn_summary_writer.summary_period = 10
     gan_summary_writer.summary_period = 10
     observation_count = 100
@@ -84,11 +82,11 @@ def run_rsgan(steps):
     D = MLP()
     DNN = MLP()
     d_lr = 1e-3
-    g_lr = d_lr / 10
+    g_lr = d_lr
 
-    D_optimizer = Adam(D.parameters(), lr=d_lr)
-    G_optimizer = Adam(G.parameters(), lr=g_lr)
-    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr)
+    D_optimizer = RMSprop(D.parameters(), lr=d_lr)
+    G_optimizer = RMSprop(G.parameters(), lr=g_lr)
+    DNN_optimizer = RMSprop(DNN.parameters(), lr=d_lr)
 
     for step in range(steps):
         labeled_examples = torch.from_numpy(train_examples.astype(np.float32))
@@ -119,7 +117,7 @@ def run_rsgan(steps):
         _ = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
         detached_unlabeled_feature_layer = unlabeled_feature_layer.detach()
-        unlabeled_loss = (unlabeled_feature_layer.mean(0) - detached_labeled_feature_layer.mean(0)).pow(2).mean() / 100
+        unlabeled_loss = (unlabeled_feature_layer.mean(0) - detached_labeled_feature_layer.mean(0)).pow(2).mean() / 10
         gan_summary_writer.add_scalar('Unlabeled Loss', unlabeled_loss.data[0])
         unlabeled_loss.backward()
         # Fake.
@@ -128,9 +126,9 @@ def run_rsgan(steps):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-        # fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg() / 100
-        # gan_summary_writer.add_scalar('Fake Loss', fake_loss.data[0])
-        # fake_loss.backward()
+        fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg() / 10
+        gan_summary_writer.add_scalar('Fake Loss', fake_loss.data[0])
+        fake_loss.backward()
         # Gradient penalty.
         alpha = Variable(torch.rand(3, train_dataset_size, 1))
         alpha = alpha / alpha.sum(0)
@@ -144,16 +142,17 @@ def run_rsgan(steps):
         # Discriminator update.
         D_optimizer.step()
         # Generator.
-        G_optimizer.zero_grad()
-        z = torch.randn(train_dataset_size, noise_size)
-        fake_examples = G(Variable(z))
-        _ = D(fake_examples)
-        fake_feature_layer = D.feature_layer
-        real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-        generator_loss = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
-        gan_summary_writer.add_scalar('Generator Loss', generator_loss.data[0])
-        generator_loss.backward()
-        G_optimizer.step()
+        if step % 5 == 0:
+            G_optimizer.zero_grad()
+            z = torch.randn(train_dataset_size, noise_size)
+            fake_examples = G(Variable(z))
+            _ = D(fake_examples)
+            fake_feature_layer = D.feature_layer
+            real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
+            generator_loss = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
+            gan_summary_writer.add_scalar('Generator Loss', generator_loss.data[0])
+            generator_loss.backward()
+            G_optimizer.step()
 
         if dnn_summary_writer.step % dnn_summary_writer.summary_period == 0:
             predicted_train_labels = DNN(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
@@ -186,7 +185,6 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-#clear_logs()
 for steps in [50000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
