@@ -2,7 +2,6 @@
 Regression semi-supervised GAN code.
 """
 import datetime
-import os
 import numpy as np
 from torch.autograd import Variable
 from torch.nn import Module, Linear
@@ -26,12 +25,13 @@ class SummaryWriter(SummaryWriter_):
 
 
 def run_rsgan(steps):
-    datetime_string = datetime.datetime.now().strftime("y%Ym%md%dh%Hm%Ms%S")
-    dnn_summary_writer = SummaryWriter('logs/dnn 5S RMSP {}'.format(datetime_string))
-    gan_summary_writer = SummaryWriter('logs/gan 5S RMSP {}'.format(datetime_string))
+    datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
+    trial_name = 'e1000 o10'
+    dnn_summary_writer = SummaryWriter('logs/dnn {} {}'.format(trial_name, datetime_string))
+    gan_summary_writer = SummaryWriter('logs/gan {} {}'.format(trial_name, datetime_string))
     dnn_summary_writer.summary_period = 10
     gan_summary_writer.summary_period = 10
-    observation_count = 100
+    observation_count = 10
     noise_size = 10
 
     train_dataset_size = 1000
@@ -81,12 +81,13 @@ def run_rsgan(steps):
     G = Generator()
     D = MLP()
     DNN = MLP()
-    d_lr = 1e-3
+    d_lr = 1e-4
     g_lr = d_lr
 
-    D_optimizer = RMSprop(D.parameters(), lr=d_lr)
-    G_optimizer = RMSprop(G.parameters(), lr=g_lr)
-    DNN_optimizer = RMSprop(DNN.parameters(), lr=d_lr)
+    betas = (0.5, 0.9)
+    D_optimizer = Adam(D.parameters(), lr=d_lr, betas=betas)
+    G_optimizer = Adam(G.parameters(), lr=g_lr, betas=betas)
+    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas)
 
     for step in range(steps):
         labeled_examples = torch.from_numpy(train_examples.astype(np.float32))
@@ -136,7 +137,7 @@ def run_rsgan(steps):
         interpolates_predictions = D(interpolates)
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=torch.ones(interpolates_predictions.size()),
-                                        create_graph=True, retain_graph=True, only_inputs=True)[0]
+                                        create_graph=True, only_inputs=True)[0]
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 10
         gradient_penalty.backward()
         # Discriminator update.
