@@ -26,7 +26,7 @@ class SummaryWriter(SummaryWriter_):
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
-    trial_name = 'e1000 o10'
+    trial_name = 'e1000 o10 fur1 lr1e-5'
     dnn_summary_writer = SummaryWriter('logs/dnn {} {}'.format(trial_name, datetime_string))
     gan_summary_writer = SummaryWriter('logs/gan {} {}'.format(trial_name, datetime_string))
     dnn_summary_writer.summary_period = 10
@@ -81,7 +81,7 @@ def run_rsgan(steps):
     G = Generator()
     D = MLP()
     DNN = MLP()
-    d_lr = 1e-4
+    d_lr = 1e-5
     g_lr = d_lr
 
     betas = (0.5, 0.9)
@@ -118,7 +118,7 @@ def run_rsgan(steps):
         _ = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
         detached_unlabeled_feature_layer = unlabeled_feature_layer.detach()
-        unlabeled_loss = (unlabeled_feature_layer.mean(0) - detached_labeled_feature_layer.mean(0)).pow(2).mean() / 10
+        unlabeled_loss = (unlabeled_feature_layer.mean(0) - detached_labeled_feature_layer.mean(0)).pow(2).mean()
         gan_summary_writer.add_scalar('Unlabeled Loss', unlabeled_loss.data[0])
         unlabeled_loss.backward()
         # Fake.
@@ -127,7 +127,7 @@ def run_rsgan(steps):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-        fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg() / 10
+        fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg()
         gan_summary_writer.add_scalar('Fake Loss', fake_loss.data[0])
         fake_loss.backward()
         # Gradient penalty.
@@ -186,7 +186,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [50000]:
+for steps in [500000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
