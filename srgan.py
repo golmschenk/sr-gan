@@ -10,6 +10,8 @@ from torch.optim import Adam, RMSprop
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
+from data import generate_simple_data
+
 
 class SummaryWriter(SummaryWriter_):
     def __init__(self, *args, **kwargs):
@@ -34,19 +36,11 @@ def run_rsgan(steps):
     observation_count = 10
     noise_size = 10
 
-    train_dataset_size = 20
-    train_means = np.random.normal(size=[train_dataset_size, 1])
-    train_standard_deviations = np.random.gamma(shape=2, size=[train_dataset_size, 1])
-    train_examples = np.random.normal(train_means, train_standard_deviations, size=[train_dataset_size, observation_count])
-    train_examples.sort(axis=1)
-    train_labels = np.concatenate((train_means, train_standard_deviations), axis=1)
+    train_dataset_size = 100
+    train_examples, train_labels = generate_simple_data(train_dataset_size, observation_count)
 
     test_dataset_size = 1000
-    test_means = np.random.normal(size=[test_dataset_size, 1])
-    test_standard_deviations = np.random.gamma(shape=2, size=[test_dataset_size, 1])
-    test_examples = np.random.normal(test_means, test_standard_deviations, size=[test_dataset_size, observation_count])
-    test_examples.sort(axis=1)
-    test_labels = np.concatenate((test_means, test_standard_deviations), axis=1)
+    test_examples, test_labels = generate_simple_data(test_dataset_size, observation_count)
 
     class Generator(Module):
         def __init__(self):
@@ -114,9 +108,7 @@ def run_rsgan(steps):
         gan_summary_writer.add_scalar('Labeled Loss', labeled_loss.data[0])
         labeled_loss.backward()
         # Unlabeled.
-        unlabeled_means = np.random.normal(size=[train_dataset_size, 1])
-        unlabeled_standard_deviations = np.random.gamma(shape=2, size=[train_dataset_size, 1])
-        unlabeled_examples_array = np.random.normal(unlabeled_means, unlabeled_standard_deviations, size=[train_dataset_size, observation_count])
+        unlabeled_examples_array, _ = generate_simple_data(train_dataset_size, observation_count)
         unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
         unlabeled_predictions = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
@@ -228,7 +220,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [100000]:
+for steps in [50000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
