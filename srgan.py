@@ -26,7 +26,7 @@ class SummaryWriter(SummaryWriter_):
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
-    trial_name = 'e1000 o10 fur1 lr1e-5'
+    trial_name = 'e1000 o10 lr1e-4'
     dnn_summary_writer = SummaryWriter('logs/dnn {} {}'.format(trial_name, datetime_string))
     gan_summary_writer = SummaryWriter('logs/gan {} {}'.format(trial_name, datetime_string))
     dnn_summary_writer.summary_period = 10
@@ -34,7 +34,7 @@ def run_rsgan(steps):
     observation_count = 10
     noise_size = 10
 
-    train_dataset_size = 1000
+    train_dataset_size = 20
     train_means = np.random.normal(size=[train_dataset_size, 1])
     train_standard_deviations = np.random.gamma(shape=2, size=[train_dataset_size, 1])
     train_examples = np.random.normal(train_means, train_standard_deviations, size=[train_dataset_size, observation_count])
@@ -48,7 +48,6 @@ def run_rsgan(steps):
     test_examples.sort(axis=1)
     test_labels = np.concatenate((test_means, test_standard_deviations), axis=1)
 
-
     class Generator(Module):
         def __init__(self):
             super().__init__()
@@ -61,7 +60,6 @@ def run_rsgan(steps):
             x = leaky_relu(self.linear2(x))
             x = self.linear3(x)
             return x
-
 
     class MLP(Module):
         def __init__(self):
@@ -81,13 +79,18 @@ def run_rsgan(steps):
     G = Generator()
     D = MLP()
     DNN = MLP()
-    d_lr = 1e-5
+    d_lr = 1e-4
     g_lr = d_lr
 
     betas = (0.5, 0.9)
     D_optimizer = Adam(D.parameters(), lr=d_lr, betas=betas)
     G_optimizer = Adam(G.parameters(), lr=g_lr, betas=betas)
     DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas)
+
+    all_fake_examples = None
+    all_unlabeled_predictions = None
+    all_test_predictions = None
+    all_dnn_test_predictions = None
 
     for step in range(steps):
         labeled_examples = torch.from_numpy(train_examples.astype(np.float32))
@@ -115,7 +118,7 @@ def run_rsgan(steps):
         unlabeled_standard_deviations = np.random.gamma(shape=2, size=[train_dataset_size, 1])
         unlabeled_examples_array = np.random.normal(unlabeled_means, unlabeled_standard_deviations, size=[train_dataset_size, observation_count])
         unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
-        _ = D(Variable(unlabeled_examples))
+        unlabeled_predictions = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
         detached_unlabeled_feature_layer = unlabeled_feature_layer.detach()
         unlabeled_loss = (unlabeled_feature_layer.mean(0) - detached_labeled_feature_layer.mean(0)).pow(2).mean()
@@ -156,12 +159,12 @@ def run_rsgan(steps):
             G_optimizer.step()
 
         if dnn_summary_writer.step % dnn_summary_writer.summary_period == 0:
-            predicted_train_labels = DNN(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
-            dnn_train_label_errors = np.mean(np.abs(predicted_train_labels - train_labels), axis=0)
+            dnn_predicted_train_labels = DNN(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
+            dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_labels), axis=0)
             dnn_summary_writer.add_scalar('Train Error Mean', dnn_train_label_errors.data[0])
             dnn_summary_writer.add_scalar('Train Error Std', dnn_train_label_errors.data[1])
-            predicted_test_labels = DNN(Variable(torch.from_numpy(test_examples.astype(np.float32)))).data.numpy()
-            dnn_test_label_errors = np.mean(np.abs(predicted_test_labels - test_labels), axis=0)
+            dnn_predicted_test_labels = DNN(Variable(torch.from_numpy(test_examples.astype(np.float32)))).data.numpy()
+            dnn_test_label_errors = np.mean(np.abs(dnn_predicted_test_labels - test_labels), axis=0)
             dnn_summary_writer.add_scalar('Test Error Mean', dnn_test_label_errors.data[0])
             dnn_summary_writer.add_scalar('Test Error Std', dnn_test_label_errors.data[1])
             predicted_train_labels = D(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
@@ -172,6 +175,45 @@ def run_rsgan(steps):
             gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_labels), axis=0)
             gan_summary_writer.add_scalar('Test Error Mean', gan_test_label_errors.data[0])
             gan_summary_writer.add_scalar('Test Error Std', gan_test_label_errors.data[1])
+
+            if dnn_summary_writer.step % 100 == 0:
+                z = torch.randn(test_dataset_size, noise_size)
+                fake_examples = G(Variable(z))
+                fake_examples_array = fake_examples.data
+                if all_fake_examples is None:
+                    all_fake_examples = np.memmap('fake_examples.memmap', dtype='float32', mode='w+',
+                                                  shape=(1, *fake_examples_array.shape))
+                    all_fake_examples[0] = fake_examples_array
+                else:
+                    all_fake_examples = np.append(all_fake_examples, fake_examples_array[np.newaxis], axis=0)
+                unlabeled_predictions_array = unlabeled_predictions.data
+                if all_unlabeled_predictions is None:
+                    all_unlabeled_predictions = np.memmap('unlabeled_predictions.memmap', dtype='float32', mode='w+',
+                                                          shape=(1, *unlabeled_predictions_array.shape))
+                    all_unlabeled_predictions[0] = unlabeled_predictions_array
+                else:
+                    all_unlabeled_predictions = np.append(all_unlabeled_predictions,
+                                                          unlabeled_predictions_array[np.newaxis], axis=0)
+                test_predictions_array = predicted_test_labels
+                if all_test_predictions is None:
+                    all_test_predictions = np.memmap('test_predictions.memmap', dtype='float32', mode='w+',
+                                                          shape=(1, *test_predictions_array.shape))
+                    all_test_predictions[0] = test_predictions_array
+                else:
+                    all_test_predictions = np.append(all_test_predictions,
+                                                     test_predictions_array[np.newaxis], axis=0)
+                dnn_test_predictions_array = dnn_predicted_test_labels
+                if all_dnn_test_predictions is None:
+                    all_dnn_test_predictions = np.memmap('dnn_test_predictions.memmap', dtype='float32', mode='w+',
+                                                          shape=(1, *dnn_test_predictions_array.shape))
+                    all_dnn_test_predictions[0] = dnn_test_predictions_array
+                else:
+                    all_dnn_test_predictions = np.append(all_dnn_test_predictions,
+                                                          dnn_test_predictions_array[np.newaxis], axis=0)
+    np.save('fake_examples.npy', all_fake_examples)
+    np.save('unlabeled_predictions.npy', all_unlabeled_predictions)
+    np.save('test_predictions.npy', all_test_predictions)
+    np.save('dnn_test_predictions.npy', all_dnn_test_predictions)
 
     predicted_train_labels = DNN(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
     dnn_train_label_errors = np.mean(np.abs(predicted_train_labels - train_labels), axis=0)
@@ -186,7 +228,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [500000]:
+for steps in [100000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
