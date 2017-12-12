@@ -10,7 +10,7 @@ from torch.optim import Adam, RMSprop
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
-from data import generate_simple_data
+from data import generate_simple_data, generate_double_peak_data
 
 
 class SummaryWriter(SummaryWriter_):
@@ -28,19 +28,20 @@ class SummaryWriter(SummaryWriter_):
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
-    trial_name = 'e1000 o10 lr1e-4'
+    trial_name = 'e100 o10 lr1e-5 fla5e-1'
     dnn_summary_writer = SummaryWriter('logs/dnn {} {}'.format(trial_name, datetime_string))
     gan_summary_writer = SummaryWriter('logs/gan {} {}'.format(trial_name, datetime_string))
-    dnn_summary_writer.summary_period = 10
-    gan_summary_writer.summary_period = 10
+    dnn_summary_writer.summary_period = 100
+    gan_summary_writer.summary_period = 100
     observation_count = 10
     noise_size = 10
+    generate_data = generate_double_peak_data
 
     train_dataset_size = 100
-    train_examples, train_labels = generate_simple_data(train_dataset_size, observation_count)
+    train_examples, train_labels = generate_data(train_dataset_size, observation_count)
 
     test_dataset_size = 1000
-    test_examples, test_labels = generate_simple_data(test_dataset_size, observation_count)
+    test_examples, test_labels = generate_data(test_dataset_size, observation_count)
 
     class Generator(Module):
         def __init__(self):
@@ -73,7 +74,7 @@ def run_rsgan(steps):
     G = Generator()
     D = MLP()
     DNN = MLP()
-    d_lr = 1e-4
+    d_lr = 1e-5
     g_lr = d_lr
 
     betas = (0.5, 0.9)
@@ -108,7 +109,7 @@ def run_rsgan(steps):
         gan_summary_writer.add_scalar('Labeled Loss', labeled_loss.data[0])
         labeled_loss.backward()
         # Unlabeled.
-        unlabeled_examples_array, _ = generate_simple_data(train_dataset_size, observation_count)
+        unlabeled_examples_array, _ = generate_data(train_dataset_size, observation_count)
         unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
         unlabeled_predictions = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
@@ -122,7 +123,7 @@ def run_rsgan(steps):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-        fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg()
+        fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 0.5).log().mean().neg()
         gan_summary_writer.add_scalar('Fake Loss', fake_loss.data[0])
         fake_loss.backward()
         # Gradient penalty.
@@ -220,7 +221,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [50000]:
+for steps in [1000000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
