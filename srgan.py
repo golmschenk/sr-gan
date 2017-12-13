@@ -2,6 +2,7 @@
 Regression semi-supervised GAN code.
 """
 import datetime
+import os
 import numpy as np
 from torch.autograd import Variable
 from torch.nn import Module, Linear
@@ -10,6 +11,7 @@ from torch.optim import Adam, RMSprop
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
+import settings
 from data import generate_simple_data, generate_double_peak_data
 
 
@@ -28,7 +30,7 @@ class SummaryWriter(SummaryWriter_):
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
-    trial_name = 'e100 o10 lr1e-5 fla5e-1'
+    trial_name = 'dg'
     dnn_summary_writer = SummaryWriter('logs/dnn {} {}'.format(trial_name, datetime_string))
     gan_summary_writer = SummaryWriter('logs/gan {} {}'.format(trial_name, datetime_string))
     dnn_summary_writer.summary_period = 100
@@ -37,7 +39,7 @@ def run_rsgan(steps):
     noise_size = 10
     generate_data = generate_double_peak_data
 
-    train_dataset_size = 100
+    train_dataset_size = 1000
     train_examples, train_labels = generate_data(train_dataset_size, observation_count)
 
     test_dataset_size = 1000
@@ -56,6 +58,33 @@ def run_rsgan(steps):
             x = self.linear3(x)
             return x
 
+    class DoubleGenerator(Module):
+        def __init__(self):
+            super().__init__()
+            self.linear1_1 = Linear(observation_count, 16)
+            self.linear1_2 = Linear(16, 32)
+            self.linear1_3 = Linear(32, 64)
+            self.linear1_4 = Linear(64, observation_count)
+
+            self.linear2_1 = Linear(observation_count, 16)
+            self.linear2_2 = Linear(16, 32)
+            self.linear2_3 = Linear(32, 64)
+            self.linear2_4 = Linear(64, observation_count)
+
+        def forward(self, x):
+            x1 = x[:train_dataset_size // 2]
+            x1 = leaky_relu(self.linear1_1(x1))
+            x1 = leaky_relu(self.linear1_2(x1))
+            x1 = leaky_relu(self.linear1_3(x1))
+            x1 = self.linear1_4(x1)
+
+            x2 = x[train_dataset_size // 2:]
+            x2 = leaky_relu(self.linear2_1(x2))
+            x2 = leaky_relu(self.linear2_2(x2))
+            x2 = leaky_relu(self.linear2_3(x2))
+            x2 = self.linear2_4(x2)
+            return torch.cat([x1, x2], dim=0)
+
     class MLP(Module):
         def __init__(self):
             super().__init__()
@@ -71,10 +100,10 @@ def run_rsgan(steps):
             x = self.linear3(x)
             return x
 
-    G = Generator()
+    G = DoubleGenerator()
     D = MLP()
     DNN = MLP()
-    d_lr = 1e-5
+    d_lr = 1e-4
     g_lr = d_lr
 
     betas = (0.5, 0.9)
@@ -86,6 +115,8 @@ def run_rsgan(steps):
     all_unlabeled_predictions = None
     all_test_predictions = None
     all_dnn_test_predictions = None
+    all_train_predictions = None
+    all_dnn_train_predictions = None
 
     for step in range(steps):
         labeled_examples = torch.from_numpy(train_examples.astype(np.float32))
@@ -111,7 +142,7 @@ def run_rsgan(steps):
         # Unlabeled.
         unlabeled_examples_array, _ = generate_data(train_dataset_size, observation_count)
         unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
-        unlabeled_predictions = D(Variable(unlabeled_examples))
+        _ = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
         detached_unlabeled_feature_layer = unlabeled_feature_layer.detach()
         unlabeled_loss = (unlabeled_feature_layer.mean(0) - detached_labeled_feature_layer.mean(0)).pow(2).mean()
@@ -129,7 +160,9 @@ def run_rsgan(steps):
         # Gradient penalty.
         alpha = Variable(torch.rand(3, train_dataset_size, 1))
         alpha = alpha / alpha.sum(0)
-        interpolates = alpha[0] * Variable(labeled_examples, requires_grad=True) + alpha[1] * Variable(unlabeled_examples, requires_grad=True) + alpha[2] * Variable(fake_examples.detach().data, requires_grad=True)
+        interpolates = (alpha[0] * Variable(labeled_examples, requires_grad=True) +
+                        alpha[1] * Variable(unlabeled_examples, requires_grad=True) +
+                        alpha[2] * Variable(fake_examples.detach().data, requires_grad=True))
         interpolates_predictions = D(interpolates)
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=torch.ones(interpolates_predictions.size()),
@@ -174,14 +207,17 @@ def run_rsgan(steps):
                 fake_examples = G(Variable(z))
                 fake_examples_array = fake_examples.data
                 if all_fake_examples is None:
-                    all_fake_examples = np.memmap('fake_examples.memmap', dtype='float32', mode='w+',
+                    all_fake_examples = np.memmap(os.path.join(settings.temporary_directory, 'fake_examples.memmap'), dtype='float32', mode='w+',
                                                   shape=(1, *fake_examples_array.shape))
                     all_fake_examples[0] = fake_examples_array
                 else:
                     all_fake_examples = np.append(all_fake_examples, fake_examples_array[np.newaxis], axis=0)
+                unlabeled_examples_array, _ = generate_data(test_dataset_size, observation_count)
+                unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
+                unlabeled_predictions = D(Variable(unlabeled_examples))
                 unlabeled_predictions_array = unlabeled_predictions.data
                 if all_unlabeled_predictions is None:
-                    all_unlabeled_predictions = np.memmap('unlabeled_predictions.memmap', dtype='float32', mode='w+',
+                    all_unlabeled_predictions = np.memmap(os.path.join(settings.temporary_directory, 'unlabeled_predictions.memmap'), dtype='float32', mode='w+',
                                                           shape=(1, *unlabeled_predictions_array.shape))
                     all_unlabeled_predictions[0] = unlabeled_predictions_array
                 else:
@@ -189,24 +225,47 @@ def run_rsgan(steps):
                                                           unlabeled_predictions_array[np.newaxis], axis=0)
                 test_predictions_array = predicted_test_labels
                 if all_test_predictions is None:
-                    all_test_predictions = np.memmap('test_predictions.memmap', dtype='float32', mode='w+',
+                    all_test_predictions = np.memmap(os.path.join(settings.temporary_directory, 'test_predictions.memmap'), dtype='float32', mode='w+',
                                                           shape=(1, *test_predictions_array.shape))
                     all_test_predictions[0] = test_predictions_array
                 else:
                     all_test_predictions = np.append(all_test_predictions,
                                                      test_predictions_array[np.newaxis], axis=0)
+                train_predictions_array = predicted_train_labels
+                if all_train_predictions is None:
+                    all_train_predictions = np.memmap(
+                        os.path.join(settings.temporary_directory, 'train_predictions.memmap'), dtype='float32',
+                        mode='w+',
+                        shape=(1, *train_predictions_array.shape))
+                    all_train_predictions[0] = train_predictions_array
+                else:
+                    all_train_predictions = np.append(all_train_predictions,
+                                                     train_predictions_array[np.newaxis], axis=0)
                 dnn_test_predictions_array = dnn_predicted_test_labels
                 if all_dnn_test_predictions is None:
-                    all_dnn_test_predictions = np.memmap('dnn_test_predictions.memmap', dtype='float32', mode='w+',
-                                                          shape=(1, *dnn_test_predictions_array.shape))
+                    all_dnn_test_predictions = np.memmap(
+                        os.path.join(settings.temporary_directory, 'dnn_test_predictions.memmap'), dtype='float32', mode='w+',
+                        shape=(1, *dnn_test_predictions_array.shape))
                     all_dnn_test_predictions[0] = dnn_test_predictions_array
                 else:
                     all_dnn_test_predictions = np.append(all_dnn_test_predictions,
                                                           dnn_test_predictions_array[np.newaxis], axis=0)
-    np.save('fake_examples.npy', all_fake_examples)
-    np.save('unlabeled_predictions.npy', all_unlabeled_predictions)
-    np.save('test_predictions.npy', all_test_predictions)
-    np.save('dnn_test_predictions.npy', all_dnn_test_predictions)
+                dnn_train_predictions_array = dnn_predicted_train_labels
+                if all_dnn_train_predictions is None:
+                    all_dnn_train_predictions = np.memmap(
+                        os.path.join(settings.temporary_directory, 'dnn_train_predictions.memmap'), dtype='float32',
+                        mode='w+',
+                        shape=(1, *dnn_train_predictions_array.shape))
+                    all_dnn_train_predictions[0] = dnn_train_predictions_array
+                else:
+                    all_dnn_train_predictions = np.append(all_dnn_train_predictions,
+                                                         dnn_train_predictions_array[np.newaxis], axis=0)
+    np.save(os.path.join(settings.temporary_directory, 'fake_examples.npy'), all_fake_examples)
+    np.save(os.path.join(settings.temporary_directory, 'unlabeled_predictions.npy'), all_unlabeled_predictions)
+    np.save(os.path.join(settings.temporary_directory, 'test_predictions.npy'), all_test_predictions)
+    np.save(os.path.join(settings.temporary_directory, 'dnn_test_predictions.npy'), all_dnn_test_predictions)
+    np.save(os.path.join(settings.temporary_directory, 'train_predictions.npy'), all_train_predictions)
+    np.save(os.path.join(settings.temporary_directory, 'dnn_train_predictions.npy'), all_dnn_train_predictions)
 
     predicted_train_labels = DNN(Variable(torch.from_numpy(train_examples.astype(np.float32)))).data.numpy()
     dnn_train_label_errors = np.mean(np.abs(predicted_train_labels - train_labels), axis=0)
@@ -221,7 +280,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [1000000]:
+for steps in [500000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
