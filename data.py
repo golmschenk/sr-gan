@@ -20,7 +20,6 @@ def generate_double_peak_data(number_of_examples, number_of_observations):
     means = double_peak_normal.rvs(size=[number_of_examples, 1])
     stds = double_peak_gamma.rvs(size=[number_of_examples, 1])
     examples = np.random.normal(means, stds, size=[number_of_examples, number_of_observations])
-    examples.sort(axis=1)
     labels = np.concatenate((means, stds), axis=1)
     return examples, labels
 
