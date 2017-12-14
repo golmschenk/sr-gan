@@ -88,12 +88,12 @@ def generate_learning_process_images():
     video_writer.close()
     print('\nMeans Video Complete.')
 
-    x_axis_limits = [0, 13]
+    x_axis_limits = [0, 7]
     x_axis = np.arange(*x_axis_limits, 0.001)
     for step_index in range(fake_examples.shape[0]):
         print('\rGenerating image {} of {}...'.format(step_index, fake_examples.shape[0]), end='')
         figure, axes = plt.subplots()
-        axes.plot(x_axis, MixtureModel([gamma(2), gamma(3, loc=4)]).pdf(x_axis), color=sns.color_palette()[0])
+        axes.plot(x_axis, MixtureModel([gamma(2)]).pdf(x_axis), color=sns.color_palette()[0])
         axes = sns.kdeplot(fake_stds[step_index], ax=axes, color=sns.color_palette()[4], bw=bandwidth)
         axes = sns.kdeplot(unlabeled_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[1], bw=bandwidth)
         axes = sns.kdeplot(test_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[2], bw=bandwidth)
