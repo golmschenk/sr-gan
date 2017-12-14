@@ -3,6 +3,19 @@ Code for the data generating models.
 """
 import numpy as np
 from scipy.stats import rv_continuous, norm, gamma
+from torch.utils.data import Dataset
+
+
+class ToyDataset(Dataset):
+    def __init__(self, dataset_size, observation_count=10):
+        self.length = dataset_size
+        self.examples, self.labels = generate_double_mean_single_std_data(self.length, observation_count)
+
+    def __getitem__(self, index):
+        return self.examples[index], self.labels[index]
+
+    def __len__(self):
+        return self.length
 
 
 def generate_simple_data(number_of_examples, number_of_observations):
@@ -20,6 +33,15 @@ def generate_double_peak_data(number_of_examples, number_of_observations):
     means = double_peak_normal.rvs(size=[number_of_examples, 1])
     stds = double_peak_gamma.rvs(size=[number_of_examples, 1])
     examples = np.random.normal(means, stds, size=[number_of_examples, number_of_observations])
+    labels = np.concatenate((means, stds), axis=1)
+    return examples, labels
+
+def generate_double_mean_single_std_data(number_of_examples, number_of_observations):
+    mean_model = MixtureModel([norm(-3, 1), norm(3, 1)])
+    std_model = MixtureModel([gamma(2)])
+    means = mean_model.rvs(size=[number_of_examples, 1]).astype(dtype=np.float32)
+    stds = std_model.rvs(size=[number_of_examples, 1]).astype(dtype=np.float32)
+    examples = np.random.normal(means, stds, size=[number_of_examples, number_of_observations]).astype(dtype=np.float32)
     labels = np.concatenate((means, stds), axis=1)
     return examples, labels
 
