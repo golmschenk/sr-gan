@@ -30,16 +30,16 @@ class SummaryWriter(SummaryWriter_):
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
-    trial_name = 'dg'
-    dnn_summary_writer = SummaryWriter('logs/dnn {} {}'.format(trial_name, datetime_string))
-    gan_summary_writer = SummaryWriter('logs/gan {} {}'.format(trial_name, datetime_string))
+    trial_directory = os.path.join(settings.logs_directory, '{} {}'.format(settings.trial_name, datetime_string))
+    dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
+    gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
     dnn_summary_writer.summary_period = 100
     gan_summary_writer.summary_period = 100
     observation_count = 10
     noise_size = 10
     generate_data = generate_double_peak_data
 
-    train_dataset_size = 1000
+    train_dataset_size = 2000
     train_examples, train_labels = generate_data(train_dataset_size, observation_count)
 
     test_dataset_size = 1000
@@ -61,43 +61,49 @@ def run_rsgan(steps):
     class DoubleGenerator(Module):
         def __init__(self):
             super().__init__()
-            self.linear1_1 = Linear(observation_count, 16)
-            self.linear1_2 = Linear(16, 32)
-            self.linear1_3 = Linear(32, 64)
-            self.linear1_4 = Linear(64, observation_count)
+            self.linear1_1 = Linear(noise_size, 20)
+            self.linear1_2 = Linear(20, 30)
+            self.linear1_3 = Linear(30, 30)
+            self.linear1_4 = Linear(30, 20)
+            self.linear1_5 = Linear(20, observation_count)
 
-            self.linear2_1 = Linear(observation_count, 16)
-            self.linear2_2 = Linear(16, 32)
-            self.linear2_3 = Linear(32, 64)
-            self.linear2_4 = Linear(64, observation_count)
+            self.linear2_1 = Linear(noise_size, 20)
+            self.linear2_2 = Linear(20, 30)
+            self.linear2_3 = Linear(30, 30)
+            self.linear2_4 = Linear(30, 20)
+            self.linear2_5 = Linear(20, observation_count)
 
         def forward(self, x):
-            x1 = x[:train_dataset_size // 2]
+            x1 = x[:x.size()[0] // 2]
             x1 = leaky_relu(self.linear1_1(x1))
             x1 = leaky_relu(self.linear1_2(x1))
             x1 = leaky_relu(self.linear1_3(x1))
-            x1 = self.linear1_4(x1)
+            x1 = leaky_relu(self.linear1_4(x1))
+            x1 = self.linear1_5(x1)
 
-            x2 = x[train_dataset_size // 2:]
+            x2 = x[x.size()[0] // 2:]
             x2 = leaky_relu(self.linear2_1(x2))
             x2 = leaky_relu(self.linear2_2(x2))
             x2 = leaky_relu(self.linear2_3(x2))
-            x2 = self.linear2_4(x2)
+            x2 = leaky_relu(self.linear2_4(x2))
+            x2 = self.linear2_5(x2)
             return torch.cat([x1, x2], dim=0)
 
     class MLP(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(observation_count, 32)
-            self.linear2 = Linear(32, 16)
-            self.linear3 = Linear(16, 2)
+            self.linear1 = Linear(observation_count, 64)
+            self.linear2 = Linear(64, 32)
+            self.linear3 = Linear(32, 8)
+            self.linear4 = Linear(8, 2)
             self.feature_layer = None
 
         def forward(self, x):
             x = leaky_relu(self.linear1(x))
             x = leaky_relu(self.linear2(x))
+            x = leaky_relu(self.linear3(x))
             self.feature_layer = x
-            x = self.linear3(x)
+            x = self.linear4(x)
             return x
 
     G = DoubleGenerator()
@@ -154,6 +160,7 @@ def run_rsgan(steps):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
+        real_feature_layer = detached_labeled_feature_layer
         fake_loss = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 0.5).log().mean().neg()
         gan_summary_writer.add_scalar('Fake Loss', fake_loss.data[0])
         fake_loss.backward()
@@ -179,7 +186,10 @@ def run_rsgan(steps):
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
             real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-            generator_loss = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
+            real_feature_layer = detached_labeled_feature_layer
+            generator_loss1 = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
+            # generator_loss2 = (real_feature_layer.std(0) - fake_feature_layer.std(0)).pow(2).mean()
+            generator_loss = generator_loss1 # + generator_loss2
             gan_summary_writer.add_scalar('Generator Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()
@@ -280,7 +290,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [500000]:
+for steps in [100000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
