@@ -51,14 +51,20 @@ def run_rsgan(steps):
     class Generator(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(noise_size, 16)
-            self.linear2 = Linear(16, 32)
-            self.linear3 = Linear(32, observation_count)
+            self.linear1 = Linear(noise_size, 20)
+            self.linear2 = Linear(20, 20)
+            self.linear3 = Linear(20, 20)
+            self.linear4 = Linear(20, 20)
+            self.linear5 = Linear(20, 20)
+            self.linear6 = Linear(20, observation_count)
 
         def forward(self, x):
             x = leaky_relu(self.linear1(x))
             x = leaky_relu(self.linear2(x))
-            x = self.linear3(x)
+            x = leaky_relu(self.linear3(x))
+            x = leaky_relu(self.linear4(x))
+            x = leaky_relu(self.linear5(x))
+            x = self.linear6(x)
             return x
 
     class DoubleGenerator(Module):
@@ -122,13 +128,13 @@ def run_rsgan(steps):
             self.gradient_sum = Variable(torch.zeros(1))
 
 
-    G = DoubleGenerator()
+    G = Generator()
     D = MLP()
     DNN = MLP()
     d_lr = 1e-5
     g_lr = d_lr
 
-    betas = (0.9, 0.999)
+    betas = (0.5, 0.9)
     D_optimizer = Adam(D.parameters(), lr=d_lr, betas=betas)
     G_optimizer = Adam(G.parameters(), lr=g_lr, betas=betas)
     DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas)
@@ -151,15 +157,14 @@ def run_rsgan(steps):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(Variable(labeled_examples))
-        dnn_loss = torch.abs(dnn_predicted_labels - Variable(labels)).pow(2).mean() / 10
+        dnn_loss = torch.abs(dnn_predicted_labels - Variable(labels)).pow(2).mean()
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(Variable(labeled_examples))
-        detached_labeled_feature_layer = D.feature_layer.detach()
-        labeled_loss = torch.abs(predicted_labels - Variable(labels)).pow(2).mean() / 10
+        labeled_loss = torch.abs(predicted_labels - Variable(labels)).pow(2).mean()
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
@@ -170,7 +175,6 @@ def run_rsgan(steps):
         unlabeled_examples, _ = next(iter(unlabeled_dataset_loader))
         _ = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
-        detached_unlabeled_feature_layer = unlabeled_feature_layer.detach()
         unlabeled_loss1 = (unlabeled_feature_layer.mean(0) - labeled_feature_layer.mean(0)).pow(2).mean()
         unlabeled_loss2 = (unlabeled_feature_layer.std(0) - labeled_feature_layer.std(0)).pow(2).mean()
         unlabeled_loss = unlabeled_loss1 + unlabeled_loss2
@@ -179,15 +183,19 @@ def run_rsgan(steps):
         unlabeled_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Unlabeled', D.gradient_sum.data[0])
         # Fake.
+        _ = D(Variable(labeled_examples))
+        labeled_feature_layer = D.feature_layer
+        _ = D(Variable(unlabeled_examples))
+        unlabeled_feature_layer = D.feature_layer
         z = torch.randn(settings.batch_size, noise_size)
         fake_examples = G(Variable(z))
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
-        # real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-        real_feature_layer = detached_labeled_feature_layer
-        fake_loss1 = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg() / 100
-        #fake_loss2 = ((real_feature_layer.std(0) - fake_feature_layer.std(0)).pow(2) + 1).log().mean().neg() / 100
-        fake_loss = fake_loss1 #+ fake_loss2
+        real_feature_layer = (labeled_feature_layer + unlabeled_feature_layer) / 2
+        #real_feature_layer = labeled_feature_layer
+        fake_loss1 = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg() / 10
+        fake_loss2 = ((real_feature_layer.std(0) - fake_feature_layer.std(0)).pow(2) + 1).log().mean().neg() / 10
+        fake_loss = fake_loss1 + fake_loss2
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -197,29 +205,33 @@ def run_rsgan(steps):
         alpha = alpha / alpha.sum(0)
         interpolates = (alpha[0] * Variable(labeled_examples, requires_grad=True) +
                         alpha[1] * Variable(unlabeled_examples, requires_grad=True) +
-                        alpha[2] * Variable(fake_examples.detach().data, requires_grad=True))
+                        alpha[1] * Variable(fake_examples.detach().data, requires_grad=True))
         interpolates_predictions = D(interpolates)
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=torch.ones(interpolates_predictions.size()),
                                         create_graph=True, only_inputs=True)[0]
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 0.1
-        # D.zero_gradient_sum()
-        # gradient_penalty.backward()
-        # gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
+        D.zero_gradient_sum()
+        gradient_penalty.backward()
+        gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # Generator.
         if step % 5 == 0:
             G_optimizer.zero_grad()
+            _ = D(Variable(labeled_examples))
+            labeled_feature_layer = D.feature_layer
+            _ = D(Variable(unlabeled_examples))
+            unlabeled_feature_layer = D.feature_layer
             z = torch.randn(settings.batch_size, noise_size)
             fake_examples = G(Variable(z))
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
-            real_feature_layer = (detached_labeled_feature_layer + detached_unlabeled_feature_layer) / 2
-            real_feature_layer = detached_labeled_feature_layer
+            real_feature_layer = (labeled_feature_layer.detach() + unlabeled_feature_layer.detach()) / 2
+            #real_feature_layer = detached_labeled_feature_layer
             generator_loss1 = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
-            #generator_loss2 = (real_feature_layer.std(0) - fake_feature_layer.std(0)).pow(2).mean()
-            generator_loss = generator_loss1 #+ generator_loss2
+            generator_loss2 = (real_feature_layer.std(0) - fake_feature_layer.std(0)).pow(2).mean()
+            generator_loss = generator_loss1 + generator_loss2
             gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()
@@ -320,7 +332,7 @@ def run_rsgan(steps):
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [100000]:
+for steps in [200000]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
