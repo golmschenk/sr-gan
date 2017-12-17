@@ -51,19 +51,20 @@ def generate_data_concept_images():
     plt.savefig('normal_with_observations.png', dpi=dpi)
 
 
-def generate_learning_process_images():
+def generate_learning_process_images(trial_directory):
     sns.set_style('darkgrid')
     stride = 1
     fps = 20
     bandwidth = 0.1
-    fake_examples = np.load(os.path.join(settings.temporary_directory, 'fake_examples.npy'), mmap_mode='r')[::stride]
-    unlabeled_predictions = np.load(os.path.join(settings.temporary_directory, 'unlabeled_predictions.npy'), mmap_mode='r')[::stride]
-    test_predictions = np.load(os.path.join(settings.temporary_directory, 'test_predictions.npy'), mmap_mode='r')[::stride]
-    dnn_test_predictions = np.load(os.path.join(settings.temporary_directory, 'dnn_test_predictions.npy'), mmap_mode='r')[::stride]
-    train_predictions = np.load(os.path.join(settings.temporary_directory, 'train_predictions.npy'), mmap_mode='r')[::stride]
-    dnn_train_predictions = np.load(os.path.join(settings.temporary_directory, 'dnn_train_predictions.npy'), mmap_mode='r')[::stride]
+    fake_examples = np.load(os.path.join(trial_directory, settings.temporary_directory, 'fake_examples.npy'), mmap_mode='r')[::stride]
+    unlabeled_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'unlabeled_predictions.npy'), mmap_mode='r')[::stride]
+    test_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'test_predictions.npy'), mmap_mode='r')[::stride]
+    dnn_test_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'dnn_test_predictions.npy'), mmap_mode='r')[::stride]
+    train_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'train_predictions.npy'), mmap_mode='r')[::stride]
+    dnn_train_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'dnn_train_predictions.npy'), mmap_mode='r')[::stride]
     fake_means = fake_examples.mean(axis=2)
     fake_stds = fake_examples.std(axis=2)
+    os.makedirs(os.path.join(trial_directory, 'presentation'), exist_ok=True)
 
     x_axis_limits = [-6, 6]
     x_axis = np.arange(*x_axis_limits, 0.001)
@@ -79,11 +80,11 @@ def generate_learning_process_images():
         axes = sns.kdeplot(dnn_train_predictions[step_index, :, 0], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth)
         axes.set_xlim(*x_axis_limits)
         axes.set_ylim(0, 0.5)
-        plt.savefig('presentation/{}.png'.format(step_index), dpi=dpi, ax=axes)
+        plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step_index)), dpi=dpi, ax=axes)
         plt.close(figure)
-    video_writer = imageio.get_writer('means.mp4', fps=fps)
+    video_writer = imageio.get_writer(os.path.join(trial_directory, 'means.mp4'), fps=fps)
     for image_index in range(fake_means.shape[0]):
-        image = imageio.imread('presentation/{}.png'.format(image_index))
+        image = imageio.imread(os.path.join(trial_directory, 'presentation/{}.png'.format(image_index)))
         video_writer.append_data(image)
     video_writer.close()
     print('\nMeans Video Complete.')
@@ -102,11 +103,11 @@ def generate_learning_process_images():
         axes = sns.kdeplot(dnn_train_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth)
         axes.set_xlim(*x_axis_limits)
         axes.set_ylim(0, 0.7)
-        plt.savefig('presentation/{}.png'.format(step_index), dpi=dpi, ax=axes)
+        plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step_index)), dpi=dpi, ax=axes)
         plt.close(figure)
-    video_writer = imageio.get_writer('stds.mp4', fps=fps)
+    video_writer = imageio.get_writer(os.path.join(trial_directory, 'stds.mp4'), fps=fps)
     for image_index in range(fake_means.shape[0]):
-        image = imageio.imread('presentation/{}.png'.format(image_index))
+        image = imageio.imread(os.path.join(trial_directory, 'presentation/{}.png'.format(image_index)))
         video_writer.append_data(image)
     video_writer.close()
     print('\nStds Video Complete.')
@@ -114,4 +115,5 @@ def generate_learning_process_images():
 
 if __name__ == '__main__':
     # generate_data_concept_images()
-    generate_learning_process_images()
+    # generate_learning_process_images()
+    pass
