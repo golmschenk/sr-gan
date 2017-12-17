@@ -5,11 +5,17 @@ import numpy as np
 from scipy.stats import rv_continuous, norm, gamma
 from torch.utils.data import Dataset
 
+import settings
+
 
 class ToyDataset(Dataset):
     def __init__(self, dataset_size, observation_count=10):
-        self.length = dataset_size
-        self.examples, self.labels = generate_double_mean_single_std_data(self.length, observation_count)
+        self.examples, self.labels = generate_double_mean_single_std_data(dataset_size, observation_count)
+        if self.labels.shape[0] < settings.batch_size:
+            repeats = settings.batch_size / self.labels.shape[0]
+            self.examples = np.repeat(self.examples, repeats, axis=0)
+            self.labels = np.repeat(self.labels, repeats, axis=0)
+        self.length = self.labels.shape[0]
 
     def __getitem__(self, index):
         return self.examples[index], self.labels[index]

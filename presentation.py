@@ -12,7 +12,7 @@ import settings
 from data import MixtureModel
 
 sns.set()
-dpi = 200
+dpi = 150
 
 
 def generate_data_concept_images():
@@ -101,7 +101,7 @@ def generate_learning_process_images():
         axes = sns.kdeplot(train_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth)
         axes = sns.kdeplot(dnn_train_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth)
         axes.set_xlim(*x_axis_limits)
-        axes.set_ylim(0, 0.5)
+        axes.set_ylim(0, 0.7)
         plt.savefig('presentation/{}.png'.format(step_index), dpi=dpi, ax=axes)
         plt.close(figure)
     video_writer = imageio.get_writer('stds.mp4', fps=fps)
