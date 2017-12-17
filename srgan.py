@@ -53,18 +53,12 @@ def run_rsgan(steps):
     class Generator(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(noise_size, 20)
-            self.linear2 = Linear(20, 20)
-            self.linear3 = Linear(20, 20)
-            self.linear4 = Linear(20, 20)
-            self.linear5 = Linear(20, 20)
-            self.linear6 = Linear(20, observation_count)
+            self.linear1 = Linear(noise_size, 50)
+            self.linear5 = Linear(50, 30)
+            self.linear6 = Linear(30, observation_count)
 
         def forward(self, x):
             x = leaky_relu(self.linear1(x))
-            x = leaky_relu(self.linear2(x))
-            x = leaky_relu(self.linear3(x))
-            x = leaky_relu(self.linear4(x))
             x = leaky_relu(self.linear5(x))
             x = self.linear6(x)
             return x
@@ -104,32 +98,40 @@ def run_rsgan(steps):
         def __init__(self):
             super().__init__()
             self.linear1_1 = Linear(noise_size, 20)
+            self.linear1_2 = Linear(20, 20)
             self.linear1_5 = Linear(20, observation_count)
 
             self.linear2_1 = Linear(noise_size, 20)
+            self.linear2_2 = Linear(20, 20)
             self.linear2_5 = Linear(20, observation_count)
 
             self.linear3_1 = Linear(noise_size, 20)
+            self.linear3_2 = Linear(20, 20)
             self.linear3_5 = Linear(20, observation_count)
 
             self.linear4_1 = Linear(noise_size, 20)
+            self.linear4_2 = Linear(20, 20)
             self.linear4_5 = Linear(20, observation_count)
 
         def forward(self, x):
             x1 = x[:25]
             x1 = leaky_relu(self.linear1_1(x1))
+            x1 = leaky_relu(self.linear1_2(x1))
             x1 = self.linear1_5(x1)
 
             x2 = x[25:50]
             x2 = leaky_relu(self.linear2_1(x2))
+            x2 = leaky_relu(self.linear2_2(x2))
             x2 = self.linear2_5(x2)
 
             x3 = x[50:75]
             x3 = leaky_relu(self.linear3_1(x3))
+            x3 = leaky_relu(self.linear3_2(x3))
             x3 = self.linear3_5(x3)
 
             x4 = x[75:100]
             x4 = leaky_relu(self.linear4_1(x4))
+            x4 = leaky_relu(self.linear4_2(x4))
             x4 = self.linear4_5(x4)
 
             return torch.cat([x1, x2, x3, x4], dim=0)
@@ -137,8 +139,7 @@ def run_rsgan(steps):
     class MLP(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(observation_count, 64)
-            self.linear2 = Linear(64, 32)
+            self.linear1 = Linear(observation_count, 32)
             self.linear3 = Linear(32, 8)
             self.linear4 = Linear(8, 2)
             self.feature_layer = None
@@ -147,7 +148,6 @@ def run_rsgan(steps):
 
         def forward(self, x):
             x = leaky_relu(self.linear1(x))
-            x = leaky_relu(self.linear2(x))
             x = leaky_relu(self.linear3(x))
             self.feature_layer = x
             x = self.linear4(x)
@@ -164,7 +164,7 @@ def run_rsgan(steps):
             self.gradient_sum = Variable(torch.zeros(1))
 
 
-    G = QuadGenerator()
+    G = Generator()
     D = MLP()
     DNN = MLP()
     d_lr = 1e-4
@@ -193,14 +193,14 @@ def run_rsgan(steps):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(Variable(labeled_examples))
-        dnn_loss = torch.abs(dnn_predicted_labels[:, 0] - Variable(labels[:, 0])).pow(2).mean() / 10
+        dnn_loss = torch.abs(dnn_predicted_labels[:, 0] - Variable(labels[:, 0])).pow(2).mean()
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(Variable(labeled_examples))
-        labeled_loss = torch.abs(predicted_labels[:, 0] - Variable(labels[:, 0])).pow(2).mean() / 10
+        labeled_loss = torch.abs(predicted_labels[:, 0] - Variable(labels[:, 0])).pow(2).mean()
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
@@ -229,7 +229,7 @@ def run_rsgan(steps):
         fake_feature_layer = D.feature_layer
         real_feature_layer = (labeled_feature_layer + unlabeled_feature_layer) / 2
         #real_feature_layer = labeled_feature_layer
-        fake_loss1 = ((real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2) + 1).log().mean().neg()
+        fake_loss1 = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean().add(1e-1).log().neg()
         fake_loss2 = ((real_feature_layer.std(0) - fake_feature_layer.std(0)).pow(2) + 1).log().mean().neg()
         fake_loss = fake_loss1 #+ fake_loss2
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
@@ -246,14 +246,14 @@ def run_rsgan(steps):
         # gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
         #                                 grad_outputs=torch.ones(interpolates_predictions.size()),
         #                                 create_graph=True, only_inputs=True)[0]
-        # gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 0.1
+        # gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 10
         # D.zero_gradient_sum()
         # gradient_penalty.backward()
         # gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # Generator.
-        if step % 5 == 0:
+        if step % 1 == 0:
             G_optimizer.zero_grad()
             _ = D(Variable(labeled_examples))
             labeled_feature_layer = D.feature_layer
@@ -289,6 +289,7 @@ def run_rsgan(steps):
             gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('Test Error/Mean', gan_test_label_errors.data[0])
             gan_summary_writer.add_scalar('Test Error/Std', gan_test_label_errors.data[1])
+            gan_summary_writer.add_scalar('Test Error/Ratio Mean GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
             if dnn_summary_writer.step % 100 == 0:
                 z = torch.randn(test_dataset_size, noise_size)
@@ -366,11 +367,12 @@ def run_rsgan(steps):
     gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
 
     generate_learning_process_images(trial_directory)
+    print('Completed {}'.format(trial_directory))
 
     return dnn_train_label_errors, dnn_test_label_errors, gan_train_label_errors, gan_test_label_errors
 
 
-for steps in [100000]:
+for steps in [settings.steps_to_run]:
     set_gan_train_losses = []
     set_gan_test_losses = []
     set_dnn_train_losses = []
