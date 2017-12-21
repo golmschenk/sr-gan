@@ -29,6 +29,11 @@ class SummaryWriter(SummaryWriter_):
         if self.step % self.summary_period == 0:
             super().add_scalar(tag, scalar_value, global_step)
 
+    def add_histogram(self, tag, values, global_step=None, bins='auto'):
+        if global_step is None:
+            global_step = self.step
+        if self.step % self.summary_period == 0:
+            super().add_histogram(tag, values, global_step, bins)
 
 def run_rsgan(steps):
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
@@ -98,9 +103,9 @@ def run_rsgan(steps):
     g_lr = d_lr
 
     betas = (0.9, 0.999)
-    D_optimizer = RMSprop(D.parameters(), lr=d_lr)
-    G_optimizer = RMSprop(G.parameters(), lr=g_lr)
-    DNN_optimizer = RMSprop(DNN.parameters(), lr=d_lr)
+    D_optimizer = Adam(D.parameters(), lr=d_lr, betas=betas)
+    G_optimizer = Adam(G.parameters(), lr=g_lr, betas=betas)
+    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas)
 
     all_fake_examples = None
     all_unlabeled_predictions = None
@@ -132,6 +137,7 @@ def run_rsgan(steps):
         D.zero_gradient_sum()
         labeled_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Labeled', D.gradient_sum.data[0])
+        gan_summary_writer.add_histogram('Labeled', D.feature_layer.mean(0).data)
         # Unlabeled.
         _ = D(Variable(labeled_examples))
         labeled_feature_layer = D.feature_layer
@@ -143,20 +149,19 @@ def run_rsgan(steps):
         D.zero_gradient_sum()
         unlabeled_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Unlabeled', D.gradient_sum.data[0])
+        gan_summary_writer.add_histogram('Unlabeled', unlabeled_feature_layer.mean(0).data)
         # Fake.
-        _ = D(Variable(labeled_examples))
-        labeled_feature_layer = D.feature_layer
         _ = D(Variable(unlabeled_examples))
         unlabeled_feature_layer = D.feature_layer
         z = torch.randn(settings.batch_size, noise_size)
         fake_examples = G(Variable(z))
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
-        real_feature_layer = (labeled_feature_layer + unlabeled_feature_layer) / 2
-        fake_loss = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).sum().pow(1/2).neg()
+        fake_loss = (unlabeled_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).sum().pow(1/2).neg()
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
+        gan_summary_writer.add_histogram('Fake', fake_feature_layer.mean(0).data)
         gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Gradient penalty.
         alpha = Variable(torch.rand(3, settings.batch_size, 1))
@@ -177,16 +182,13 @@ def run_rsgan(steps):
         # Generator.
         if step % 5 == 0:
             G_optimizer.zero_grad()
-            _ = D(Variable(labeled_examples))
-            labeled_feature_layer = D.feature_layer
             _ = D(Variable(unlabeled_examples))
-            unlabeled_feature_layer = D.feature_layer
+            unlabeled_feature_layer = D.feature_layer.detach()
             z = torch.randn(settings.batch_size, noise_size)
             fake_examples = G(Variable(z))
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
-            real_feature_layer = (labeled_feature_layer.detach() + unlabeled_feature_layer.detach()) / 2
-            generator_loss = (real_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
+            generator_loss = (unlabeled_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
             gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()
