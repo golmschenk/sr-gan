@@ -1,7 +1,7 @@
 import numpy as np
 
 observation_count = 10
-test_dataset_size = 1000
+test_dataset_size = 10000000
 test_means = np.random.normal(size=[test_dataset_size, 1])
 test_standard_deviations = np.random.gamma(shape=2, size=[test_dataset_size, 1])
 test_examples = np.random.normal(test_means, test_standard_deviations, size=[test_dataset_size, observation_count])
