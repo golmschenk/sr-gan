@@ -4,6 +4,7 @@ Regression semi-supervised GAN code.
 import datetime
 import os
 import numpy as np
+from scipy.stats import norm, gamma
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
@@ -13,7 +14,7 @@ from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
 import settings
-from data import ToyDataset, generate_double_mean_single_std_data
+from data import ToyDataset, MixtureModel
 from presentation import generate_learning_process_images
 
 
@@ -68,6 +69,20 @@ def run_rsgan(steps):
             x = self.linear6(x)
             return x
 
+    class FakeGenerator(Module):
+        def __init__(self):
+            super().__init__()
+            self.fake_parameters = Linear(1, 1)
+
+        def forward(self, x):
+            mean_model = MixtureModel([norm(0, 1)])
+            std_model = MixtureModel([gamma(2)])
+            means = mean_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
+            stds = std_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
+            fake_examples = np.random.normal(means, stds, size=[x.size()[0], observation_count]).astype(dtype=np.float32)
+            fake_examples = Variable(torch.from_numpy(fake_examples))
+            return fake_examples
+
     class MLP(Module):
         def __init__(self):
             super().__init__()
@@ -96,7 +111,7 @@ def run_rsgan(steps):
             self.gradient_sum = Variable(torch.zeros(1))
 
 
-    G = Generator()
+    G = FakeGenerator()
     D = MLP()
     DNN = MLP()
     d_lr = 1e-4
@@ -164,11 +179,10 @@ def run_rsgan(steps):
         gan_summary_writer.add_histogram('Fake', fake_feature_layer.mean(0).data)
         gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Gradient penalty.
-        alpha = Variable(torch.rand(3, settings.batch_size, 1))
+        alpha = Variable(torch.rand(2, settings.batch_size, 1))
         alpha = alpha / alpha.sum(0)
-        interpolates = (alpha[0] * Variable(labeled_examples, requires_grad=True) +
-                        alpha[1] * Variable(unlabeled_examples, requires_grad=True) +
-                        alpha[2] * Variable(fake_examples.detach().data, requires_grad=True))
+        interpolates = (alpha[0] * Variable(unlabeled_examples, requires_grad=True) +
+                        alpha[1] * Variable(fake_examples.detach().data, requires_grad=True))
         interpolates_predictions = D(interpolates)
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=torch.ones(interpolates_predictions.size()),
