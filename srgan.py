@@ -43,6 +43,10 @@ class SummaryWriter(SummaryWriter_):
             super().add_histogram(tag, values, global_step, bins)
 
 def run_rsgan(settings):
+    """
+    :param settings: The settings object.
+    :type settings: Settings
+    """
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
     trial_directory = os.path.join(settings.logs_directory, '{} {}'.format(settings.trial_name, datetime_string))
     os.makedirs(os.path.join(trial_directory, 'presentation'))
@@ -56,14 +60,13 @@ def run_rsgan(settings):
     observation_count = 10
     noise_size = 10
 
-    train_dataset = ToyDataset(dataset_size=100, observation_count=observation_count)
+    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
-    unlabeled_dataset = ToyDataset(dataset_size=50000, observation_count=observation_count)
+    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count)
     unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
 
-    test_dataset_size = 1000
-    test_dataset = ToyDataset(test_dataset_size, observation_count)
+    test_dataset = ToyDataset(settings.test_dataset_size, observation_count)
 
     class Generator(Module):
         def __init__(self):
@@ -130,13 +133,14 @@ def run_rsgan(settings):
     G = gpu(FakeGenerator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-5
+    d_lr = 1e-4
     g_lr = d_lr
 
     betas = (0.9, 0.999)
-    D_optimizer = Adam(D.parameters(), lr=d_lr, betas=betas, weight_decay=0.01)
+    weight_decay = 0
+    D_optimizer = Adam(D.parameters(), lr=d_lr, betas=betas, weight_decay=weight_decay)
     G_optimizer = Adam(G.parameters(), lr=g_lr, betas=betas)
-    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas, weight_decay=0.01)
+    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas, weight_decay=weight_decay)
 
     step_time_start = datetime.datetime.now()
 
@@ -186,18 +190,18 @@ def run_rsgan(settings):
         fake_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Gradient penalty.
-        # alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
-        # alpha = alpha / alpha.sum(0)
-        # interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
-        #                 alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
-        # interpolates_predictions = D(interpolates)
-        # gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
-        #                                 grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
-        #                                 create_graph=True, only_inputs=True)[0]
-        # gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
-        # D.zero_gradient_sum()
-        # gradient_penalty.backward()
-        # gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
+        alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
+        alpha = alpha / alpha.sum(0)
+        interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
+                        alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
+        interpolates_predictions = D(interpolates)
+        gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
+                                        grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
+                                        create_graph=True, only_inputs=True)[0]
+        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
+        D.zero_gradient_sum()
+        gradient_penalty.backward()
+        gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # D.apply(clipper)
@@ -235,10 +239,10 @@ def run_rsgan(settings):
             gan_summary_writer.add_scalar('Test Error/Ratio Mean GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
             if dnn_summary_writer.step % settings.presentation_step_period == 0:
-                z = torch.randn(test_dataset_size, noise_size)
+                z = torch.randn(settings.test_dataset_size, noise_size)
                 fake_examples = G(gpu(Variable(z)))
                 fake_examples_array = cpu(fake_examples.data).numpy()
-                unlabeled_examples_array = unlabeled_dataset.examples[:test_dataset_size]
+                unlabeled_examples_array = unlabeled_dataset.examples[:settings.test_dataset_size]
                 unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
                 unlabeled_predictions = D(gpu(Variable(unlabeled_examples)))
                 unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
