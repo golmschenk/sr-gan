@@ -5,7 +5,9 @@ import numpy as np
 from scipy.stats import rv_continuous, norm, gamma
 from torch.utils.data import Dataset
 
-import settings
+from settings import Settings
+
+settings = Settings()
 
 
 class ToyDataset(Dataset):
