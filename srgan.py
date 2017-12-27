@@ -19,6 +19,9 @@ from hardware import gpu, cpu
 from presentation import generate_learning_process_images, generate_video_from_frames, generate_display_frame
 
 global_trial_directory = None
+seed = 0
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 
 class SummaryWriter(SummaryWriter_):
