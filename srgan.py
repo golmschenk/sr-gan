@@ -198,7 +198,7 @@ def run_rsgan(settings):
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
                                         create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
+        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e3
         D.zero_gradient_sum()
         gradient_penalty.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])

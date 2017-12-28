@@ -77,8 +77,8 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     x_axis_limits = [-6, 6]
     x_axis = np.arange(*x_axis_limits, 0.001)
     figure, axes = plt.subplots(dpi=dpi)
-    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[0])
-    axes = sns.kdeplot(fake_means, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake')
+    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
+    axes = sns.kdeplot(fake_means, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
     axes = sns.kdeplot(unlabeled_predictions[:, 0], ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
     axes = sns.kdeplot(test_predictions[:, 0], ax=axes, color=sns.color_palette()[2], bw=bandwidth, label='GAN Test Predictions')
     axes = sns.kdeplot(train_predictions[:, 0], ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth, label='GAN Train Predictions')
@@ -90,67 +90,6 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step_index)), dpi=dpi, ax=axes)
     plt.close(figure)
 
-
-def generate_learning_process_images(trial_directory):
-    sns.set_style('darkgrid')
-    stride = 1
-    fps = 20
-    bandwidth = 0.1
-    fake_examples = np.load(os.path.join(trial_directory, settings.temporary_directory, 'fake_examples.npy'), mmap_mode='r')[::stride]
-    unlabeled_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'unlabeled_predictions.npy'), mmap_mode='r')[::stride]
-    test_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'test_predictions.npy'), mmap_mode='r')[::stride]
-    dnn_test_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'dnn_test_predictions.npy'), mmap_mode='r')[::stride]
-    train_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'train_predictions.npy'), mmap_mode='r')[::stride]
-    dnn_train_predictions = np.load(os.path.join(trial_directory, settings.temporary_directory, 'dnn_train_predictions.npy'), mmap_mode='r')[::stride]
-    fake_means = fake_examples.mean(axis=2)
-    fake_stds = fake_examples.std(axis=2)
-    os.makedirs(os.path.join(trial_directory, 'presentation'), exist_ok=True)
-
-    x_axis_limits = [-6, 6]
-    x_axis = np.arange(*x_axis_limits, 0.001)
-    for step_index in range(fake_examples.shape[0]):
-        print('\rGenerating image {} of {}...'.format(step_index, fake_examples.shape[0]), end='')
-        figure, axes = plt.subplots()
-        axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[0])
-        axes = sns.kdeplot(fake_means[step_index], ax=axes, color=sns.color_palette()[4], bw=bandwidth)
-        axes = sns.kdeplot(unlabeled_predictions[step_index, :, 0], ax=axes, color=sns.color_palette()[1], bw=bandwidth)
-        axes = sns.kdeplot(test_predictions[step_index, :, 0], ax=axes, color=sns.color_palette()[2], bw=bandwidth)
-        axes = sns.kdeplot(dnn_test_predictions[step_index, :, 0], ax=axes, color=sns.color_palette()[3], bw=bandwidth)
-        axes = sns.kdeplot(train_predictions[step_index, :, 0], ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth)
-        axes = sns.kdeplot(dnn_train_predictions[step_index, :, 0], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth)
-        axes.set_xlim(*x_axis_limits)
-        axes.set_ylim(0, 0.5)
-        plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step_index)), dpi=dpi, ax=axes)
-        plt.close(figure)
-    video_writer = imageio.get_writer(os.path.join(trial_directory, 'means.mp4'), fps=fps)
-    for image_index in range(fake_means.shape[0]):
-        image = imageio.imread(os.path.join(trial_directory, 'presentation/{}.png'.format(image_index)))
-        video_writer.append_data(image)
-    video_writer.close()
-    print('\nMeans Video Complete.')
-
-    # x_axis_limits = [0, 7]
-    # x_axis = np.arange(*x_axis_limits, 0.001)
-    # for step_index in range(fake_examples.shape[0]):
-    #     print('\rGenerating image {} of {}...'.format(step_index, fake_examples.shape[0]), end='')
-    #     figure, axes = plt.subplots()
-    #     axes.plot(x_axis, MixtureModel([gamma(2)]).pdf(x_axis), color=sns.color_palette()[0])
-    #     axes = sns.kdeplot(fake_stds[step_index], ax=axes, color=sns.color_palette()[4], bw=bandwidth)
-    #     axes = sns.kdeplot(unlabeled_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[1], bw=bandwidth)
-    #     axes = sns.kdeplot(test_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[2], bw=bandwidth)
-    #     axes = sns.kdeplot(dnn_test_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[3], bw=bandwidth)
-    #     axes = sns.kdeplot(train_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth)
-    #     axes = sns.kdeplot(dnn_train_predictions[step_index, :, 1], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth)
-    #     axes.set_xlim(*x_axis_limits)
-    #     axes.set_ylim(0, 0.7)
-    #     plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step_index)), dpi=dpi, ax=axes)
-    #     plt.close(figure)
-    # video_writer = imageio.get_writer(os.path.join(trial_directory, 'stds.mp4'), fps=fps)
-    # for image_index in range(fake_means.shape[0]):
-    #     image = imageio.imread(os.path.join(trial_directory, 'presentation/{}.png'.format(image_index)))
-    #     video_writer.append_data(image)
-    # video_writer.close()
-    # print('\nStds Video Complete.')
 
 def generate_video_from_frames(trial_directory):
     fps = 20
