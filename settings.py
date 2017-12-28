@@ -4,8 +4,8 @@ General settings.
 
 class Settings():
     def __init__(self):
-        self.trial_name = 'fake generator lr 1e-4'
-        self.steps_to_run = 200000000
+        self.trial_name = 'Size comparison generator'
+        self.steps_to_run = 10000
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'
         self.batch_size = 100

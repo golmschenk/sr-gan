@@ -267,7 +267,6 @@ def run_rsgan(settings):
     print('GAN Train: {}'.format(np.mean(gan_train_label_errors, axis=0)))
     print('GAN Test: {}'.format(np.mean(gan_test_label_errors, axis=0)))
 
-    generate_learning_process_images(trial_directory)
     print('Completed {}'.format(trial_directory))
 
 settings = Settings()
