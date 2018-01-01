@@ -8,7 +8,7 @@ from scipy.stats import norm, gamma
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam, RMSprop
+from torch.optim import Adam, RMSprop, lr_scheduler
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
@@ -16,7 +16,7 @@ import torch
 from settings import Settings
 from data import ToyDataset, MixtureModel
 from hardware import gpu, cpu
-from presentation import generate_learning_process_images, generate_video_from_frames, generate_display_frame
+from presentation import generate_video_from_frames, generate_display_frame
 
 global_trial_directory = None
 seed = 0
@@ -133,7 +133,7 @@ def run_rsgan(settings):
     G = gpu(FakeGenerator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-4
+    d_lr = 1e-5
     g_lr = d_lr
 
     betas = (0.9, 0.999)
@@ -142,7 +142,16 @@ def run_rsgan(settings):
     G_optimizer = Adam(G.parameters(), lr=g_lr, betas=betas)
     DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, betas=betas, weight_decay=weight_decay)
 
+    # learning_rate_multiplier_function = lambda epoch: 0.1 ** (epoch / 1000000)
+    # dnn_scheduler = lr_scheduler.LambdaLR(DNN_optimizer, lr_lambda=learning_rate_multiplier_function)
+    # dnn_scheduler.step(0)
+    # d_scheduler = lr_scheduler.LambdaLR(D_optimizer, lr_lambda=learning_rate_multiplier_function)
+    # d_scheduler.step(0)
+    # g_scheduler = lr_scheduler.LambdaLR(G_optimizer, lr_lambda=learning_rate_multiplier_function)
+    # g_scheduler.step(0)
+
     step_time_start = datetime.datetime.now()
+    print(trial_directory)
 
     for step in range(settings.steps_to_run):
         labeled_examples, labels = next(iter(train_dataset_loader))
@@ -150,7 +159,7 @@ def run_rsgan(settings):
         gan_summary_writer.step = step
         dnn_summary_writer.step = step
         if step % settings.summary_step_period == 0 and step != 0:
-            print('Step {}, {}...'.format(step, datetime.datetime.now() - step_time_start))
+            print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
@@ -198,7 +207,7 @@ def run_rsgan(settings):
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
                                         create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e3
+        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
         D.zero_gradient_sum()
         gradient_penalty.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
@@ -219,7 +228,7 @@ def run_rsgan(settings):
             generator_loss.backward()
             G_optimizer.step()
 
-        if dnn_summary_writer.step % dnn_summary_writer.summary_period == 0:
+        if dnn_summary_writer.step % dnn_summary_writer.summary_period == 0 or dnn_summary_writer.step % settings.presentation_step_period == 0:
             dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('Train Error/Mean', dnn_train_label_errors.data[0])
@@ -250,7 +259,11 @@ def run_rsgan(settings):
                 train_predictions_array = predicted_train_labels
                 dnn_test_predictions_array = dnn_predicted_test_labels
                 dnn_train_predictions_array = dnn_predicted_train_labels
-                generate_display_frame(trial_directory, fake_examples_array, unlabeled_predictions_array, test_predictions_array, dnn_test_predictions_array, train_predictions_array, dnn_train_predictions_array)
+                generate_display_frame(trial_directory, fake_examples_array, unlabeled_predictions_array, test_predictions_array, dnn_test_predictions_array, train_predictions_array, dnn_train_predictions_array, step)
+
+        # dnn_scheduler.step(step)
+        # d_scheduler.step(step)
+        # g_scheduler.step(step)
 
     predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
     dnn_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
@@ -267,6 +280,7 @@ def run_rsgan(settings):
     print('GAN Train: {}'.format(np.mean(gan_train_label_errors, axis=0)))
     print('GAN Test: {}'.format(np.mean(gan_test_label_errors, axis=0)))
 
+    generate_video_from_frames(global_trial_directory)
     print('Completed {}'.format(trial_directory))
 
 settings = Settings()
@@ -276,5 +290,3 @@ except KeyboardInterrupt:
     print('Generating video before quitting...')
     generate_video_from_frames(global_trial_directory)
     exit()
-generate_video_from_frames(global_trial_directory)
-

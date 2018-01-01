@@ -69,7 +69,7 @@ def generate_data_concept_images():
     plt.close(figure)
 
 
-def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions, test_predictions, dnn_test_predictions, train_predictions, dnn_train_predictions):
+def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions, test_predictions, dnn_test_predictions, train_predictions, dnn_train_predictions, step):
     step_index = len([file for file in os.listdir(os.path.join(trial_directory, 'presentation')) if file.endswith('.png')])
     sns.set_style('darkgrid')
     bandwidth = 0.1
@@ -77,6 +77,7 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     x_axis_limits = [-6, 6]
     x_axis = np.arange(*x_axis_limits, 0.001)
     figure, axes = plt.subplots(dpi=dpi)
+    axes.text(0.98, 0.98, 'Step: {}'.format(step), horizontalalignment='right', verticalalignment='top', family='monospace', fontsize=10, transform=axes.transAxes)
     axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
     axes = sns.kdeplot(fake_means, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
     axes = sns.kdeplot(unlabeled_predictions[:, 0], ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
