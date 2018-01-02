@@ -91,6 +91,7 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     axes.legend(loc='upper left')
     plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step)), dpi=dpi, ax=axes)
     plt.close(figure)
+    return imageio.imread(os.path.join(trial_directory, 'presentation/{}.png'.format(step)))
 
 
 def natural_sort_key(string, natural_sort_regex=re.compile('([0-9]+)')):

@@ -42,6 +42,12 @@ class SummaryWriter(SummaryWriter_):
         if self.step % self.summary_period == 0:
             super().add_histogram(tag, values, global_step, bins)
 
+    def add_image(self, tag, img_tensor, global_step=None):
+        if global_step is None:
+            global_step = self.step
+        if self.step % self.summary_period == 0:
+            super().add_image(tag, img_tensor, global_step)
+
 def run_rsgan(settings):
     """
     :param settings: The settings object.
@@ -130,10 +136,10 @@ def run_rsgan(settings):
 
     clipper = WeightClipper()
 
-    G = gpu(FakeGenerator())
+    G = gpu(Generator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-5
+    d_lr = 1e-4
     g_lr = d_lr
 
     betas = (0.9, 0.999)
@@ -163,14 +169,14 @@ def run_rsgan(settings):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
-        dnn_loss = torch.abs(dnn_predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).pow(2).mean()
+        dnn_loss = (dnn_predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().mean()
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(gpu(Variable(labeled_examples)))
-        labeled_loss = torch.abs(predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).pow(2).mean()
+        labeled_loss = (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().mean()
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
@@ -181,7 +187,7 @@ def run_rsgan(settings):
         unlabeled_examples, _ = next(iter(unlabeled_dataset_loader))
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        unlabeled_loss = (unlabeled_feature_layer.mean(0) - labeled_feature_layer.mean(0)).pow(2).mean()
+        unlabeled_loss = (unlabeled_feature_layer.mean(0) - labeled_feature_layer.mean(0)).pow(2).sum().pow(1/2)
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -223,7 +229,7 @@ def run_rsgan(settings):
             fake_examples = G(gpu(Variable(z)))
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
-            generator_loss = (unlabeled_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).mean()
+            generator_loss = (unlabeled_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).sum().pow(1/2)
             gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()
@@ -237,6 +243,7 @@ def run_rsgan(settings):
             dnn_test_label_errors = np.mean(np.abs(dnn_predicted_test_labels - test_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('Test Error/Mean', dnn_test_label_errors.data[0])
             dnn_summary_writer.add_scalar('Test Error/Std', dnn_test_label_errors.data[1])
+
             predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
             gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('Train Error/Mean', gan_train_label_errors.data[0])
@@ -259,7 +266,8 @@ def run_rsgan(settings):
                 train_predictions_array = predicted_train_labels
                 dnn_test_predictions_array = dnn_predicted_test_labels
                 dnn_train_predictions_array = dnn_predicted_train_labels
-                generate_display_frame(trial_directory, fake_examples_array, unlabeled_predictions_array, test_predictions_array, dnn_test_predictions_array, train_predictions_array, dnn_train_predictions_array, step)
+                distribution_image = generate_display_frame(trial_directory, fake_examples_array, unlabeled_predictions_array, test_predictions_array, dnn_test_predictions_array, train_predictions_array, dnn_train_predictions_array, step)
+                gan_summary_writer.add_image('Distributions', distribution_image)
 
         # dnn_scheduler.step(step)
         # d_scheduler.step(step)
