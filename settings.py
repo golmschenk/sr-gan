@@ -4,7 +4,7 @@ General settings.
 
 class Settings():
     def __init__(self):
-        self.trial_name = 'gp 1e1'
+        self.trial_name = 'sqr ll fl 2 final only weights l2 lr 1e-4'
         self.steps_to_run = 10000000
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'

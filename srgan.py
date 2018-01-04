@@ -4,11 +4,11 @@ Regression semi-supervised GAN code.
 import datetime
 import os
 import numpy as np
-from scipy.stats import norm, gamma
+from scipy.stats import norm, gamma, wasserstein_distance
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam, RMSprop, lr_scheduler
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
@@ -47,6 +47,20 @@ class SummaryWriter(SummaryWriter_):
             global_step = self.step
         if self.step % self.summary_period == 0:
             super().add_image(tag, img_tensor, global_step)
+
+
+def mean_distance(predicted_labels, labels):
+    return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).pow(2).mean()
+
+
+def feature_distance(base_features, other_features, normalize=False):
+    base_mean_features = base_features.mean(0)
+    other_mean_features = other_features.mean(0)
+    if normalize:
+        base_mean_features = base_mean_features.div(base_mean_features.norm() + 1e-10)
+        other_mean_features = other_mean_features.div(other_mean_features.norm() + 1e-10)
+    return (base_mean_features - other_mean_features).pow(2).sum().pow(1 / 2)
+
 
 def run_rsgan(settings):
     """
@@ -128,18 +142,10 @@ def run_rsgan(settings):
         def zero_gradient_sum(self):
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
-    class WeightClipper(object):
-        def __call__(self, module):
-            if hasattr(module, 'weight'):
-                w = module.weight.data
-                w.clamp_(min=-1, max=1)
-
-    clipper = WeightClipper()
-
     G = gpu(Generator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-4
+    d_lr = 1e-5
     g_lr = d_lr
 
     betas = (0.9, 0.999)
@@ -169,25 +175,29 @@ def run_rsgan(settings):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
-        dnn_loss = (dnn_predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().mean()
+        dnn_loss = mean_distance(dnn_predicted_labels, labels)
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(gpu(Variable(labeled_examples)))
-        labeled_loss = (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().mean()
+        labeled_loss = mean_distance(predicted_labels, labels)
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Labeled', D.gradient_sum.data[0])
+
+        l2_layer_loss = list(D.linear4.parameters())[0].pow(2).sum()
+        l2_layer_loss.backward()
+
         # Unlabeled.
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
         unlabeled_examples, _ = next(iter(unlabeled_dataset_loader))
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        unlabeled_loss = (unlabeled_feature_layer.mean(0) - labeled_feature_layer.mean(0)).pow(2).sum().pow(1/2)
+        unlabeled_loss = feature_distance(unlabeled_feature_layer, labeled_feature_layer)
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -199,7 +209,7 @@ def run_rsgan(settings):
         fake_examples = G(gpu(Variable(z)))
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
-        fake_loss = (unlabeled_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).sum().pow(1/2).neg()
+        fake_loss = feature_distance(unlabeled_feature_layer, fake_feature_layer).neg() * 2
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -219,7 +229,6 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
-        # D.apply(clipper)
         # Generator.
         if step % 5 == 0:
             G_optimizer.zero_grad()
@@ -229,7 +238,7 @@ def run_rsgan(settings):
             fake_examples = G(gpu(Variable(z)))
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
-            generator_loss = (unlabeled_feature_layer.mean(0) - fake_feature_layer.mean(0)).pow(2).sum().pow(1/2)
+            generator_loss = feature_distance(unlabeled_feature_layer, fake_feature_layer)
             gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()
@@ -254,13 +263,26 @@ def run_rsgan(settings):
             gan_summary_writer.add_scalar('Test Error/Std', gan_test_label_errors.data[1])
             gan_summary_writer.add_scalar('Test Error/Ratio Mean GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
+            z = torch.randn(settings.test_dataset_size, noise_size)
+            fake_examples = G(gpu(Variable(z)))
+            fake_examples_array = cpu(fake_examples.data).numpy()
+            fake_labels_array = np.mean(fake_examples_array, axis=1)
+            unlabeled_labels_array = unlabeled_dataset.labels[:settings.test_dataset_size][:, 0]
+            label_wasserstein_distance = wasserstein_distance(fake_labels_array, unlabeled_labels_array)
+            gan_summary_writer.add_scalar('Generator/Label Wasserstein', label_wasserstein_distance)
+
+            unlabeled_examples_array = unlabeled_dataset.examples[:settings.test_dataset_size]
+            unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
+            unlabeled_predictions = D(gpu(Variable(unlabeled_examples)))
+            unlabeled_feature_layer = D.feature_layer
+            _ = D(fake_examples)
+            fake_feature_layer = D.feature_layer
+            feature_wasserstein_distance = 0
+            for feature_index in range(fake_feature_layer.shape[1]):
+                feature_wasserstein_distance += wasserstein_distance(cpu(fake_feature_layer).data.numpy()[:, feature_index], cpu(unlabeled_feature_layer).data.numpy()[:, feature_index])
+            gan_summary_writer.add_scalar('Generator/Feature Wasserstein', feature_wasserstein_distance)
+
             if dnn_summary_writer.step % settings.presentation_step_period == 0:
-                z = torch.randn(settings.test_dataset_size, noise_size)
-                fake_examples = G(gpu(Variable(z)))
-                fake_examples_array = cpu(fake_examples.data).numpy()
-                unlabeled_examples_array = unlabeled_dataset.examples[:settings.test_dataset_size]
-                unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
-                unlabeled_predictions = D(gpu(Variable(unlabeled_examples)))
                 unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
                 test_predictions_array = predicted_test_labels
                 train_predictions_array = predicted_train_labels
@@ -290,6 +312,7 @@ def run_rsgan(settings):
 
     generate_video_from_frames(global_trial_directory)
     print('Completed {}'.format(trial_directory))
+
 
 settings = Settings()
 try:

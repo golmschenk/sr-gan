@@ -87,7 +87,7 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     axes = sns.kdeplot(dnn_test_predictions[:, 0], ax=axes, color=sns.color_palette()[3], bw=bandwidth, label='DNN Test Predictions')
     axes = sns.kdeplot(dnn_train_predictions[:, 0], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth, label='DNN Train Predictions')
     axes.set_xlim(*x_axis_limits)
-    axes.set_ylim(0, 0.5)
+    axes.set_ylim(0, 0.4)
     axes.legend(loc='upper left')
     plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step)), dpi=dpi, ax=axes)
     plt.close(figure)
