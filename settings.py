@@ -4,7 +4,7 @@ General settings.
 
 class Settings():
     def __init__(self):
-        self.trial_name = 'base rmsp f abs ful 1e-3'
+        self.trial_name = 'cg fl 1e3'
         self.steps_to_run = 10000000
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'

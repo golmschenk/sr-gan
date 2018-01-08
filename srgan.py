@@ -58,15 +58,13 @@ class SummaryWriter(SummaryWriter_):
 
 
 def mean_distance(predicted_labels, labels, order=2):
-    root = 1 / 2 if order == 1 else 1
-    return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(order).sum().pow(root)
+    return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(2).sum().pow(1/2).pow(order)
 
 
 def feature_distance(base_features, other_features, order=2):
     base_mean_features = base_features.mean(0)
     other_mean_features = other_features.mean(0)
-    root = 1 / 2 if order == 1 else 1
-    return (base_mean_features - other_mean_features).abs().pow(2).sum().pow(root)
+    return (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1/2).pow(order)
 
 
 def feature_angle(base_features, other_features, target=0):
@@ -127,6 +125,20 @@ def run_rsgan(settings):
             fake_examples = gpu(Variable(torch.from_numpy(fake_examples)))
             return fake_examples
 
+    class FakeComplementaryGenerator(Module):
+        def __init__(self):
+            super().__init__()
+            self.fake_parameters = Linear(1, 1)
+
+        def forward(self, x):
+            mean_model = MixtureModel([norm(-6, 0.5), norm(0, 0.5), norm(6, 0.5)])
+            std_model = MixtureModel([gamma(2)])
+            means = mean_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
+            stds = std_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
+            fake_examples = np.random.normal(means, stds, size=[x.size()[0], observation_count]).astype(dtype=np.float32)
+            fake_examples = gpu(Variable(torch.from_numpy(fake_examples)))
+            return fake_examples
+
     class MLP(Module):
         def __init__(self):
             super().__init__()
@@ -155,7 +167,7 @@ def run_rsgan(settings):
         def zero_gradient_sum(self):
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
-    G = gpu(Generator())
+    G = gpu(FakeComplementaryGenerator())
     D = gpu(MLP())
     DNN = gpu(MLP())
     d_lr = 1e-4
@@ -203,10 +215,12 @@ def run_rsgan(settings):
         # Unlabeled.
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
+        gan_summary_writer.add_histogram('Features/Labeled', cpu(labeled_feature_layer).data.numpy())
         unlabeled_examples, _ = next(iter(unlabeled_dataset_loader))
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        unlabeled_loss = feature_distance(unlabeled_feature_layer, labeled_feature_layer) * 1e-3
+        gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
+        unlabeled_loss = feature_distance(unlabeled_feature_layer, labeled_feature_layer)
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -218,28 +232,29 @@ def run_rsgan(settings):
         fake_examples = G(gpu(Variable(z)))
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
-        fake_loss = feature_distance(unlabeled_feature_layer, fake_feature_layer, order=1) * 1e-3
+        gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
+        fake_loss = feature_distance(unlabeled_feature_layer, fake_feature_layer, order=1).neg() * 1e3
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Gradient penalty.
-        alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
-        alpha = alpha / alpha.sum(0)
-        interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
-                        alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
-        interpolates_predictions = D(interpolates)
-        gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
-                                        grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
-                                        create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
-        D.zero_gradient_sum()
-        gradient_penalty.backward()
-        gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
+        # alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
+        # alpha = alpha / alpha.sum(0)
+        # interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
+        #                 alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
+        # interpolates_predictions = D(interpolates)
+        # gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
+        #                                 grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
+        #                                 create_graph=True, only_inputs=True)[0]
+        # gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
+        # D.zero_gradient_sum()
+        # gradient_penalty.backward()
+        # gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # Generator.
-        if step % 5 == 0:
+        if step % 1 == 0:
             G_optimizer.zero_grad()
             _ = D(gpu(Variable(unlabeled_examples)))
             unlabeled_feature_layer = D.feature_layer.detach()
