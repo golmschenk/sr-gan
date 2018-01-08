@@ -4,13 +4,13 @@ General settings.
 
 class Settings():
     def __init__(self):
-        self.trial_name = 'sqr ll fl 2 final only weights l2 lr 1e-4'
+        self.trial_name = 'base rmsp f abs ful 1e-3'
         self.steps_to_run = 10000000
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'
         self.batch_size = 100
         self.presentation_step_period = 1000
         self.summary_step_period = 1000
-        self.labeled_dataset_size = 100
+        self.labeled_dataset_size = 10
         self.unlabeled_dataset_size = 50000
         self.test_dataset_size = 1000
