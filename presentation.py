@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from scipy.stats import norm, gamma
+from scipy.stats import norm, gamma, uniform
 import seaborn as sns
 
 from settings import Settings
@@ -75,11 +75,11 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     sns.set_style('darkgrid')
     bandwidth = 0.1
     fake_means = fake_examples.mean(axis=1)
-    x_axis_limits = [-6, 6]
+    x_axis_limits = [-4, 4]
     x_axis = np.arange(*x_axis_limits, 0.001)
     figure, axes = plt.subplots(dpi=dpi)
     axes.text(0.98, 0.98, 'Step: {}'.format(step), horizontalalignment='right', verticalalignment='top', family='monospace', fontsize=10, transform=axes.transAxes)
-    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
+    axes.plot(x_axis, MixtureModel([uniform(-2, 1), uniform(1, 1)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
     axes = sns.kdeplot(fake_means, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
     axes = sns.kdeplot(unlabeled_predictions[:, 0], ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
     axes = sns.kdeplot(test_predictions[:, 0], ax=axes, color=sns.color_palette()[2], bw=bandwidth, label='GAN Test Predictions')
@@ -87,7 +87,7 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     axes = sns.kdeplot(dnn_test_predictions[:, 0], ax=axes, color=sns.color_palette()[3], bw=bandwidth, label='DNN Test Predictions')
     axes = sns.kdeplot(dnn_train_predictions[:, 0], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth, label='DNN Train Predictions')
     axes.set_xlim(*x_axis_limits)
-    axes.set_ylim(0, 0.4)
+    axes.set_ylim(0, 1)
     axes.legend(loc='upper left')
     plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step)), dpi=dpi, ax=axes)
     plt.close(figure)

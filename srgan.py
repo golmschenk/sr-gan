@@ -4,11 +4,12 @@ Regression semi-supervised GAN code.
 import datetime
 import os
 import numpy as np
-from scipy.stats import norm, gamma, wasserstein_distance
+import math
+from scipy.stats import norm, gamma, wasserstein_distance, uniform
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam, RMSprop
+from torch.optim import Adam, RMSprop, SGD
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
@@ -57,19 +58,42 @@ class SummaryWriter(SummaryWriter_):
             super().add_image(tag, img_tensor, global_step)
 
 
-def mean_distance(predicted_labels, labels, order=2):
+def mean_distance_loss(predicted_labels, labels, order=2):
     return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(2).sum().pow(1/2).pow(order)
 
 
-def feature_distance(base_features, other_features, order=2):
+def feature_distance_loss(base_features, other_features, order=2):
     base_mean_features = base_features.mean(0)
     other_mean_features = other_features.mean(0)
     return (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1/2).pow(order)
 
 
-def feature_angle(base_features, other_features, target=0):
-    angle = angle_between(base_features, other_features)
+def feature_angle_loss(base_features, other_features, target=0, summary_writer=None):
+    angle = angle_between(base_features.mean(0), other_features.mean(0))
+    if summary_writer:
+        summary_writer.add_scalar('Feature Vector/Angle', angle.data[0])
     return (angle - target).abs().pow(2)
+
+def feature_corrcoef(x):
+    transposed_x = x.transpose(0, 1)
+    return corrcoef(transposed_x)
+
+def corrcoef(x):
+    mean_x = x.mean(1, keepdim=True)
+    xm = x.sub(mean_x)
+    c = xm.mm(xm.t())
+    c = c / (x.size(1) - 1)
+    d = torch.diag(c)
+    stddev = torch.pow(d, 0.5)
+    c = c.div(stddev.expand_as(c))
+    c = c.div(stddev.expand_as(c).t())
+    c = torch.clamp(c, -1.0, 1.0)
+    return c
+
+def feature_covariance_loss(base_features, other_features):
+    base_corrcoef = feature_corrcoef(base_features)
+    other_corrcoef = feature_corrcoef(other_features)
+    return (base_corrcoef - other_corrcoef).abs().sum()
 
 
 def run_rsgan(settings):
@@ -131,11 +155,11 @@ def run_rsgan(settings):
             self.fake_parameters = Linear(1, 1)
 
         def forward(self, x):
-            mean_model = MixtureModel([norm(-6, 0.5), norm(0, 0.5), norm(6, 0.5)])
-            std_model = MixtureModel([gamma(2)])
+            mean_model = MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
+            std_model = MixtureModel([uniform(loc=1, scale=1)])
             means = mean_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
             stds = std_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
-            fake_examples = np.random.normal(means, stds, size=[x.size()[0], observation_count]).astype(dtype=np.float32)
+            fake_examples = np.random.uniform(means - (stds / 2), means + (stds / 2), size=[x.size()[0], observation_count]).astype(dtype=np.float32)
             fake_examples = gpu(Variable(torch.from_numpy(fake_examples)))
             return fake_examples
 
@@ -170,14 +194,14 @@ def run_rsgan(settings):
     G = gpu(FakeComplementaryGenerator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-4
+    d_lr = 1e-8
     g_lr = d_lr
 
     betas = (0.9, 0.999)
     weight_decay = 0.001
-    D_optimizer = RMSprop(D.parameters(), lr=d_lr, weight_decay=weight_decay)
-    G_optimizer = RMSprop(G.parameters(), lr=g_lr)
-    DNN_optimizer = RMSprop(DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+    D_optimizer = SGD(D.parameters(), lr=d_lr, weight_decay=weight_decay, momentum=0.99)
+    G_optimizer = SGD(G.parameters(), lr=g_lr, momentum=0.99)
+    DNN_optimizer = SGD(DNN.parameters(), lr=d_lr, weight_decay=weight_decay, momentum=0.99)
 
     # learning_rate_multiplier_function = lambda epoch: 0.1 ** (epoch / 1000000)
     # dnn_scheduler = lr_scheduler.LambdaLR(DNN_optimizer, lr_lambda=learning_rate_multiplier_function)
@@ -200,14 +224,14 @@ def run_rsgan(settings):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
-        dnn_loss = mean_distance(dnn_predicted_labels, labels)
+        dnn_loss = mean_distance_loss(dnn_predicted_labels, labels)
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(gpu(Variable(labeled_examples)))
-        labeled_loss = mean_distance(predicted_labels, labels)
+        labeled_loss = mean_distance_loss(predicted_labels, labels)
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
@@ -220,7 +244,7 @@ def run_rsgan(settings):
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
-        unlabeled_loss = feature_distance(unlabeled_feature_layer, labeled_feature_layer)
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer)
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -233,7 +257,8 @@ def run_rsgan(settings):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        fake_loss = feature_distance(unlabeled_feature_layer, fake_feature_layer, order=1).neg() * 1e3
+        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer) * 1e1
+        #fake_loss = feature_covariance_loss(unlabeled_feature_layer, fake_feature_layer).neg()
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -262,7 +287,7 @@ def run_rsgan(settings):
             fake_examples = G(gpu(Variable(z)))
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
-            generator_loss = feature_distance(unlabeled_feature_layer, fake_feature_layer)
+            generator_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer)
             gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()

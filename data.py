@@ -2,7 +2,7 @@
 Code for the data generating models.
 """
 import numpy as np
-from scipy.stats import rv_continuous, norm, gamma
+from scipy.stats import rv_continuous, norm, gamma, uniform
 from torch.utils.data import Dataset
 
 from settings import Settings
@@ -43,13 +43,24 @@ def generate_double_peak_data(number_of_examples, number_of_observations):
     labels = np.concatenate((means, stds), axis=1)
     return examples, labels
 
-def generate_double_mean_single_std_data(number_of_examples, number_of_observations):
+
+def generate_double_mean_single_std_data_normals(number_of_examples, number_of_observations):
     mean_model = MixtureModel([norm(-3, 1), norm(3, 1)])
     std_model = MixtureModel([gamma(2)])
     means = mean_model.rvs(size=[number_of_examples, 1]).astype(dtype=np.float32)
     stds = std_model.rvs(size=[number_of_examples, 1]).astype(dtype=np.float32)
     examples = np.random.normal(means, stds, size=[number_of_examples, number_of_observations]).astype(dtype=np.float32)
     labels = np.concatenate((means, stds), axis=1)
+    return examples, labels
+
+
+def generate_double_mean_single_std_data(number_of_examples, number_of_observations):
+    mean_model = MixtureModel([uniform(-2, 1), uniform(1, 1)])
+    std_model = MixtureModel([uniform(loc=1, scale=1)])
+    middles = mean_model.rvs(size=[number_of_examples, 1]).astype(dtype=np.float32)
+    widths = std_model.rvs(size=[number_of_examples, 1]).astype(dtype=np.float32)
+    examples = np.random.uniform(middles - (widths / 2), middles + (widths / 2), size=[number_of_examples, number_of_observations]).astype(dtype=np.float32)
+    labels = np.concatenate((middles, widths), axis=1)
     return examples, labels
 
 
