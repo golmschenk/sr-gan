@@ -24,8 +24,10 @@ seed = 0
 torch.manual_seed(seed)
 np.random.seed(seed)
 
+
 def unit_vector(vector):
     return vector.div(vector.norm() + 1e-10)
+
 
 def angle_between(vector0, vector1):
     unit_vector0 = unit_vector(vector0)
@@ -74,9 +76,11 @@ def feature_angle_loss(base_features, other_features, target=0, summary_writer=N
         summary_writer.add_scalar('Feature Vector/Angle', angle.data[0])
     return (angle - target).abs().pow(2)
 
+
 def feature_corrcoef(x):
     transposed_x = x.transpose(0, 1)
     return corrcoef(transposed_x)
+
 
 def corrcoef(x):
     mean_x = x.mean(1, keepdim=True)
@@ -89,6 +93,7 @@ def corrcoef(x):
     c = c.div(stddev.expand_as(c).t())
     c = torch.clamp(c, -1.0, 1.0)
     return c
+
 
 def feature_covariance_loss(base_features, other_features):
     base_corrcoef = feature_corrcoef(base_features)
@@ -174,7 +179,7 @@ def run_rsgan(settings):
             self.register_gradient_sum_hooks()
 
         def forward(self, x):
-            x, _ = x.sort(1)
+            #x, _ = x.sort(1)
             x = leaky_relu(self.linear1(x))
             x = leaky_relu(self.linear3(x))
             self.feature_layer = x
@@ -194,14 +199,14 @@ def run_rsgan(settings):
     G = gpu(FakeComplementaryGenerator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-8
+    d_lr = 1e-5
     g_lr = d_lr
 
     betas = (0.9, 0.999)
-    weight_decay = 0.001
-    D_optimizer = SGD(D.parameters(), lr=d_lr, weight_decay=weight_decay, momentum=0.99)
-    G_optimizer = SGD(G.parameters(), lr=g_lr, momentum=0.99)
-    DNN_optimizer = SGD(DNN.parameters(), lr=d_lr, weight_decay=weight_decay, momentum=0.99)
+    weight_decay = 1e-2
+    D_optimizer = Adam(D.parameters(), lr=d_lr, weight_decay=weight_decay)
+    G_optimizer = Adam(G.parameters(), lr=g_lr)
+    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
 
     # learning_rate_multiplier_function = lambda epoch: 0.1 ** (epoch / 1000000)
     # dnn_scheduler = lr_scheduler.LambdaLR(DNN_optimizer, lr_lambda=learning_rate_multiplier_function)
@@ -257,8 +262,7 @@ def run_rsgan(settings):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer) * 1e1
-        #fake_loss = feature_covariance_loss(unlabeled_feature_layer, fake_feature_layer).neg()
+        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer)
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
