@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
 from settings import Settings
-from data import ToyDataset, MixtureModel
+from data import ToyDataset, MixtureModel, generate_examples_from_coefficients, irrelevant_data_multiplier
 from hardware import gpu, cpu
 from presentation import generate_video_from_frames, generate_display_frame
 
@@ -64,10 +64,15 @@ def mean_distance_loss(predicted_labels, labels, order=2):
     return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(2).sum().pow(1/2).pow(order)
 
 
-def feature_distance_loss(base_features, other_features, order=2):
+def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):
     base_mean_features = base_features.mean(0)
     other_mean_features = other_features.mean(0)
-    return (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1/2).pow(order)
+    if base_noise:
+        base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
+    mean_feature_distance = (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1 / 2)
+    if scale:
+        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm())
+    return mean_feature_distance.pow(order)
 
 
 def feature_angle_loss(base_features, other_features, target=0, summary_writer=None):
@@ -116,7 +121,7 @@ def run_rsgan(settings):
     gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
     dnn_summary_writer.summary_period = settings.summary_step_period
     gan_summary_writer.summary_period = settings.summary_step_period
-    observation_count = 3
+    observation_count = 10
     noise_size = 10
 
     train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count)
@@ -130,9 +135,9 @@ def run_rsgan(settings):
     class Generator(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(noise_size, 50)
-            self.linear5 = Linear(50, 30)
-            self.linear6 = Linear(30, observation_count)
+            self.linear1 = Linear(noise_size, 20)
+            self.linear5 = Linear(20, 30)
+            self.linear6 = Linear(30, observation_count * irrelevant_data_multiplier)
 
         def forward(self, x):
             x = leaky_relu(self.linear1(x))
@@ -160,28 +165,35 @@ def run_rsgan(settings):
             self.fake_parameters = Linear(1, 1)
 
         def forward(self, x):
-            mean_model = MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
-            std_model = MixtureModel([uniform(loc=1, scale=1)])
-            means = mean_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
-            stds = std_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
-            fake_examples = np.random.uniform(means - (stds / 2), means + (stds / 2), size=[x.size()[0], observation_count]).astype(dtype=np.float32)
-            fake_examples = gpu(Variable(torch.from_numpy(fake_examples)))
-            return fake_examples
+            b_distribution = MixtureModel([uniform(loc=-3, scale=6)]) # MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
+            c_distribution = MixtureModel([uniform(loc=-2, scale=4)]) # MixtureModel([uniform(loc=-2, scale=1), uniform(loc=1, scale=1)])
+            number_of_examples = x.size()[0]
+            b = b_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+            c = c_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+            generated_examples = generate_examples_from_coefficients(b, c, observation_count)
+            generated_examples += np.random.normal(0, 0.1, generated_examples.shape)
+            return gpu(Variable(torch.from_numpy(generated_examples)))
 
     class MLP(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(observation_count, 32)
+            self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 32)
             self.linear3 = Linear(32, 8)
-            self.linear4 = Linear(8, 2)
+            self.linear4 = Linear(8, 1)
             self.feature_layer = None
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
             self.register_gradient_sum_hooks()
 
-        def forward(self, x):
+        def forward(self, x, add_noise=False):
             #x, _ = x.sort(1)
+            if add_noise:
+                x += torch.normal(torch.zeros_like(x), x.norm(dim=1, keepdim=True).expand_as(x) * 0.5)
             x = leaky_relu(self.linear1(x))
+            if add_noise:
+                x += torch.normal(torch.zeros_like(x), x.norm(dim=1, keepdim=True).expand_as(x) * 0.5)
             x = leaky_relu(self.linear3(x))
+            if add_noise:
+                x += torch.normal(torch.zeros_like(x), x.norm(dim=1, keepdim=True).expand_as(x) * 0.5)
             self.feature_layer = x
             x = self.linear4(x)
             return x
@@ -196,7 +208,7 @@ def run_rsgan(settings):
         def zero_gradient_sum(self):
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
-    G = gpu(FakeComplementaryGenerator())
+    G = gpu(Generator())
     D = gpu(MLP())
     DNN = gpu(MLP())
     d_lr = 1e-5
@@ -249,7 +261,7 @@ def run_rsgan(settings):
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
-        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer)
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer, scale=True)
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -262,7 +274,7 @@ def run_rsgan(settings):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer)
+        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer) * 1e-1
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -285,7 +297,7 @@ def run_rsgan(settings):
         # Generator.
         if step % 1 == 0:
             G_optimizer.zero_grad()
-            _ = D(gpu(Variable(unlabeled_examples)))
+            _ = D(gpu(Variable(unlabeled_examples)), add_noise=True)
             unlabeled_feature_layer = D.feature_layer.detach()
             z = torch.randn(settings.batch_size, noise_size)
             fake_examples = G(gpu(Variable(z)))

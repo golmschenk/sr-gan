@@ -9,10 +9,12 @@ from settings import Settings
 
 settings = Settings()
 
+irrelevant_data_multiplier = 5
+
 
 class ToyDataset(Dataset):
-    def __init__(self, dataset_size, observation_count=10):
-        self.examples, self.labels = generate_double_mean_single_std_data(dataset_size, observation_count)
+    def __init__(self, dataset_size, observation_count):
+        self.examples, self.labels = generate_polynomial_examples(dataset_size, observation_count)
         if self.labels.shape[0] < settings.batch_size:
             repeats = settings.batch_size / self.labels.shape[0]
             self.examples = np.repeat(self.examples, repeats, axis=0)
@@ -62,6 +64,28 @@ def generate_double_mean_single_std_data(number_of_examples, number_of_observati
     examples = np.random.uniform(middles - (widths / 2), middles + (widths / 2), size=[number_of_examples, number_of_observations]).astype(dtype=np.float32)
     labels = np.concatenate((middles, widths), axis=1)
     return examples, labels
+
+
+def generate_polynomial_examples(number_of_examples, number_of_observations):
+    b, c = generate_double_b_single_c_coefficients(number_of_examples)
+    examples = generate_examples_from_coefficients(b, c, number_of_observations)
+    examples += np.random.normal(0, 0.1, examples.shape)
+    return examples, c[:, 0, :]
+
+
+def generate_double_b_single_c_coefficients(number_of_examples):
+    b_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
+    c_distribution = MixtureModel([uniform(loc=-1, scale=2)])
+    b = b_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    c = c_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    return b, c
+
+
+def generate_examples_from_coefficients(b, c, number_of_observations):
+    x = np.linspace(-1, 1, num=number_of_observations)
+    examples = x + (b * (x ** 2)) + (c * (x ** 3))
+    examples = examples.reshape(examples.shape[0], number_of_observations * irrelevant_data_multiplier)
+    return examples.astype(dtype=np.float32)
 
 
 class MixtureModel(rv_continuous):
