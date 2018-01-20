@@ -1,13 +1,13 @@
 """
 Code for preparing presentation stuff.
 """
-import os
-import re
-
-import imageio as imageio
-import numpy as np
 import matplotlib
 matplotlib.use('Agg')
+import os
+import re
+import imageio as imageio
+import numpy as np
+import shutil
 import matplotlib.pyplot as plt
 from scipy.stats import norm, gamma, uniform
 import seaborn as sns
@@ -103,9 +103,9 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     axes.set_xlim(*x_axis_limits)
     axes.set_ylim(0, 1)
     axes.legend(loc='upper left')
-    plt.savefig(os.path.join(trial_directory, 'presentation/{}.png'.format(step)), dpi=dpi, ax=axes)
+    plt.savefig(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)), dpi=dpi, ax=axes)
     plt.close(figure)
-    return imageio.imread(os.path.join(trial_directory, 'presentation/{}.png'.format(step)))
+    return imageio.imread(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)))
 
 
 
@@ -117,13 +117,14 @@ def natural_sort_key(string, natural_sort_regex=re.compile('([0-9]+)')):
 
 def generate_video_from_frames(trial_directory):
     fps = 20
-    file_names = [file for file in os.listdir(os.path.join(trial_directory, 'presentation')) if file.endswith('.png')]
+    file_names = [file for file in os.listdir(os.path.join(trial_directory, settings.temporary_directory)) if file.endswith('.png')]
     file_names.sort(key=natural_sort_key)
     video_writer = imageio.get_writer(os.path.join(trial_directory, '{}.mp4'.format(os.path.basename(trial_directory))), fps=fps)
     for file_name in file_names:
-        image = imageio.imread(os.path.join(trial_directory, 'presentation/{}'.format(file_name)))
+        image = imageio.imread(os.path.join(trial_directory, '{}/{}'.format(settings.temporary_directory, file_name)))
         video_writer.append_data(image)
     video_writer.close()
+    shutil.rmtree(os.path.join(trial_directory, settings.temporary_directory))
     print('\nMeans Video Complete.')
 
 

@@ -113,7 +113,6 @@ def run_rsgan(settings):
     """
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
     trial_directory = os.path.join(settings.logs_directory, '{} {}'.format(settings.trial_name, datetime_string))
-    os.makedirs(os.path.join(trial_directory, 'presentation'))
     global global_trial_directory
     global_trial_directory = trial_directory
     os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
@@ -241,14 +240,14 @@ def run_rsgan(settings):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
-        dnn_loss = mean_distance_loss(dnn_predicted_labels, labels)
+        dnn_loss = mean_distance_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(gpu(Variable(labeled_examples)))
-        labeled_loss = mean_distance_loss(predicted_labels, labels)
+        labeled_loss = mean_distance_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
@@ -261,7 +260,7 @@ def run_rsgan(settings):
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
-        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer, scale=True)
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer, scale=True) * settings.unlabeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -274,7 +273,7 @@ def run_rsgan(settings):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer) * 1e-1
+        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer) * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -376,10 +375,13 @@ def run_rsgan(settings):
     print('Completed {}'.format(trial_directory))
 
 
-settings = Settings()
-try:
-    run_rsgan(settings)
-except KeyboardInterrupt:
-    print('Generating video before quitting...')
-    generate_video_from_frames(global_trial_directory)
-    exit()
+for multiplier in ['1e-4', '1e-3']:
+    settings = Settings()
+    settings.trial_name = 'fl {}'.format(multiplier, multiplier)
+    settings.fake_loss_multiplier = float(multiplier)
+    try:
+        run_rsgan(settings)
+    except KeyboardInterrupt as error:
+        print('Generating video before quitting...')
+        generate_video_from_frames(global_trial_directory)
+        raise error
