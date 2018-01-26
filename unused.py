@@ -26,3 +26,11 @@ class WeightClipper(object):
 
 clipper = WeightClipper()
 # D.apply(clipper)
+
+def torch_variable_contains_nan_or_inf(variable):
+    if np.isnan(cpu(variable).data.numpy()).any():
+        return True
+    elif np.isinf(cpu(variable).data.numpy()).any():
+        return True
+    else:
+        return False

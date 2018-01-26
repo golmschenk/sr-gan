@@ -3,6 +3,7 @@ Regression semi-supervised GAN code.
 """
 import datetime
 import os
+import random
 import numpy as np
 import math
 from scipy.stats import norm, gamma, wasserstein_distance, uniform
@@ -20,9 +21,22 @@ from hardware import gpu, cpu
 from presentation import generate_video_from_frames, generate_display_frame
 
 global_trial_directory = None
-seed = 0
-torch.manual_seed(seed)
-np.random.seed(seed)
+
+
+def zero_seed():
+    seed = 0
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+zero_seed()
+
+
+def infinite_iter(dataset):
+    while True:
+        for examples in dataset:
+            yield examples
 
 
 def unit_vector(vector):
@@ -32,7 +46,8 @@ def unit_vector(vector):
 def angle_between(vector0, vector1):
     unit_vector0 = unit_vector(vector0)
     unit_vector1 = unit_vector(vector1)
-    return unit_vector0.dot(unit_vector1).clamp(-1.0, 1.0).acos()
+    epsilon = 1e-6
+    return unit_vector0.dot(unit_vector1).clamp(-1.0 + epsilon, 1.0 - epsilon).acos()
 
 
 class SummaryWriter(SummaryWriter_):
@@ -48,6 +63,8 @@ class SummaryWriter(SummaryWriter_):
             super().add_scalar(tag, scalar_value, global_step)
 
     def add_histogram(self, tag, values, global_step=None, bins='auto'):
+        if not settings.histogram_logging:
+            return
         if global_step is None:
             global_step = self.step
         if self.step % self.summary_period == 0:
@@ -71,7 +88,8 @@ def feature_distance_loss(base_features, other_features, order=2, base_noise=0, 
         base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
     mean_feature_distance = (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1 / 2)
     if scale:
-        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm())
+        epsilon = 1e-10
+        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + epsilon)
     return mean_feature_distance.pow(order)
 
 
@@ -176,9 +194,10 @@ def run_rsgan(settings):
     class MLP(Module):
         def __init__(self):
             super().__init__()
-            self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 32)
-            self.linear3 = Linear(32, 8)
-            self.linear4 = Linear(8, 1)
+            zero_seed()
+            self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 16)
+            self.linear3 = Linear(16, 4)
+            self.linear4 = Linear(4, 1)
             self.feature_layer = None
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
             self.register_gradient_sum_hooks()
@@ -186,13 +205,13 @@ def run_rsgan(settings):
         def forward(self, x, add_noise=False):
             #x, _ = x.sort(1)
             if add_noise:
-                x += torch.normal(torch.zeros_like(x), x.norm(dim=1, keepdim=True).expand_as(x) * 0.5)
+                x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 0.5)
             x = leaky_relu(self.linear1(x))
             if add_noise:
-                x += torch.normal(torch.zeros_like(x), x.norm(dim=1, keepdim=True).expand_as(x) * 0.5)
+                x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 0.5)
             x = leaky_relu(self.linear3(x))
             if add_noise:
-                x += torch.normal(torch.zeros_like(x), x.norm(dim=1, keepdim=True).expand_as(x) * 0.5)
+                x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 0.5)
             self.feature_layer = x
             x = self.linear4(x)
             return x
@@ -210,7 +229,7 @@ def run_rsgan(settings):
     G = gpu(Generator())
     D = gpu(MLP())
     DNN = gpu(MLP())
-    d_lr = 1e-5
+    d_lr = settings.learning_rate
     g_lr = d_lr
 
     betas = (0.9, 0.999)
@@ -229,9 +248,11 @@ def run_rsgan(settings):
 
     step_time_start = datetime.datetime.now()
     print(trial_directory)
+    train_dataset_generator = infinite_iter(train_dataset_loader)
+    unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
 
     for step in range(settings.steps_to_run):
-        labeled_examples, labels = next(iter(train_dataset_loader))
+        labeled_examples, labels = next(train_dataset_generator)
         # DNN.
         gan_summary_writer.step = step
         dnn_summary_writer.step = step
@@ -256,7 +277,7 @@ def run_rsgan(settings):
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Labeled', cpu(labeled_feature_layer).data.numpy())
-        unlabeled_examples, _ = next(iter(unlabeled_dataset_loader))
+        unlabeled_examples, _ = next(unlabeled_dataset_generator)
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
@@ -375,13 +396,18 @@ def run_rsgan(settings):
     print('Completed {}'.format(trial_directory))
 
 
-for multiplier in ['1e-4', '1e-3']:
+for count in [5, 15, 20, 25]:
+    multiplier = '1e-6'
     settings = Settings()
-    settings.trial_name = 'fl {}'.format(multiplier, multiplier)
     settings.fake_loss_multiplier = float(multiplier)
+    settings.unlabeled_loss_multiplier = float(multiplier)
+    settings.steps_to_run = 3000000
+    settings.learning_rate = 1e-5
+    settings.labeled_dataset_size = count
+    settings.trial_name = 'ul {} fl {} plus1 zs {}e distance fl'.format(multiplier, multiplier, count)
     try:
         run_rsgan(settings)
     except KeyboardInterrupt as error:
-        print('Generating video before quitting...')
+        print('\nGenerating video before quitting...', end='')
         generate_video_from_frames(global_trial_directory)
         raise error

@@ -14,7 +14,10 @@ class Settings():
         self.labeled_dataset_size = 50
         self.unlabeled_dataset_size = 50000
         self.test_dataset_size = 1000
+        self.learning_rate = 1e-5
 
         self.labeled_loss_multiplier = 1e0
         self.unlabeled_loss_multiplier = 1e0
         self.fake_loss_multiplier = 1e0
+
+        self.histogram_logging = False
