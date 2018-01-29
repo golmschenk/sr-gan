@@ -1,17 +1,25 @@
 import numpy as np
+from scipy.optimize import curve_fit
 
-observation_count = 10
-test_dataset_size = 10000000
-test_means = np.random.normal(size=[test_dataset_size, 1])
-test_standard_deviations = np.random.gamma(shape=2, size=[test_dataset_size, 1])
-test_examples = np.random.normal(test_means, test_standard_deviations, size=[test_dataset_size, observation_count])
-test_examples.sort(axis=1)
-test_labels = np.concatenate((test_means, test_standard_deviations), axis=1)
+from data import ToyDataset
 
-predicted_means = test_examples.mean(axis=1)
-predicted_stds = test_examples.std(axis=1)
-predicted_labels = np.stack((predicted_means, predicted_stds), axis=1)
 
-test_label_errors = np.mean(np.abs(predicted_labels - test_labels), axis=0)
-print('Test Error Mean: {}'.format(test_label_errors.data[0]))
-print('Test Error Std {}'.format(test_label_errors.data[1]))
+
+for test_dataset_size in [1, 3, 5, 10, 15, 20, 25, 30, 50]:
+    observation_count = 10
+
+    test_dataset = ToyDataset(test_dataset_size, observation_count, seed=2)
+
+
+    def third_order_polynomial(x, a0, a1, a2, a3):
+        return a0 + (a1 * x) + (a2 * x ** 2) + (a3 * x ** 3)
+
+
+    errors = []
+    x = np.linspace(-1, 1, num=10)
+    for test_example, test_label in zip(test_dataset.examples, test_dataset.labels):
+        y = test_example[:10]
+        coefficients, _ = curve_fit(third_order_polynomial, x, y, bounds=([0, 1, -np.inf, -np.inf], [0 + 1e-8, 1 + 1e-8, np.inf, np.inf]))
+        errors.append(coefficients[3] - test_label)
+    mean_error = np.mean(np.abs(errors))
+    print('{} examples: {:.5}'.format(test_dataset_size, mean_error))

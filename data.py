@@ -1,7 +1,10 @@
 """
 Code for the data generating models.
 """
+import random
+
 import numpy as np
+import torch
 from scipy.stats import rv_continuous, norm, gamma, uniform
 from torch.utils.data import Dataset
 
@@ -13,7 +16,9 @@ irrelevant_data_multiplier = 5
 
 
 class ToyDataset(Dataset):
-    def __init__(self, dataset_size, observation_count):
+    def __init__(self, dataset_size, observation_count, seed=None):
+        if seed is not None:
+            seed_all(seed)
         self.examples, self.labels = generate_polynomial_examples(dataset_size, observation_count)
         if self.labels.shape[0] < settings.batch_size:
             repeats = settings.batch_size / self.labels.shape[0]
@@ -67,23 +72,25 @@ def generate_double_mean_single_std_data(number_of_examples, number_of_observati
 
 
 def generate_polynomial_examples(number_of_examples, number_of_observations):
-    b, c = generate_double_b_single_c_coefficients(number_of_examples)
-    examples = generate_examples_from_coefficients(b, c, number_of_observations)
+    a2, a3, a4 = generate_double_a2_single_a3_coefficients(number_of_examples)
+    examples = generate_examples_from_coefficients(a2, a3, a4, number_of_observations)
     examples += np.random.normal(0, 0.1, examples.shape)
-    return examples, c[:, 0, :]
+    return examples, a3[:, 0, :]
 
 
-def generate_double_b_single_c_coefficients(number_of_examples):
-    b_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
-    c_distribution = MixtureModel([uniform(loc=-1, scale=2)])
-    b = b_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
-    c = c_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
-    return b, c
+def generate_double_a2_single_a3_coefficients(number_of_examples):
+    a2_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
+    a3_distribution = MixtureModel([uniform(loc=-1, scale=2)])
+    a2 = a2_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    a3 = a3_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    a4_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
+    a4 = a4_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    return a2, a3, a4
 
 
-def generate_examples_from_coefficients(b, c, number_of_observations):
+def generate_examples_from_coefficients(a2, a3, a4, number_of_observations):
     x = np.linspace(-1, 1, num=number_of_observations)
-    examples = x + (b * (x ** 2)) + (c * (x ** 3))
+    examples = x + (a2 * (x ** 2)) + (a3 * (x ** 3)) + (a4 * (x ** 4))
     examples = examples.reshape(examples.shape[0], number_of_observations * irrelevant_data_multiplier)
     return examples.astype(dtype=np.float32)
 
@@ -107,3 +114,7 @@ class MixtureModel(rv_continuous):
         return rvs
 
 
+def seed_all(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)

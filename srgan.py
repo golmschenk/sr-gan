@@ -3,34 +3,25 @@ Regression semi-supervised GAN code.
 """
 import datetime
 import os
-import random
 import numpy as np
 import math
 from scipy.stats import norm, gamma, wasserstein_distance, uniform
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam, RMSprop, SGD
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
 
 from settings import Settings
-from data import ToyDataset, MixtureModel, generate_examples_from_coefficients, irrelevant_data_multiplier
+from data import ToyDataset, MixtureModel, generate_examples_from_coefficients, irrelevant_data_multiplier, seed_all
 from hardware import gpu, cpu
 from presentation import generate_video_from_frames, generate_display_frame
 
 global_trial_directory = None
 
-
-def zero_seed():
-    seed = 0
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-
-zero_seed()
+seed_all()
 
 
 def infinite_iter(dataset):
@@ -141,13 +132,13 @@ def run_rsgan(settings):
     observation_count = 10
     noise_size = 10
 
-    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count)
+    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=0)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
-    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count)
+    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count, seed=1)
     unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
 
-    test_dataset = ToyDataset(settings.test_dataset_size, observation_count)
+    test_dataset = ToyDataset(settings.test_dataset_size, observation_count, seed=2)
 
     class Generator(Module):
         def __init__(self):
@@ -182,19 +173,21 @@ def run_rsgan(settings):
             self.fake_parameters = Linear(1, 1)
 
         def forward(self, x):
-            b_distribution = MixtureModel([uniform(loc=-3, scale=6)]) # MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
-            c_distribution = MixtureModel([uniform(loc=-2, scale=4)]) # MixtureModel([uniform(loc=-2, scale=1), uniform(loc=1, scale=1)])
+            # a2_distribution = MixtureModel([uniform(loc=-3, scale=6)])
+            a2_distribution = MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
+            # a3_distribution = MixtureModel([uniform(loc=-2, scale=4)])
+            a3_distribution = MixtureModel([uniform(loc=-2, scale=1), uniform(loc=1, scale=1)])
             number_of_examples = x.size()[0]
-            b = b_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
-            c = c_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
-            generated_examples = generate_examples_from_coefficients(b, c, observation_count)
+            a2 = a2_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+            a3 = a3_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+            generated_examples = generate_examples_from_coefficients(a2, a3, observation_count)
             generated_examples += np.random.normal(0, 0.1, generated_examples.shape)
             return gpu(Variable(torch.from_numpy(generated_examples)))
 
     class MLP(Module):
         def __init__(self):
             super().__init__()
-            zero_seed()
+            seed_all()
             self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 16)
             self.linear3 = Linear(16, 4)
             self.linear4 = Linear(4, 1)
@@ -294,24 +287,25 @@ def run_rsgan(settings):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        fake_loss = feature_angle_loss(unlabeled_feature_layer, fake_feature_layer, target=math.pi, summary_writer=gan_summary_writer) * settings.fake_loss_multiplier
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Gradient penalty.
-        # alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
-        # alpha = alpha / alpha.sum(0)
-        # interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
-        #                 alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
-        # interpolates_predictions = D(interpolates)
-        # gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
-        #                                 grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
-        #                                 create_graph=True, only_inputs=True)[0]
-        # gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
-        # D.zero_gradient_sum()
-        # gradient_penalty.backward()
-        # gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
+        if settings.gradient_penalty_on:
+            alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
+            alpha = alpha / alpha.sum(0)
+            interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
+                            alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
+            interpolates_predictions = D(interpolates)
+            gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
+                                            grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
+                                            create_graph=True, only_inputs=True)[0]
+            gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
+            D.zero_gradient_sum()
+            gradient_penalty.backward()
+            gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # Generator.
@@ -396,15 +390,16 @@ def run_rsgan(settings):
     print('Completed {}'.format(trial_directory))
 
 
-for count in [5, 15, 20, 25]:
-    multiplier = '1e-6'
+for unlabeled_multiplier in ['1e0']:
+    fake_multiplier = '1e-1'
     settings = Settings()
-    settings.fake_loss_multiplier = float(multiplier)
-    settings.unlabeled_loss_multiplier = float(multiplier)
+    settings.fake_loss_multiplier = float(fake_multiplier)
+    settings.unlabeled_loss_multiplier = float(unlabeled_multiplier)
     settings.steps_to_run = 3000000
     settings.learning_rate = 1e-5
-    settings.labeled_dataset_size = count
-    settings.trial_name = 'ul {} fl {} plus1 zs {}e distance fl'.format(multiplier, multiplier, count)
+    settings.labeled_dataset_size = 15
+    settings.gradient_penalty_on = False
+    settings.trial_name = 'ul {} fl {} fl d rg a4'.format(unlabeled_multiplier, fake_multiplier)
     try:
         run_rsgan(settings)
     except KeyboardInterrupt as error:

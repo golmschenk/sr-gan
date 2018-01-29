@@ -19,5 +19,6 @@ class Settings():
         self.labeled_loss_multiplier = 1e0
         self.unlabeled_loss_multiplier = 1e0
         self.fake_loss_multiplier = 1e0
+        self.gradient_penalty_on = False
 
         self.histogram_logging = False

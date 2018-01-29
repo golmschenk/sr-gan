@@ -84,17 +84,16 @@ def generate_polynomial_concept_images():
     plt.close(figure)
 
 
-
 def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions, test_predictions, dnn_test_predictions, train_predictions, dnn_train_predictions, step):
     sns.set_style('darkgrid')
     bandwidth = 0.1
-    fake_c = np.transpose(np.polyfit(np.linspace(-1, 1, num=10), np.transpose(fake_examples[:, :10]), 3))[:, 0]
+    fake_a3 = np.transpose(np.polyfit(np.linspace(-1, 1, num=10), np.transpose(fake_examples[:, :10]), 3))[:, 0]
     x_axis_limits = [-4, 4]
     x_axis = np.arange(*x_axis_limits, 0.001)
     figure, axes = plt.subplots(dpi=dpi)
     axes.text(0.98, 0.98, 'Step: {}'.format(step), horizontalalignment='right', verticalalignment='top', family='monospace', fontsize=10, transform=axes.transAxes)
     axes.plot(x_axis, MixtureModel([uniform(-1, 2)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
-    axes = sns.kdeplot(fake_c, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
+    axes = sns.kdeplot(fake_a3, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
     axes = sns.kdeplot(unlabeled_predictions[:, 0], ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
     axes = sns.kdeplot(test_predictions[:, 0], ax=axes, color=sns.color_palette()[2], bw=bandwidth, label='GAN Test Predictions')
     axes = sns.kdeplot(train_predictions[:, 0], ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth, label='GAN Train Predictions')
@@ -106,9 +105,6 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     plt.savefig(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)), dpi=dpi, ax=axes)
     plt.close(figure)
     return imageio.imread(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)))
-
-
-
 
 
 def natural_sort_key(string, natural_sort_regex=re.compile('([0-9]+)')):
