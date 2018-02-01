@@ -11,6 +11,7 @@ import shutil
 import matplotlib.pyplot as plt
 from scipy.stats import norm, gamma, uniform
 import seaborn as sns
+import matplotlib2tikz
 
 from settings import Settings
 from data import MixtureModel
@@ -76,11 +77,23 @@ def generate_polynomial_concept_images():
     sns.set_style('darkgrid')
     figure, axes = plt.subplots(dpi=dpi)
     x_axis = np.arange(-1, 1, 0.001)
-    axes.plot(x_axis, (-1 * (x_axis ** 3)) + (2 * (x_axis ** 2)) + x_axis, color=sns.color_palette()[4])
+    axes.plot(x_axis, (-1 * (x_axis ** 4)) + (-1 * (x_axis ** 3)) + (2 * (x_axis ** 2)) + x_axis, color=sns.color_palette()[4])
     observation_color = sns.xkcd_rgb['medium grey']
     for observation in np.linspace(-1, 1, num=10):
-        axes.plot([observation, observation], [0, -1 * observation ** 3 + 2 * observation ** 2 + observation], color=observation_color)
+        axes.plot([observation, observation], [0, -1 * observation ** 4 + -1 * observation ** 3 + 2 * observation ** 2 + observation], color=observation_color)
     plt.savefig('polynomial_with_observations.png', dpi=dpi)
+    matplotlib2tikz.save(os.path.join('latex', 'polynomial_example.tex'))
+    plt.close(figure)
+
+
+def generate_single_peak_double_peak():
+    sns.set_style('darkgrid')
+    figure, axes = plt.subplots(dpi=dpi)
+    x_axis = np.arange(-5, 5, 0.001)
+    axes.plot(x_axis, norm(0, 1).pdf(x_axis), color=sns.color_palette()[0])
+    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[1])
+    plt.show()
+    matplotlib2tikz.save(os.path.join('latex', 'single_peak_double_peak.tex'))
     plt.close(figure)
 
 
@@ -125,4 +138,4 @@ def generate_video_from_frames(trial_directory):
 
 
 if __name__ == '__main__':
-    generate_polynomial_concept_images()
+    generate_single_peak_double_peak()

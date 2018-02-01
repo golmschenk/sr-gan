@@ -9,7 +9,7 @@ from scipy.stats import norm, gamma, wasserstein_distance, uniform
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam
+from torch.optim import Adam, RMSprop
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
@@ -140,6 +140,11 @@ def run_rsgan(settings):
 
     test_dataset = ToyDataset(settings.test_dataset_size, observation_count, seed=2)
 
+    def add_layer_noise(add_noise, x):
+        if add_noise:
+            x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 3e-2)
+        return x
+
     class Generator(Module):
         def __init__(self):
             super().__init__()
@@ -147,9 +152,11 @@ def run_rsgan(settings):
             self.linear5 = Linear(20, 30)
             self.linear6 = Linear(30, observation_count * irrelevant_data_multiplier)
 
-        def forward(self, x):
+        def forward(self, x, add_noise=False):
             x = leaky_relu(self.linear1(x))
+            x = add_layer_noise(add_noise, x)
             x = leaky_relu(self.linear5(x))
+            x = add_layer_noise(add_noise, x)
             x = self.linear6(x)
             return x
 
@@ -197,14 +204,11 @@ def run_rsgan(settings):
 
         def forward(self, x, add_noise=False):
             #x, _ = x.sort(1)
-            if add_noise:
-                x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 0.5)
+            x = add_layer_noise(add_noise, x)
             x = leaky_relu(self.linear1(x))
-            if add_noise:
-                x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 0.5)
+            x = add_layer_noise(add_noise, x)
             x = leaky_relu(self.linear3(x))
-            if add_noise:
-                x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 0.5)
+            x = add_layer_noise(add_noise, x)
             self.feature_layer = x
             x = self.linear4(x)
             return x
@@ -282,8 +286,9 @@ def run_rsgan(settings):
         # Fake.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        z = torch.randn(settings.batch_size, noise_size)
-        fake_examples = G(gpu(Variable(z)))
+        z = torch.from_numpy(MixtureModel([norm(-3, 1), norm(3, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+        # z = torch.randn(settings.batch_size, noise_size)
+        fake_examples = G(gpu(Variable(z)), add_noise=False)
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
@@ -311,7 +316,7 @@ def run_rsgan(settings):
         # Generator.
         if step % 1 == 0:
             G_optimizer.zero_grad()
-            _ = D(gpu(Variable(unlabeled_examples)), add_noise=True)
+            _ = D(gpu(Variable(unlabeled_examples)), add_noise=False)
             unlabeled_feature_layer = D.feature_layer.detach()
             z = torch.randn(settings.batch_size, noise_size)
             fake_examples = G(gpu(Variable(z)))
@@ -342,8 +347,9 @@ def run_rsgan(settings):
             # gan_summary_writer.add_scalar('Test Error/Std', gan_test_label_errors.data[1])
             gan_summary_writer.add_scalar('Test Error/Ratio Mean GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
-            z = torch.randn(settings.test_dataset_size, noise_size)
-            fake_examples = G(gpu(Variable(z)))
+            z = torch.from_numpy(MixtureModel([norm(-3, 1), norm(3, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+            # z = torch.randn(settings.test_dataset_size, noise_size)
+            fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
             unlabeled_labels_array = unlabeled_dataset.labels[:settings.test_dataset_size][:, 0]
@@ -399,7 +405,7 @@ for unlabeled_multiplier in ['1e0']:
     settings.learning_rate = 1e-5
     settings.labeled_dataset_size = 15
     settings.gradient_penalty_on = False
-    settings.trial_name = 'ul {} fl {} fl d rg a4'.format(unlabeled_multiplier, fake_multiplier)
+    settings.trial_name = 'ul {} fl {} fl d zbrg a4'.format(unlabeled_multiplier, fake_multiplier)
     try:
         run_rsgan(settings)
     except KeyboardInterrupt as error:
