@@ -13,6 +13,7 @@ from torch.optim import Adam, RMSprop
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
+import re
 
 from settings import Settings
 from data import ToyDataset, MixtureModel, generate_examples_from_coefficients, irrelevant_data_multiplier, seed_all
@@ -66,6 +67,31 @@ class SummaryWriter(SummaryWriter_):
             global_step = self.step
         if self.step % self.summary_period == 0:
             super().add_image(tag, img_tensor, global_step)
+
+class FeatureChaserSummaryWriter():
+    def __init__(self, base_path):
+        self.step = 0
+        self.summary_period = 1
+        self.fake_summary_writer = SummaryWriter_(base_path + 'fake')
+        self.unlabeled_summary_writer = SummaryWriter_(base_path + 'unlabeled')
+
+    def plot_features(self, feature_layer, global_step=None, type='unlabeled'):
+        if global_step is None:
+            global_step = self.step
+        if self.step % self.summary_period == 0:
+            feature_means = feature_layer.mean(0)
+            feature_means = cpu(feature_means.data).numpy()
+            if type == 'fake':
+                self.fake_summary_writer.add_scalar('Vector Means/Feature0', float(feature_means[0]), global_step)
+                self.fake_summary_writer.add_scalar('Vector Means/Feature1', float(feature_means[1]), global_step)
+                self.fake_summary_writer.add_scalar('Vector Means/Feature2', float(feature_means[2]), global_step)
+                self.fake_summary_writer.add_scalar('Vector Means/Feature3', float(feature_means[3]), global_step)
+            else:
+                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature0', float(feature_means[0]), global_step)
+                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature1', float(feature_means[1]), global_step)
+                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature2', float(feature_means[2]), global_step)
+                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature3', float(feature_means[3]), global_step)
+
 
 
 def mean_distance_loss(predicted_labels, labels, order=2):
@@ -127,6 +153,8 @@ def run_rsgan(settings):
     os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
     dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
     gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
+    f_summary_writer = FeatureChaserSummaryWriter(os.path.join(trial_directory, 'F'))
+    f_summary_writer.summary_period = settings.summary_step_period
     dnn_summary_writer.summary_period = settings.summary_step_period
     gan_summary_writer.summary_period = settings.summary_step_period
     observation_count = 10
@@ -142,7 +170,7 @@ def run_rsgan(settings):
 
     def add_layer_noise(add_noise, x):
         if add_noise:
-            x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * 3e-2)
+            x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * settings.noise_scale)
         return x
 
     class Generator(Module):
@@ -253,6 +281,7 @@ def run_rsgan(settings):
         # DNN.
         gan_summary_writer.step = step
         dnn_summary_writer.step = step
+        f_summary_writer.step = step
         if step % settings.summary_step_period == 0 and step != 0:
             print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
             step_time_start = datetime.datetime.now()
@@ -260,6 +289,8 @@ def run_rsgan(settings):
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
         dnn_loss = mean_distance_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
+        dnn_feature_layer = DNN.feature_layer
+        dnn_summary_writer.add_scalar('Feature Norm/Labeled', float(np.linalg.norm(cpu(dnn_feature_layer.mean(0)).data.numpy(), ord=2)))
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
@@ -273,6 +304,7 @@ def run_rsgan(settings):
         # Unlabeled.
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
+        gan_summary_writer.add_scalar('Feature Norm/Labeled', float(np.linalg.norm(cpu(labeled_feature_layer.mean(0)).data.numpy(), ord=2)))
         gan_summary_writer.add_histogram('Features/Labeled', cpu(labeled_feature_layer).data.numpy())
         unlabeled_examples, _ = next(unlabeled_dataset_generator)
         _ = D(gpu(Variable(unlabeled_examples)))
@@ -286,13 +318,15 @@ def run_rsgan(settings):
         # Fake.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        z = torch.from_numpy(MixtureModel([norm(-3, 1), norm(3, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
-        # z = torch.randn(settings.batch_size, noise_size)
+        # z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+        z = torch.randn(settings.batch_size, noise_size)
         fake_examples = G(gpu(Variable(z)), add_noise=False)
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True).neg() * settings.fake_loss_multiplier
+        f_summary_writer.plot_features(unlabeled_feature_layer)
+        f_summary_writer.plot_features(fake_feature_layer, type='fake')
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True, order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -303,11 +337,12 @@ def run_rsgan(settings):
             alpha = alpha / alpha.sum(0)
             interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
                             alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
-            interpolates_predictions = D(interpolates)
+            _ = D(interpolates)
+            interpolates_predictions = D.feature_layer
             gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                             grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
                                             create_graph=True, only_inputs=True)[0]
-            gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * 1e1
+            gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
             D.zero_gradient_sum()
             gradient_penalty.backward()
             gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
@@ -347,8 +382,8 @@ def run_rsgan(settings):
             # gan_summary_writer.add_scalar('Test Error/Std', gan_test_label_errors.data[1])
             gan_summary_writer.add_scalar('Test Error/Ratio Mean GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
-            z = torch.from_numpy(MixtureModel([norm(-3, 1), norm(3, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
-            # z = torch.randn(settings.test_dataset_size, noise_size)
+            # z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+            z = torch.randn(settings.test_dataset_size, noise_size)
             fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
@@ -395,17 +430,28 @@ def run_rsgan(settings):
     generate_video_from_frames(global_trial_directory)
     print('Completed {}'.format(trial_directory))
 
+def clean_scientific_notation(string):
+    string = re.sub(r'\.0*e', r'e', string)
+    string = re.sub(r'0+e', r'e', string)
+    string = re.sub(r'e\+0*[1-9]', r'e', string)
+    string = re.sub(r'e\+0*0', r'e0', string)
+    string = re.sub(r'e-0*', r'e', string)
+    return string
 
-for unlabeled_multiplier in ['1e0']:
-    fake_multiplier = '1e-1'
+
+for fake_multiplier in [1e-1]:
+    unlabeled_multiplier = 1e0
     settings = Settings()
-    settings.fake_loss_multiplier = float(fake_multiplier)
-    settings.unlabeled_loss_multiplier = float(unlabeled_multiplier)
-    settings.steps_to_run = 3000000
+    settings.fake_loss_multiplier = fake_multiplier
+    settings.unlabeled_loss_multiplier = unlabeled_multiplier
+    settings.steps_to_run = 1000000
     settings.learning_rate = 1e-5
-    settings.labeled_dataset_size = 15
-    settings.gradient_penalty_on = False
-    settings.trial_name = 'ul {} fl {} fl d zbrg a4'.format(unlabeled_multiplier, fake_multiplier)
+    settings.labeled_dataset_size = 30
+    settings.gradient_penalty_on = True
+    settings.gradient_penalty_multiplier = 1e3
+    settings.fake_loss_order = 1
+    settings.trial_name = 'ul {:e} fl {:e} fl do{} a4 {}le fc fgp{:e}'.format(unlabeled_multiplier, fake_multiplier, settings.fake_loss_order, settings.labeled_dataset_size, settings.gradient_penalty_multiplier)
+    settings.trial_name = clean_scientific_notation(settings.trial_name)
     try:
         run_rsgan(settings)
     except KeyboardInterrupt as error:
