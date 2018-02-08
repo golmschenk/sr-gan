@@ -431,24 +431,22 @@ def run_rsgan(settings):
     print('Completed {}'.format(trial_directory))
 
 def clean_scientific_notation(string):
-    string = re.sub(r'\.0*e', r'e', string)
-    string = re.sub(r'0+e', r'e', string)
-    string = re.sub(r'e\+0*[1-9]', r'e', string)
-    string = re.sub(r'e\+0*0', r'e0', string)
-    string = re.sub(r'e-0*', r'e', string)
+    regex = r'\.?0*e([+\-])0*([0-9])'
+    string = re.sub(regex, r'e\g<1>\g<2>', string)
+    string = re.sub(r'e\+', r'e', string)
     return string
 
 
-for fake_multiplier in [1e-1]:
+for fake_multiplier in [1e-2, 1e-3]:
     unlabeled_multiplier = 1e0
     settings = Settings()
     settings.fake_loss_multiplier = fake_multiplier
     settings.unlabeled_loss_multiplier = unlabeled_multiplier
     settings.steps_to_run = 1000000
     settings.learning_rate = 1e-5
-    settings.labeled_dataset_size = 30
+    settings.labeled_dataset_size = 5
     settings.gradient_penalty_on = True
-    settings.gradient_penalty_multiplier = 1e3
+    settings.gradient_penalty_multiplier = 1e2
     settings.fake_loss_order = 1
     settings.trial_name = 'ul {:e} fl {:e} fl do{} a4 {}le fc fgp{:e}'.format(unlabeled_multiplier, fake_multiplier, settings.fake_loss_order, settings.labeled_dataset_size, settings.gradient_penalty_multiplier)
     settings.trial_name = clean_scientific_notation(settings.trial_name)
