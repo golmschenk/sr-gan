@@ -4,6 +4,7 @@ Code for the data generating models.
 import random
 
 import numpy as np
+import time
 import torch
 from scipy.stats import rv_continuous, norm, gamma, uniform
 from torch.utils.data import Dataset
@@ -17,8 +18,7 @@ irrelevant_data_multiplier = 5
 
 class ToyDataset(Dataset):
     def __init__(self, dataset_size, observation_count, seed=None):
-        if seed is not None:
-            seed_all(seed)
+        seed_all(seed)
         self.examples, self.labels = generate_polynomial_examples(dataset_size, observation_count)
         if self.labels.shape[0] < settings.batch_size:
             repeats = settings.batch_size / self.labels.shape[0]
@@ -114,7 +114,9 @@ class MixtureModel(rv_continuous):
         return rvs
 
 
-def seed_all(seed=0):
+def seed_all(seed=None):
     random.seed(seed)
     np.random.seed(seed)
+    if seed is None:
+        seed = int(time.time())
     torch.manual_seed(seed)

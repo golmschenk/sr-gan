@@ -115,9 +115,15 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     axes.set_xlim(*x_axis_limits)
     axes.set_ylim(0, 1)
     axes.legend(loc='upper left')
-    plt.savefig(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)), dpi=dpi, ax=axes)
+    figure.tight_layout(pad=0)
+    figure.canvas.draw()
+    image_array = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    image_array = image_array.reshape(figure.canvas.get_width_height()[::-1] + (3,))
     plt.close(figure)
-    return imageio.imread(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)))
+    return image_array
+    # plt.savefig(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)), dpi=dpi, ax=axes)
+    # plt.close(figure)
+    # return imageio.imread(os.path.join(trial_directory, '{}/{}.png'.format(settings.temporary_directory, step)))
 
 
 def natural_sort_key(string, natural_sort_regex=re.compile('([0-9]+)')):

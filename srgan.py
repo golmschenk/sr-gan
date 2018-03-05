@@ -22,7 +22,7 @@ from presentation import generate_video_from_frames, generate_display_frame
 
 global_trial_directory = None
 
-seed_all()
+seed_all(0)
 
 
 def infinite_iter(dataset):
@@ -160,7 +160,7 @@ def run_rsgan(settings):
     observation_count = 10
     noise_size = 10
 
-    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=0)
+    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=3)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
     unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count, seed=1)
@@ -222,7 +222,7 @@ def run_rsgan(settings):
     class MLP(Module):
         def __init__(self):
             super().__init__()
-            seed_all()
+            seed_all(0)
             self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 16)
             self.linear3 = Linear(16, 4)
             self.linear4 = Linear(4, 1)
@@ -310,7 +310,7 @@ def run_rsgan(settings):
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
-        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer, scale=True) * settings.unlabeled_loss_multiplier
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer, scale=False) * settings.unlabeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
@@ -318,8 +318,8 @@ def run_rsgan(settings):
         # Fake.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        # z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
-        z = torch.randn(settings.batch_size, noise_size)
+        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+        # z = torch.randn(settings.batch_size, noise_size)
         fake_examples = G(gpu(Variable(z)), add_noise=False)
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
@@ -382,8 +382,8 @@ def run_rsgan(settings):
             # gan_summary_writer.add_scalar('Test Error/Std', gan_test_label_errors.data[1])
             gan_summary_writer.add_scalar('Test Error/Ratio Mean GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
-            # z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
-            z = torch.randn(settings.test_dataset_size, noise_size)
+            z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+            # z = torch.randn(settings.test_dataset_size, noise_size)
             fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
@@ -427,7 +427,7 @@ def run_rsgan(settings):
     predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
     gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
 
-    generate_video_from_frames(global_trial_directory)
+    # generate_video_from_frames(global_trial_directory)
     print('Completed {}'.format(trial_directory))
 
 def clean_scientific_notation(string):
@@ -437,22 +437,25 @@ def clean_scientific_notation(string):
     return string
 
 
-for fake_multiplier in [1e-2, 1e-3]:
-    unlabeled_multiplier = 1e0
+for labeled_dataset_size in [100, 300, 500, 50, 30, 15, 5]:
+    scale_multiplier = 1e0
+    fake_multiplier = 1e-6 * scale_multiplier
+    unlabeled_multiplier = 1e-3 * scale_multiplier
     settings = Settings()
     settings.fake_loss_multiplier = fake_multiplier
     settings.unlabeled_loss_multiplier = unlabeled_multiplier
-    settings.steps_to_run = 1000000
-    settings.learning_rate = 1e-5
-    settings.labeled_dataset_size = 5
-    settings.gradient_penalty_on = True
-    settings.gradient_penalty_multiplier = 1e2
+    settings.steps_to_run = 3000000
+    settings.learning_rate = 1e-4
+    settings.labeled_dataset_size = labeled_dataset_size
+    settings.gradient_penalty_on = False
+    settings.gradient_penalty_multiplier = 0
+    settings.mean_offset = 0
     settings.fake_loss_order = 1
-    settings.trial_name = 'ul {:e} fl {:e} fl do{} a4 {}le fc fgp{:e}'.format(unlabeled_multiplier, fake_multiplier, settings.fake_loss_order, settings.labeled_dataset_size, settings.gradient_penalty_multiplier)
+    settings.trial_name = 'tle ul {:e} fl {:e} {}le fgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
     settings.trial_name = clean_scientific_notation(settings.trial_name)
     try:
         run_rsgan(settings)
     except KeyboardInterrupt as error:
         print('\nGenerating video before quitting...', end='')
-        generate_video_from_frames(global_trial_directory)
+        # generate_video_from_frames(global_trial_directory)
         raise error
