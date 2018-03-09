@@ -331,6 +331,11 @@ def run_rsgan(settings):
         D.zero_gradient_sum()
         fake_loss.backward()
         gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
+        # Feature norm loss.
+        _ = D(gpu(Variable(unlabeled_examples)))
+        unlabeled_feature_layer = D.feature_layer
+        feature_norm_loss = (unlabeled_feature_layer.norm(0).mean() - 1).pow(2)
+        feature_norm_loss.backward()
         # Gradient penalty.
         if settings.gradient_penalty_on:
             alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
@@ -437,21 +442,21 @@ def clean_scientific_notation(string):
     return string
 
 
-for labeled_dataset_size in [100, 300, 500, 50, 30, 15, 5]:
-    scale_multiplier = 1e0
+for scale_multiplier in [1e2]:
+    scale_multiplier = scale_multiplier
     fake_multiplier = 1e-6 * scale_multiplier
     unlabeled_multiplier = 1e-3 * scale_multiplier
     settings = Settings()
     settings.fake_loss_multiplier = fake_multiplier
     settings.unlabeled_loss_multiplier = unlabeled_multiplier
-    settings.steps_to_run = 3000000
+    settings.steps_to_run = 1000000
     settings.learning_rate = 1e-4
-    settings.labeled_dataset_size = labeled_dataset_size
+    settings.labeled_dataset_size = 15
     settings.gradient_penalty_on = False
     settings.gradient_penalty_multiplier = 0
     settings.mean_offset = 0
     settings.fake_loss_order = 1
-    settings.trial_name = 'tle ul {:e} fl {:e} {}le fgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
+    settings.trial_name = 'tnl2 ul {:e} fl {:e} {}le fgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
     settings.trial_name = clean_scientific_notation(settings.trial_name)
     try:
         run_rsgan(settings)
