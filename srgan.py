@@ -153,8 +153,8 @@ def run_rsgan(settings):
     os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
     dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
     gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
-    f_summary_writer = FeatureChaserSummaryWriter(os.path.join(trial_directory, 'F'))
-    f_summary_writer.summary_period = settings.summary_step_period
+    # f_summary_writer = FeatureChaserSummaryWriter(os.path.join(trial_directory, 'F'))
+    # f_summary_writer.summary_period = settings.summary_step_period
     dnn_summary_writer.summary_period = settings.summary_step_period
     gan_summary_writer.summary_period = settings.summary_step_period
     observation_count = 10
@@ -281,7 +281,7 @@ def run_rsgan(settings):
         # DNN.
         gan_summary_writer.step = step
         dnn_summary_writer.step = step
-        f_summary_writer.step = step
+        # f_summary_writer.step = step
         if step % settings.summary_step_period == 0 and step != 0:
             print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
             step_time_start = datetime.datetime.now()
@@ -324,9 +324,9 @@ def run_rsgan(settings):
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        f_summary_writer.plot_features(unlabeled_feature_layer)
-        f_summary_writer.plot_features(fake_feature_layer, type='fake')
-        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True, order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
+        # f_summary_writer.plot_features(unlabeled_feature_layer)
+        # f_summary_writer.plot_features(fake_feature_layer, type='fake')
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=False, order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -442,21 +442,21 @@ def clean_scientific_notation(string):
     return string
 
 
-for scale_multiplier in [1e2]:
-    scale_multiplier = scale_multiplier
+for labeled_dataset_size in [5, 15, 30, 50, 100, 500]:
+    scale_multiplier = 1e2
     fake_multiplier = 1e-6 * scale_multiplier
     unlabeled_multiplier = 1e-3 * scale_multiplier
     settings = Settings()
     settings.fake_loss_multiplier = fake_multiplier
     settings.unlabeled_loss_multiplier = unlabeled_multiplier
-    settings.steps_to_run = 1000000
-    settings.learning_rate = 1e-4
-    settings.labeled_dataset_size = 15
+    settings.steps_to_run = 3000000
+    settings.learning_rate = 1e-5
+    settings.labeled_dataset_size = labeled_dataset_size
     settings.gradient_penalty_on = False
     settings.gradient_penalty_multiplier = 0
     settings.mean_offset = 0
     settings.fake_loss_order = 1
-    settings.trial_name = 'tnl2 ul {:e} fl {:e} {}le fgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
+    settings.trial_name = 'tle ul {:e} fl {:e} {}le fgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
     settings.trial_name = clean_scientific_notation(settings.trial_name)
     try:
         run_rsgan(settings)
