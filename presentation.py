@@ -91,7 +91,7 @@ def generate_single_peak_double_peak():
     figure, axes = plt.subplots(dpi=dpi)
     x_axis = np.arange(-5, 5, 0.001)
     axes.plot(x_axis, norm(0, 1).pdf(x_axis), color=sns.color_palette()[0])
-    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[1])
+    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[1], label='HHZ 1')
     plt.show()
     matplotlib2tikz.save(os.path.join('latex', 'single_peak_double_peak.tex'))
     plt.close(figure)

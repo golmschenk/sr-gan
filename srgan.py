@@ -228,7 +228,8 @@ def run_rsgan(settings):
             self.linear4 = Linear(4, 1)
             self.feature_layer = None
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
-            self.register_gradient_sum_hooks()
+            if settings.gradient_logging:
+                self.register_gradient_sum_hooks()
 
         def forward(self, x, add_noise=False):
             #x, _ = x.sort(1)
@@ -249,7 +250,8 @@ def run_rsgan(settings):
             [parameter.register_hook(gradient_sum_hook) for parameter in self.parameters()]
 
         def zero_gradient_sum(self):
-            self.gradient_sum = gpu(Variable(torch.zeros(1)))
+            if settings.gradient_logging:
+                self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
     G = gpu(Generator())
     D = gpu(MLP())
@@ -300,7 +302,8 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
-        gan_summary_writer.add_scalar('Gradient Sums/Labeled', D.gradient_sum.data[0])
+        if settings.gradient_logging:
+            gan_summary_writer.add_scalar('Gradient Sums/Labeled', D.gradient_sum.data[0])
         # Unlabeled.
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
@@ -314,7 +317,8 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
-        gan_summary_writer.add_scalar('Gradient Sums/Unlabeled', D.gradient_sum.data[0])
+        if settings.gradient_logging:
+            gan_summary_writer.add_scalar('Gradient Sums/Unlabeled', D.gradient_sum.data[0])
         # Fake.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
@@ -330,7 +334,8 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
-        gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
+        if settings.gradient_logging:
+            gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Feature norm loss.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
@@ -338,7 +343,7 @@ def run_rsgan(settings):
         feature_norm_loss.backward()
         # Gradient penalty.
         if settings.gradient_penalty_on:
-            alpha = gpu(Variable(torch.rand(2, settings.batch_size, 1)))
+            alpha = gpu(Variable(torch.rand(2)))
             alpha = alpha / alpha.sum(0)
             interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
                             alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
@@ -350,11 +355,12 @@ def run_rsgan(settings):
             gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
             D.zero_gradient_sum()
             gradient_penalty.backward()
-            gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
+            if settings.gradient_logging:
+                gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # Generator.
-        if step % 1 == 0:
+        if step % settings.generator_training_step_period == 0:
             G_optimizer.zero_grad()
             _ = D(gpu(Variable(unlabeled_examples)), add_noise=False)
             unlabeled_feature_layer = D.feature_layer.detach()
@@ -442,25 +448,27 @@ def clean_scientific_notation(string):
     return string
 
 
-for labeled_dataset_size in [5, 15, 30, 50, 100, 500]:
-    scale_multiplier = 1e2
-    fake_multiplier = 1e-6 * scale_multiplier
-    unlabeled_multiplier = 1e-3 * scale_multiplier
-    settings = Settings()
-    settings.fake_loss_multiplier = fake_multiplier
-    settings.unlabeled_loss_multiplier = unlabeled_multiplier
-    settings.steps_to_run = 3000000
-    settings.learning_rate = 1e-5
-    settings.labeled_dataset_size = labeled_dataset_size
-    settings.gradient_penalty_on = False
-    settings.gradient_penalty_multiplier = 0
-    settings.mean_offset = 0
-    settings.fake_loss_order = 1
-    settings.trial_name = 'tle ul {:e} fl {:e} {}le fgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
-    settings.trial_name = clean_scientific_notation(settings.trial_name)
-    try:
-        run_rsgan(settings)
-    except KeyboardInterrupt as error:
-        print('\nGenerating video before quitting...', end='')
-        # generate_video_from_frames(global_trial_directory)
-        raise error
+for gradient_penalty_multiplier in [1, 100]:
+    for scale_multiplier in [1e0, 1e1, 1e2]:
+        scale_multiplier = scale_multiplier
+        fake_multiplier = 1e-1 * scale_multiplier
+        unlabeled_multiplier = 1e-1 * scale_multiplier
+        settings = Settings()
+        settings.fake_loss_multiplier = fake_multiplier
+        settings.unlabeled_loss_multiplier = unlabeled_multiplier
+        settings.steps_to_run = 1000000
+        settings.learning_rate = 1e-5
+        settings.labeled_dataset_size = 15
+        settings.gradient_penalty_on = True
+        settings.gradient_penalty_multiplier = gradient_penalty_multiplier
+        settings.mean_offset = 0
+        settings.fake_loss_order = 1
+        settings.generator_training_step_period = 5
+        settings.trial_name = 't1agp ul {:e} fl {:e} {}le 1afgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
+        settings.trial_name = clean_scientific_notation(settings.trial_name)
+        try:
+            run_rsgan(settings)
+        except KeyboardInterrupt as error:
+            print('\nGenerating video before quitting...', end='')
+            # generate_video_from_frames(global_trial_directory)
+            raise error

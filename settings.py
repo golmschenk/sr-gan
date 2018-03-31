@@ -24,5 +24,7 @@ class Settings():
         self.gradient_penalty_multiplier = 1e1
         self.mean_offset = 1e0
         self.fake_loss_order = 2
+        self.generator_training_step_period = 1
 
         self.histogram_logging = False
+        self.gradient_logging = False
