@@ -60,7 +60,7 @@ class SummaryWriter(SummaryWriter_):
 
     def add_histogram(self, tag, values, global_step=None, bins='auto'):
         """Add a histogram to the Tensorboard summary."""
-        if not settings.histogram_logging:
+        if not settings_.histogram_logging:
             return
         if global_step is None:
             global_step = self.step
@@ -75,11 +75,13 @@ class SummaryWriter(SummaryWriter_):
             super().add_image(tag, img_tensor, global_step)
 
 
-def mean_distance_loss(predicted_labels, labels, order=2):
+def coefficient_estimate_loss(predicted_labels, labels, order=2):
+    """Calculate the loss from the coefficient prediction."""
     return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(2).sum().pow(1/2).pow(order)
 
 
 def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):
+    """Calculate the loss based on the distance between feature vectors."""
     base_mean_features = base_features.mean(0)
     other_mean_features = other_features.mean(0)
     if base_noise:
@@ -92,6 +94,7 @@ def feature_distance_loss(base_features, other_features, order=2, base_noise=0, 
 
 
 def feature_angle_loss(base_features, other_features, target=0, summary_writer=None):
+    """Calculate the loss based on the angle between feature vectors."""
     angle = angle_between(base_features.mean(0), other_features.mean(0))
     if summary_writer:
         summary_writer.add_scalar('Feature Vector/Angle', angle.data[0])
@@ -99,11 +102,13 @@ def feature_angle_loss(base_features, other_features, target=0, summary_writer=N
 
 
 def feature_corrcoef(x):
+    """Calculate the feature vector's correlation coefficients."""
     transposed_x = x.transpose(0, 1)
     return corrcoef(transposed_x)
 
 
 def corrcoef(x):
+    """Calculate the correlation coefficients."""
     mean_x = x.mean(1, keepdim=True)
     xm = x.sub(mean_x)
     c = xm.mm(xm.t())
@@ -117,13 +122,16 @@ def corrcoef(x):
 
 
 def feature_covariance_loss(base_features, other_features):
+    """Calculate the loss between feature vector correlation coefficient distances."""
     base_corrcoef = feature_corrcoef(base_features)
     other_corrcoef = feature_corrcoef(other_features)
     return (base_corrcoef - other_corrcoef).abs().sum()
 
 
-def run_rsgan(settings):
+def run_srgan(settings):
     """
+    Train the SRGAN
+
     :param settings: The settings object.
     :type settings: Settings
     """
@@ -144,17 +152,21 @@ def run_rsgan(settings):
     train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=3)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
-    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count, seed=1)
+    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
+                                   seed=1)
     unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
 
     test_dataset = ToyDataset(settings.test_dataset_size, observation_count, seed=2)
 
     def add_layer_noise(add_noise, x):
+        """Add noise to the given layer."""
         if add_noise:
-            x += torch.normal(torch.zeros_like(x), x.detach().norm(dim=1, keepdim=True).expand_as(x) * settings.noise_scale)
+            x += torch.normal(torch.zeros_like(x),
+                              x.detach().norm(dim=1,keepdim=True).expand_as(x) * settings.noise_scale)
         return x
 
     class Generator(Module):
+        """The generator model."""
         def __init__(self):
             super().__init__()
             self.linear1 = Linear(noise_size, 20)
@@ -162,6 +174,7 @@ def run_rsgan(settings):
             self.linear6 = Linear(30, observation_count * irrelevant_data_multiplier)
 
         def forward(self, x, add_noise=False):
+            """The forward pass of the module."""
             x = leaky_relu(self.linear1(x))
             x = add_layer_noise(add_noise, x)
             x = leaky_relu(self.linear5(x))
@@ -170,11 +183,13 @@ def run_rsgan(settings):
             return x
 
     class FakeGenerator(Module):
+        """A fake generator model."""
         def __init__(self):
             super().__init__()
             self.fake_parameters = Linear(1, 1)
 
         def forward(self, x):
+            """The forward pass of the module."""
             mean_model = MixtureModel([norm(0, 1)])
             std_model = MixtureModel([gamma(2)])
             means = mean_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
@@ -184,11 +199,13 @@ def run_rsgan(settings):
             return fake_examples
 
     class FakeComplementaryGenerator(Module):
+        """A fake generator model which can generator complementary data."""
         def __init__(self):
             super().__init__()
             self.fake_parameters = Linear(1, 1)
 
         def forward(self, x):
+            """The forward pass of the module."""
             # a2_distribution = MixtureModel([uniform(loc=-3, scale=6)])
             a2_distribution = MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
             # a3_distribution = MixtureModel([uniform(loc=-2, scale=4)])
@@ -201,6 +218,7 @@ def run_rsgan(settings):
             return gpu(Variable(torch.from_numpy(generated_examples)))
 
     class MLP(Module):
+        """The DNN MLP model."""
         def __init__(self):
             super().__init__()
             seed_all(0)
@@ -211,6 +229,7 @@ def run_rsgan(settings):
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
         def forward(self, x, add_noise=False):
+            """The forward pass of the module."""
             x = add_layer_noise(add_noise, x)
             x = leaky_relu(self.linear1(x))
             x = add_layer_noise(add_noise, x)
@@ -221,6 +240,7 @@ def run_rsgan(settings):
             return x
 
         def register_gradient_sum_hooks(self):
+            """A hook to remember the sum gradients of a backwards call."""
             def gradient_sum_hook(grad):
                 nonlocal self
                 self.gradient_sum += grad.abs().sum()
@@ -228,6 +248,7 @@ def run_rsgan(settings):
             [parameter.register_hook(gradient_sum_hook) for parameter in self.parameters()]
 
         def zero_gradient_sum(self):
+            """Zeros the sum gradients to allow for a new summing for logging."""
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
     G_model = gpu(Generator())
@@ -275,7 +296,7 @@ def run_rsgan(settings):
             step_time_start = datetime.datetime.now()
         DNN_optimizer.zero_grad()
         dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
-        dnn_loss = mean_distance_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
+        dnn_loss = coefficient_estimate_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_feature_layer = DNN.feature_layer
         dnn_summary_writer.add_scalar('Feature Norm/Labeled', float(np.linalg.norm(cpu(dnn_feature_layer.mean(0)).data.numpy(), ord=2)))
@@ -284,7 +305,7 @@ def run_rsgan(settings):
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(gpu(Variable(labeled_examples)))
-        labeled_loss = mean_distance_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
+        labeled_loss = coefficient_estimate_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
@@ -436,21 +457,21 @@ for gradient_penalty_multiplier in [10]:
         scale_multiplier = scale_multiplier
         fake_multiplier = 1e0 * scale_multiplier
         unlabeled_multiplier = 1e0 * scale_multiplier
-        settings = Settings()
-        settings.fake_loss_multiplier = fake_multiplier
-        settings.unlabeled_loss_multiplier = unlabeled_multiplier
-        settings.steps_to_run = 1000000
-        settings.learning_rate = 1e-5
-        settings.labeled_dataset_size = 15
-        settings.gradient_penalty_on = True
-        settings.gradient_penalty_multiplier = gradient_penalty_multiplier
-        settings.mean_offset = 0
-        settings.fake_loss_order = 1
-        settings.generator_training_step_period = 5
-        settings.trial_name = 'save ul {:e} fl {:e} {}le 1afgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
-        settings.trial_name = clean_scientific_notation(settings.trial_name)
+        settings_ = Settings()
+        settings_.fake_loss_multiplier = fake_multiplier
+        settings_.unlabeled_loss_multiplier = unlabeled_multiplier
+        settings_.steps_to_run = 1000000
+        settings_.learning_rate = 1e-5
+        settings_.labeled_dataset_size = 15
+        settings_.gradient_penalty_on = True
+        settings_.gradient_penalty_multiplier = gradient_penalty_multiplier
+        settings_.mean_offset = 0
+        settings_.fake_loss_order = 1
+        settings_.generator_training_step_period = 5
+        settings_.trial_name = 'save ul {:e} fl {:e} {}le 1afgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings_.labeled_dataset_size, settings_.gradient_penalty_multiplier, settings_.mean_offset, settings_.learning_rate)
+        settings_.trial_name = clean_scientific_notation(settings_.trial_name)
         try:
-            run_rsgan(settings)
+            run_srgan(settings_)
         except KeyboardInterrupt as error:
             print('\nGenerating video before quitting...', end='')
             # generate_video_from_frames(global_trial_directory)
