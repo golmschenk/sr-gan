@@ -253,9 +253,18 @@ def run_rsgan(settings):
             if settings.gradient_logging:
                 self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
-    G = gpu(Generator())
-    D = gpu(MLP())
-    DNN = gpu(MLP())
+    G_model = gpu(Generator())
+    D_mlp = MLP()
+    DNN_mlp = MLP()
+    if settings.DNN_load_model_path:
+        DNN_mlp.load_state_dict(torch.load(settings.DNN_load_model_path))
+    if settings.D_load_model_path:
+        D_mlp.load_state_dict(torch.load(settings.D_load_model_path))
+    if settings.G_load_model_path:
+        G_model.load_state_dict(torch.load(settings.G_load_model_path))
+    G = gpu(G_model)
+    D = gpu(D_mlp)
+    DNN = gpu(DNN_mlp)
     d_lr = settings.learning_rate
     g_lr = d_lr
 
@@ -440,6 +449,11 @@ def run_rsgan(settings):
 
     # generate_video_from_frames(global_trial_directory)
     print('Completed {}'.format(trial_directory))
+    if settings.should_save_models:
+        torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model.pth'))
+        torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model.pth'))
+        torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model.pth'))
+
 
 def clean_scientific_notation(string):
     regex = r'\.?0*e([+\-])0*([0-9])'
@@ -448,11 +462,11 @@ def clean_scientific_notation(string):
     return string
 
 
-for gradient_penalty_multiplier in [1, 100]:
-    for scale_multiplier in [1e0, 1e1, 1e2]:
+for gradient_penalty_multiplier in [10]:
+    for scale_multiplier in [1e-1]:
         scale_multiplier = scale_multiplier
-        fake_multiplier = 1e-1 * scale_multiplier
-        unlabeled_multiplier = 1e-1 * scale_multiplier
+        fake_multiplier = 1e0 * scale_multiplier
+        unlabeled_multiplier = 1e0 * scale_multiplier
         settings = Settings()
         settings.fake_loss_multiplier = fake_multiplier
         settings.unlabeled_loss_multiplier = unlabeled_multiplier
@@ -464,7 +478,7 @@ for gradient_penalty_multiplier in [1, 100]:
         settings.mean_offset = 0
         settings.fake_loss_order = 1
         settings.generator_training_step_period = 5
-        settings.trial_name = 't1agp ul {:e} fl {:e} {}le 1afgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
+        settings.trial_name = 'save ul {:e} fl {:e} {}le 1afgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings.labeled_dataset_size, settings.gradient_penalty_multiplier, settings.mean_offset, settings.learning_rate)
         settings.trial_name = clean_scientific_notation(settings.trial_name)
         try:
             run_rsgan(settings)

@@ -28,3 +28,7 @@ class Settings():
 
         self.histogram_logging = False
         self.gradient_logging = False
+        self.DNN_load_model_path = None
+        self.D_load_model_path = None
+        self.G_load_model_path = None
+        self.should_save_models = True
