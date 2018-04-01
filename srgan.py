@@ -331,23 +331,30 @@ def run_srgan(settings):
             generator_loss.backward()
             G_optimizer.step()
 
-        if dnn_summary_writer.step % dnn_summary_writer.summary_period == 0 or dnn_summary_writer.step % settings.presentation_step_period == 0:
-            dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
+        if (dnn_summary_writer.step % dnn_summary_writer.summary_period == 0 or
+                dnn_summary_writer.step % settings.presentation_step_period == 0):
+            dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
+                train_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('Train Error/MAE', dnn_train_label_errors.data[0])
-            dnn_predicted_test_labels = cpu(DNN(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
+            dnn_predicted_test_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
+                test_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_test_label_errors = np.mean(np.abs(dnn_predicted_test_labels - test_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('Test Error/MAE', dnn_test_label_errors.data[0])
 
-            predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
+            predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(
+                train_dataset.examples.astype(np.float32))))).data).numpy()
             gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('Train Error/MAE', gan_train_label_errors.data[0])
-            predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
+            predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(
+                test_dataset.examples.astype(np.float32))))).data).numpy()
             gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('Test Error/MAE', gan_test_label_errors.data[0])
-            gan_summary_writer.add_scalar('Test Error/Ratio MAE GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
+            gan_summary_writer.add_scalar('Test Error/Ratio MAE GAN DNN',
+                                          gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
-            z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+            z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
+                size=[settings.batch_size, noise_size]).astype(np.float32))
             fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
@@ -379,6 +386,7 @@ def run_srgan(settings):
 
 
 def clean_scientific_notation(string):
+    """Cleans up scientific notation to remove unneeded fluff digits."""
     regex = r'\.?0*e([+\-])0*([0-9])'
     string = re.sub(regex, r'e\g<1>\g<2>', string)
     string = re.sub(r'e\+', r'e', string)
@@ -401,11 +409,13 @@ for gradient_penalty_multiplier in [10]:
         settings_.mean_offset = 0
         settings_.fake_loss_order = 1
         settings_.generator_training_step_period = 5
-        settings_.trial_name = 'save ul {:e} fl {:e} {}le 1afgp{:e} zbrg{:e} lr {:e} seed 3'.format(unlabeled_multiplier, fake_multiplier, settings_.labeled_dataset_size, settings_.gradient_penalty_multiplier, settings_.mean_offset, settings_.learning_rate)
-        settings_.trial_name = clean_scientific_notation(settings_.trial_name)
-        try:
-            run_srgan(settings_)
-        except KeyboardInterrupt as error:
-            print('\nGenerating video before quitting...', end='')
-            # generate_video_from_frames(global_trial_directory)
-            raise error
+        trial_name = 'save'
+        trial_name += ' ul {:e}'.format(unlabeled_multiplier)
+        trial_name += ' fl {:e}'.format(fake_multiplier)
+        trial_name += ' {}le'.format(settings_.labeled_dataset_size)
+        trial_name += ' 1afgp{:e}'.format(settings_.gradient_penalty_multiplier)
+        trial_name += ' zbrg{:e}'.format(settings_.mean_offset)
+        trial_name += ' lr {:e}'.format(settings_.learning_rate)
+        trial_name += ' seed 3'
+        settings_.trial_name = clean_scientific_notation(trial_name)
+        run_srgan(settings_)
