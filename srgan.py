@@ -4,7 +4,7 @@ Regression semi-supervised GAN code.
 import datetime
 import os
 import numpy as np
-from scipy.stats import norm, gamma, wasserstein_distance, uniform
+from scipy.stats import norm, wasserstein_distance
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
@@ -15,7 +15,7 @@ import torch
 import re
 
 from settings import Settings
-from data import ToyDataset, MixtureModel, generate_examples_from_coefficients, irrelevant_data_multiplier, seed_all
+from data import ToyDataset, MixtureModel, irrelevant_data_multiplier, seed_all
 from hardware import gpu, cpu
 from presentation import generate_display_frame
 
@@ -181,41 +181,6 @@ def run_srgan(settings):
             x = add_layer_noise(add_noise, x)
             x = self.linear6(x)
             return x
-
-    class FakeGenerator(Module):
-        """A fake generator model."""
-        def __init__(self):
-            super().__init__()
-            self.fake_parameters = Linear(1, 1)
-
-        def forward(self, x):
-            """The forward pass of the module."""
-            mean_model = MixtureModel([norm(0, 1)])
-            std_model = MixtureModel([gamma(2)])
-            means = mean_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
-            stds = std_model.rvs(size=[x.size()[0], 1]).astype(dtype=np.float32)
-            fake_examples = np.random.normal(means, stds, size=[x.size()[0], observation_count]).astype(dtype=np.float32)
-            fake_examples = gpu(Variable(torch.from_numpy(fake_examples)))
-            return fake_examples
-
-    class FakeComplementaryGenerator(Module):
-        """A fake generator model which can generator complementary data."""
-        def __init__(self):
-            super().__init__()
-            self.fake_parameters = Linear(1, 1)
-
-        def forward(self, x):
-            """The forward pass of the module."""
-            # a2_distribution = MixtureModel([uniform(loc=-3, scale=6)])
-            a2_distribution = MixtureModel([uniform(loc=-3, scale=1), uniform(loc=-1, scale=1), uniform(loc=0, scale=1), uniform(loc=2, scale=1)])
-            # a3_distribution = MixtureModel([uniform(loc=-2, scale=4)])
-            a3_distribution = MixtureModel([uniform(loc=-2, scale=1), uniform(loc=1, scale=1)])
-            number_of_examples = x.size()[0]
-            a2 = a2_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
-            a3 = a3_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
-            generated_examples = generate_examples_from_coefficients(a2, a3, observation_count)
-            generated_examples += np.random.normal(0, 0.1, generated_examples.shape)
-            return gpu(Variable(torch.from_numpy(generated_examples)))
 
     class MLP(Module):
         """The DNN MLP model."""
