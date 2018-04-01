@@ -246,7 +246,6 @@ def run_srgan(settings):
         # DNN.
         gan_summary_writer.step = step
         dnn_summary_writer.step = step
-        # f_summary_writer.step = step
         if step % settings.summary_step_period == 0 and step != 0:
             print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
             step_time_start = datetime.datetime.now()
@@ -262,13 +261,10 @@ def run_srgan(settings):
         # Labeled.
         D_optimizer.zero_grad()
         predicted_labels = D(gpu(Variable(labeled_examples)))
+        labeled_feature_layer = D.feature_layer
         labeled_loss = coefficient_estimate_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
-        D.zero_gradient_sum()
-        labeled_loss.backward()
         # Unlabeled.
-        _ = D(gpu(Variable(labeled_examples)))
-        labeled_feature_layer = D.feature_layer
         gan_summary_writer.add_scalar('Feature Norm/Labeled',
                                       float(np.linalg.norm(cpu(labeled_feature_layer.mean(0)).data.numpy(), ord=2)))
         gan_summary_writer.add_histogram('Features/Labeled', cpu(labeled_feature_layer).data.numpy())
@@ -279,11 +275,7 @@ def run_srgan(settings):
         unlabeled_loss = feature_distance_loss(unlabeled_feature_layer,
                                                labeled_feature_layer, scale=False) * settings.unlabeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
-        D.zero_gradient_sum()
-        unlabeled_loss.backward()
         # Fake.
-        _ = D(gpu(Variable(unlabeled_examples)))
-        unlabeled_feature_layer = D.feature_layer
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
                                            norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
@@ -294,28 +286,22 @@ def run_srgan(settings):
         fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=False,
                                           order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
-        D.zero_gradient_sum()
-        fake_loss.backward()
         # Feature norm loss.
-        _ = D(gpu(Variable(unlabeled_examples)))
-        unlabeled_feature_layer = D.feature_layer
         feature_norm_loss = (unlabeled_feature_layer.norm(0).mean() - 1).pow(2)
-        feature_norm_loss.backward()
         # Gradient penalty.
-        if settings.gradient_penalty_on:
-            alpha = gpu(Variable(torch.rand(2)))
-            alpha = alpha / alpha.sum(0)
-            interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
-                            alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
-            _ = D(interpolates)
-            interpolates_predictions = D.feature_layer
-            gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
-                                            grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
-                                            create_graph=True, only_inputs=True)[0]
-            gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
-            D.zero_gradient_sum()
-            gradient_penalty.backward()
+        alpha = gpu(Variable(torch.rand(2)))
+        alpha = alpha / alpha.sum(0)
+        interpolates = (alpha[0] * gpu(Variable(unlabeled_examples, requires_grad=True)) +
+                        alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
+        _ = D(interpolates)
+        interpolates_predictions = D.feature_layer
+        gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
+                                        grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
+                                        create_graph=True, only_inputs=True)[0]
+        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
         # Discriminator update.
+        loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
+        loss.backward()
         D_optimizer.step()
         # Generator.
         if step % settings.generator_training_step_period == 0:
