@@ -4,12 +4,11 @@ Regression semi-supervised GAN code.
 import datetime
 import os
 import numpy as np
-import math
 from scipy.stats import norm, gamma, wasserstein_distance, uniform
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam, RMSprop
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
@@ -18,7 +17,7 @@ import re
 from settings import Settings
 from data import ToyDataset, MixtureModel, generate_examples_from_coefficients, irrelevant_data_multiplier, seed_all
 from hardware import gpu, cpu
-from presentation import generate_video_from_frames, generate_display_frame
+from presentation import generate_display_frame
 
 global_trial_directory = None
 
@@ -26,16 +25,19 @@ seed_all(0)
 
 
 def infinite_iter(dataset):
+    """Create an infinite generator from a dataset."""
     while True:
         for examples in dataset:
             yield examples
 
 
 def unit_vector(vector):
+    """Gets the unit vector version of a vector."""
     return vector.div(vector.norm() + 1e-10)
 
 
 def angle_between(vector0, vector1):
+    """Calculates the angle between two vectors."""
     unit_vector0 = unit_vector(vector0)
     unit_vector1 = unit_vector(vector1)
     epsilon = 1e-6
@@ -43,18 +45,21 @@ def angle_between(vector0, vector1):
 
 
 class SummaryWriter(SummaryWriter_):
+    """A custom version of the Tensorboard summary writer class."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.step = 0
         self.summary_period = 1
 
     def add_scalar(self, tag, scalar_value, global_step=None):
+        """Add a scalar to the Tensorboard summary."""
         if global_step is None:
             global_step = self.step
         if self.step % self.summary_period == 0:
             super().add_scalar(tag, scalar_value, global_step)
 
     def add_histogram(self, tag, values, global_step=None, bins='auto'):
+        """Add a histogram to the Tensorboard summary."""
         if not settings.histogram_logging:
             return
         if global_step is None:
@@ -63,6 +68,7 @@ class SummaryWriter(SummaryWriter_):
             super().add_histogram(tag, values, global_step, bins)
 
     def add_image(self, tag, img_tensor, global_step=None):
+        """Add an image to the Tensorboard summary."""
         if global_step is None:
             global_step = self.step
         if self.step % self.summary_period == 0:
@@ -228,11 +234,8 @@ def run_rsgan(settings):
             self.linear4 = Linear(4, 1)
             self.feature_layer = None
             self.gradient_sum = gpu(Variable(torch.zeros(1)))
-            if settings.gradient_logging:
-                self.register_gradient_sum_hooks()
 
         def forward(self, x, add_noise=False):
-            #x, _ = x.sort(1)
             x = add_layer_noise(add_noise, x)
             x = leaky_relu(self.linear1(x))
             x = add_layer_noise(add_noise, x)
@@ -250,8 +253,7 @@ def run_rsgan(settings):
             [parameter.register_hook(gradient_sum_hook) for parameter in self.parameters()]
 
         def zero_gradient_sum(self):
-            if settings.gradient_logging:
-                self.gradient_sum = gpu(Variable(torch.zeros(1)))
+            self.gradient_sum = gpu(Variable(torch.zeros(1)))
 
     G_model = gpu(Generator())
     D_mlp = MLP()
@@ -311,8 +313,6 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         D.zero_gradient_sum()
         labeled_loss.backward()
-        if settings.gradient_logging:
-            gan_summary_writer.add_scalar('Gradient Sums/Labeled', D.gradient_sum.data[0])
         # Unlabeled.
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
@@ -326,8 +326,6 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
-        if settings.gradient_logging:
-            gan_summary_writer.add_scalar('Gradient Sums/Unlabeled', D.gradient_sum.data[0])
         # Fake.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
@@ -343,8 +341,6 @@ def run_rsgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
-        if settings.gradient_logging:
-            gan_summary_writer.add_scalar('Gradient Sums/Fake', D.gradient_sum.data[0])
         # Feature norm loss.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
@@ -364,8 +360,6 @@ def run_rsgan(settings):
             gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
             D.zero_gradient_sum()
             gradient_penalty.backward()
-            if settings.gradient_logging:
-                gan_summary_writer.add_scalar('Gradient Sums/Gradient Penalty', D.gradient_sum.data[0])
         # Discriminator update.
         D_optimizer.step()
         # Generator.

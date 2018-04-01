@@ -27,7 +27,6 @@ class Settings():
         self.generator_training_step_period = 1
 
         self.histogram_logging = False
-        self.gradient_logging = False
         self.DNN_load_model_path = None
         self.D_load_model_path = None
         self.G_load_model_path = None
