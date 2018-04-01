@@ -74,31 +74,6 @@ class SummaryWriter(SummaryWriter_):
         if self.step % self.summary_period == 0:
             super().add_image(tag, img_tensor, global_step)
 
-class FeatureChaserSummaryWriter():
-    def __init__(self, base_path):
-        self.step = 0
-        self.summary_period = 1
-        self.fake_summary_writer = SummaryWriter_(base_path + 'fake')
-        self.unlabeled_summary_writer = SummaryWriter_(base_path + 'unlabeled')
-
-    def plot_features(self, feature_layer, global_step=None, type='unlabeled'):
-        if global_step is None:
-            global_step = self.step
-        if self.step % self.summary_period == 0:
-            feature_means = feature_layer.mean(0)
-            feature_means = cpu(feature_means.data).numpy()
-            if type == 'fake':
-                self.fake_summary_writer.add_scalar('Vector Means/Feature0', float(feature_means[0]), global_step)
-                self.fake_summary_writer.add_scalar('Vector Means/Feature1', float(feature_means[1]), global_step)
-                self.fake_summary_writer.add_scalar('Vector Means/Feature2', float(feature_means[2]), global_step)
-                self.fake_summary_writer.add_scalar('Vector Means/Feature3', float(feature_means[3]), global_step)
-            else:
-                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature0', float(feature_means[0]), global_step)
-                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature1', float(feature_means[1]), global_step)
-                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature2', float(feature_means[2]), global_step)
-                self.unlabeled_summary_writer.add_scalar('Vector Means/Feature3', float(feature_means[3]), global_step)
-
-
 
 def mean_distance_loss(predicted_labels, labels, order=2):
     return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(2).sum().pow(1/2).pow(order)
