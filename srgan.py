@@ -142,8 +142,6 @@ def run_srgan(settings):
     os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
     dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
     gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
-    # f_summary_writer = FeatureChaserSummaryWriter(os.path.join(trial_directory, 'F'))
-    # f_summary_writer.summary_period = settings.summary_step_period
     dnn_summary_writer.summary_period = settings.summary_step_period
     gan_summary_writer.summary_period = settings.summary_step_period
     observation_count = 10
@@ -162,7 +160,7 @@ def run_srgan(settings):
         """Add noise to the given layer."""
         if add_noise:
             x += torch.normal(torch.zeros_like(x),
-                              x.detach().norm(dim=1,keepdim=True).expand_as(x) * settings.noise_scale)
+                              x.detach().norm(dim=1, keepdim=True).expand_as(x) * settings.noise_scale)
         return x
 
     class Generator(Module):
@@ -207,6 +205,7 @@ def run_srgan(settings):
         def register_gradient_sum_hooks(self):
             """A hook to remember the sum gradients of a backwards call."""
             def gradient_sum_hook(grad):
+                """The hook callback."""
                 nonlocal self
                 self.gradient_sum += grad.abs().sum()
                 return grad
@@ -231,19 +230,11 @@ def run_srgan(settings):
     d_lr = settings.learning_rate
     g_lr = d_lr
 
-    betas = (0.9, 0.999)
+    # betas = (0.9, 0.999)
     weight_decay = 1e-2
     D_optimizer = Adam(D.parameters(), lr=d_lr, weight_decay=weight_decay)
     G_optimizer = Adam(G.parameters(), lr=g_lr)
     DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
-
-    # learning_rate_multiplier_function = lambda epoch: 0.1 ** (epoch / 1000000)
-    # dnn_scheduler = lr_scheduler.LambdaLR(DNN_optimizer, lr_lambda=learning_rate_multiplier_function)
-    # dnn_scheduler.step(0)
-    # d_scheduler = lr_scheduler.LambdaLR(D_optimizer, lr_lambda=learning_rate_multiplier_function)
-    # d_scheduler.step(0)
-    # g_scheduler = lr_scheduler.LambdaLR(G_optimizer, lr_lambda=learning_rate_multiplier_function)
-    # g_scheduler.step(0)
 
     step_time_start = datetime.datetime.now()
     print(trial_directory)
@@ -264,7 +255,8 @@ def run_srgan(settings):
         dnn_loss = coefficient_estimate_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_feature_layer = DNN.feature_layer
-        dnn_summary_writer.add_scalar('Feature Norm/Labeled', float(np.linalg.norm(cpu(dnn_feature_layer.mean(0)).data.numpy(), ord=2)))
+        dnn_summary_writer.add_scalar('Feature Norm/Labeled',
+                                      float(np.linalg.norm(cpu(dnn_feature_layer.mean(0)).data.numpy(), ord=2)))
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
@@ -277,28 +269,30 @@ def run_srgan(settings):
         # Unlabeled.
         _ = D(gpu(Variable(labeled_examples)))
         labeled_feature_layer = D.feature_layer
-        gan_summary_writer.add_scalar('Feature Norm/Labeled', float(np.linalg.norm(cpu(labeled_feature_layer.mean(0)).data.numpy(), ord=2)))
+        gan_summary_writer.add_scalar('Feature Norm/Labeled',
+                                      float(np.linalg.norm(cpu(labeled_feature_layer.mean(0)).data.numpy(), ord=2)))
         gan_summary_writer.add_histogram('Features/Labeled', cpu(labeled_feature_layer).data.numpy())
         unlabeled_examples, _ = next(unlabeled_dataset_generator)
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
-        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer, scale=False) * settings.unlabeled_loss_multiplier
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer,
+                                               labeled_feature_layer, scale=False) * settings.unlabeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         D.zero_gradient_sum()
         unlabeled_loss.backward()
         # Fake.
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
-        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
-        # z = torch.randn(settings.batch_size, noise_size)
+        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
+                                           norm(settings.mean_offset, 1)]
+                                          ).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
         fake_examples = G(gpu(Variable(z)), add_noise=False)
         _ = D(fake_examples.detach())
         fake_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Fake', cpu(fake_feature_layer).data.numpy())
-        # f_summary_writer.plot_features(unlabeled_feature_layer)
-        # f_summary_writer.plot_features(fake_feature_layer, type='fake')
-        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=False, order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=False,
+                                          order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         D.zero_gradient_sum()
         fake_loss.backward()
@@ -341,24 +335,19 @@ def run_srgan(settings):
             dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('Train Error/MAE', dnn_train_label_errors.data[0])
-            # dnn_summary_writer.add_scalar('Train Error/Std', dnn_train_label_errors.data[1])
             dnn_predicted_test_labels = cpu(DNN(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_test_label_errors = np.mean(np.abs(dnn_predicted_test_labels - test_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('Test Error/MAE', dnn_test_label_errors.data[0])
-            # dnn_summary_writer.add_scalar('Test Error/Std', dnn_test_label_errors.data[1])
 
             predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
             gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('Train Error/MAE', gan_train_label_errors.data[0])
-            # gan_summary_writer.add_scalar('Train Error/Std', gan_train_label_errors.data[1])
             predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
             gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('Test Error/MAE', gan_test_label_errors.data[0])
-            # gan_summary_writer.add_scalar('Test Error/Std', gan_test_label_errors.data[1])
             gan_summary_writer.add_scalar('Test Error/Ratio MAE GAN DNN', gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
             z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
-            # z = torch.randn(settings.test_dataset_size, noise_size)
             fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
@@ -369,15 +358,6 @@ def run_srgan(settings):
             unlabeled_examples_array = unlabeled_dataset.examples[:settings.test_dataset_size]
             unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
             unlabeled_predictions = D(gpu(Variable(unlabeled_examples)))
-            unlabeled_feature_layer = D.feature_layer
-            _ = D(fake_examples)
-            fake_feature_layer = D.feature_layer
-            gan_summary_writer.add_scalar('Feature Norm/Unlabeled', float(np.linalg.norm(cpu(unlabeled_feature_layer.mean(0)).data.numpy(), ord=2)))
-            gan_summary_writer.add_scalar('Feature Norm/Fake', float(np.linalg.norm(cpu(fake_feature_layer.mean(0)).data.numpy(), ord=2)))
-            feature_wasserstein_distance = 0
-            for feature_index in range(fake_feature_layer.shape[1]):
-                feature_wasserstein_distance += wasserstein_distance(cpu(fake_feature_layer).data.numpy()[:, feature_index], cpu(unlabeled_feature_layer).data.numpy()[:, feature_index])
-            gan_summary_writer.add_scalar('Generator/Feature Wasserstein', feature_wasserstein_distance)
 
             if dnn_summary_writer.step % settings.presentation_step_period == 0:
                 unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
@@ -385,24 +365,12 @@ def run_srgan(settings):
                 train_predictions_array = predicted_train_labels
                 dnn_test_predictions_array = dnn_predicted_test_labels
                 dnn_train_predictions_array = dnn_predicted_train_labels
-                distribution_image = generate_display_frame(trial_directory, fake_examples_array, unlabeled_predictions_array, test_predictions_array, dnn_test_predictions_array, train_predictions_array, dnn_train_predictions_array, step)
+                distribution_image = generate_display_frame(trial_directory, fake_examples_array,
+                                                            unlabeled_predictions_array, test_predictions_array,
+                                                            dnn_test_predictions_array, train_predictions_array,
+                                                            dnn_train_predictions_array, step)
                 gan_summary_writer.add_image('Distributions', distribution_image)
 
-        # dnn_scheduler.step(step)
-        # d_scheduler.step(step)
-        # g_scheduler.step(step)
-
-    predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
-    dnn_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
-    predicted_test_labels = cpu(DNN(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
-    dnn_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
-
-    predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(train_dataset.examples.astype(np.float32))))).data).numpy()
-    gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
-    predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(test_dataset.examples.astype(np.float32))))).data).numpy()
-    gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
-
-    # generate_video_from_frames(global_trial_directory)
     print('Completed {}'.format(trial_directory))
     if settings.should_save_models:
         torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model.pth'))
