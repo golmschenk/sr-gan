@@ -8,7 +8,7 @@ from scipy.stats import norm, wasserstein_distance
 from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
-from torch.optim import Adam
+from torch.optim import Adam, RMSprop
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter as SummaryWriter_
 import torch
@@ -147,7 +147,7 @@ def run_srgan(settings):
     observation_count = 10
     noise_size = 10
 
-    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=3)
+    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=0)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
     unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
@@ -218,19 +218,17 @@ def run_srgan(settings):
     G_model = gpu(Generator())
     D_mlp = MLP()
     DNN_mlp = MLP()
-    if settings.DNN_load_model_path:
-        DNN_mlp.load_state_dict(torch.load(settings.DNN_load_model_path))
-    if settings.D_load_model_path:
-        D_mlp.load_state_dict(torch.load(settings.D_load_model_path))
-    if settings.G_load_model_path:
-        G_model.load_state_dict(torch.load(settings.G_load_model_path))
+    if settings.load_model_path:
+        DNN_mlp.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'DNN_model.pth')))
+        D_mlp.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'D_model.pth')))
+        G_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'G_model.pth')))
     G = gpu(G_model)
     D = gpu(D_mlp)
     DNN = gpu(DNN_mlp)
     d_lr = settings.learning_rate
     g_lr = d_lr
 
-    # betas = (0.9, 0.999)
+    betas = (0.9, 0.999)
     weight_decay = 1e-2
     D_optimizer = Adam(D.parameters(), lr=d_lr, weight_decay=weight_decay)
     G_optimizer = Adam(G.parameters(), lr=g_lr)
@@ -255,7 +253,7 @@ def run_srgan(settings):
         dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
         dnn_feature_layer = DNN.feature_layer
         dnn_summary_writer.add_scalar('Feature Norm/Labeled',
-                                      float(np.linalg.norm(cpu(dnn_feature_layer.mean(0)).data.numpy(), ord=2)))
+                                      float(cpu(dnn_feature_layer.norm(dim=1).mean()).data.numpy()))
         dnn_loss.backward()
         DNN_optimizer.step()
         # Labeled.
@@ -266,12 +264,14 @@ def run_srgan(settings):
         gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
         # Unlabeled.
         gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                      float(np.linalg.norm(cpu(labeled_feature_layer.mean(0)).data.numpy(), ord=2)))
+                                      float(cpu(labeled_feature_layer.norm(dim=1).mean()).data.numpy()))
         gan_summary_writer.add_histogram('Features/Labeled', cpu(labeled_feature_layer).data.numpy())
         unlabeled_examples, _ = next(unlabeled_dataset_generator)
         _ = D(gpu(Variable(unlabeled_examples)))
         unlabeled_feature_layer = D.feature_layer
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
+        gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
+                                      float(cpu(unlabeled_feature_layer.norm(dim=1).mean()).data.numpy()))
         unlabeled_loss = feature_distance_loss(unlabeled_feature_layer,
                                                labeled_feature_layer, scale=False) * settings.unlabeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
@@ -287,7 +287,7 @@ def run_srgan(settings):
                                           order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         # Feature norm loss.
-        feature_norm_loss = (unlabeled_feature_layer.norm(0).mean() - 1).pow(2)
+        feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2)
         # Gradient penalty.
         alpha = gpu(Variable(torch.rand(2)))
         alpha = alpha / alpha.sum(0)
@@ -298,7 +298,7 @@ def run_srgan(settings):
         gradients = torch.autograd.grad(outputs=interpolates_predictions, inputs=interpolates,
                                         grad_outputs=gpu(torch.ones(interpolates_predictions.size())),
                                         create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
+        gradient_penalty = ((gradients.norm(dim=1) - 1) ** 2).mean() * settings.gradient_penalty_multiplier
         # Discriminator update.
         loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
         loss.backward()
@@ -379,29 +379,31 @@ def clean_scientific_notation(string):
     return string
 
 
-for gradient_penalty_multiplier in [10]:
-    for scale_multiplier in [1e-1]:
-        scale_multiplier = scale_multiplier
-        fake_multiplier = 1e0 * scale_multiplier
-        unlabeled_multiplier = 1e0 * scale_multiplier
+for unlabeled_multiplier in [1e-3]:
+    for fake_multiplier in [1e-3]:
+        scale_multiplier = 1e0
+        fake_multiplier = fake_multiplier * scale_multiplier
+        unlabeled_multiplier = unlabeled_multiplier * scale_multiplier
         settings_ = Settings()
         settings_.fake_loss_multiplier = fake_multiplier
         settings_.unlabeled_loss_multiplier = unlabeled_multiplier
-        settings_.steps_to_run = 1000000
+        settings_.steps_to_run = 3000000
         settings_.learning_rate = 1e-5
         settings_.labeled_dataset_size = 15
         settings_.gradient_penalty_on = True
-        settings_.gradient_penalty_multiplier = gradient_penalty_multiplier
+        settings_.gradient_penalty_multiplier = 0
         settings_.mean_offset = 0
         settings_.fake_loss_order = 1
         settings_.generator_training_step_period = 5
-        trial_name = 'save'
-        trial_name += ' ul {:e}'.format(unlabeled_multiplier)
-        trial_name += ' fl {:e}'.format(fake_multiplier)
-        trial_name += ' {}le'.format(settings_.labeled_dataset_size)
-        trial_name += ' 1afgp{:e}'.format(settings_.gradient_penalty_multiplier)
-        trial_name += ' zbrg{:e}'.format(settings_.mean_offset)
-        trial_name += ' lr {:e}'.format(settings_.learning_rate)
-        trial_name += ' seed 3'
+        settings_.should_save_models = True
+        settings_.load_model_path = '/home/golmschenk/srgan/logs/save ul 1e-1 fl 1e-1 15le 1afgp1e1 zbrg0e0 lr 1e-5 seed 3 y2018m04d01h03m09s27'
+        trial_name = 'save '
+        trial_name += ' ul{:e}'.format(unlabeled_multiplier)
+        trial_name += ' fl{:e}'.format(fake_multiplier)
+        trial_name += ' le{}'.format(settings_.labeled_dataset_size)
+        trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
+        trial_name += ' bg{:e}'.format(settings_.mean_offset)
+        trial_name += ' lr{:e}'.format(settings_.learning_rate)
+        trial_name += ' load'
         settings_.trial_name = clean_scientific_notation(trial_name)
         run_srgan(settings_)
