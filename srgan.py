@@ -3,6 +3,8 @@ Regression semi-supervised GAN code.
 """
 import datetime
 import os
+import random
+
 import numpy as np
 from scipy.stats import norm, wasserstein_distance
 from torch.autograd import Variable
@@ -383,8 +385,14 @@ def clean_scientific_notation(string):
     return string
 
 
-for unlabeled_multiplier in [1e-3]:
-    for fake_multiplier in [1e-3]:
+def shuffled(list_):
+    """A simple wrapper to make a *returning* version of random.shuffle()"""
+    random.shuffle(list_)
+    return list_
+
+
+for unlabeled_multiplier in shuffled([1e-1]):
+    for fake_multiplier in shuffled([1e0]):
         scale_multiplier = 1e0
         fake_multiplier = fake_multiplier * scale_multiplier
         unlabeled_multiplier = unlabeled_multiplier * scale_multiplier
