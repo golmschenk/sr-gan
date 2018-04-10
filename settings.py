@@ -20,8 +20,9 @@ class Settings():
         self.unlabeled_loss_multiplier = 1e0
         self.fake_loss_multiplier = 1e0
         self.gradient_penalty_on = False
-        self.noise_scale = 5e-1
         self.gradient_penalty_multiplier = 1e1
+        self.norm_loss_multiplier = 1
+        self.noise_scale = 5e-1
         self.mean_offset = 1e0
         self.fake_loss_order = 2
         self.generator_training_step_period = 1

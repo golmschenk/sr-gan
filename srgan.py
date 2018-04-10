@@ -287,7 +287,7 @@ def run_srgan(settings):
                                           order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
         # Feature norm loss.
-        feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2)
+        feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2) * settings.norm_loss_multiplier
         # Gradient penalty.
         alpha = gpu(Variable(torch.rand(2)))
         alpha = alpha / alpha.sum(0)
