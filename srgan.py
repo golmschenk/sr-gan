@@ -219,9 +219,13 @@ def run_srgan(settings):
     D_mlp = MLP()
     DNN_mlp = MLP()
     if settings.load_model_path:
-        DNN_mlp.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'DNN_model.pth')))
-        D_mlp.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'D_model.pth')))
-        G_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'G_model.pth')))
+        if not torch.cuda.is_available():
+            map_location = 'cpu'
+        else:
+            map_location = None
+        DNN_mlp.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'DNN_model.pth'), map_location))
+        D_mlp.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'D_model.pth'), map_location))
+        G_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'G_model.pth'), map_location))
     G = gpu(G_model)
     D = gpu(D_mlp)
     DNN = gpu(DNN_mlp)
