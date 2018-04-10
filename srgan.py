@@ -328,21 +328,21 @@ def run_srgan(settings):
             dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
                 train_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels), axis=0)
-            dnn_summary_writer.add_scalar('Train Error/MAE', dnn_train_label_errors.data[0])
+            dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors.data[0])
             dnn_predicted_test_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
                 test_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_test_label_errors = np.mean(np.abs(dnn_predicted_test_labels - test_dataset.labels), axis=0)
-            dnn_summary_writer.add_scalar('Test Error/MAE', dnn_test_label_errors.data[0])
+            dnn_summary_writer.add_scalar('1 Test Error/MAE', dnn_test_label_errors.data[0])
 
             predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(
                 train_dataset.examples.astype(np.float32))))).data).numpy()
             gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
-            gan_summary_writer.add_scalar('Train Error/MAE', gan_train_label_errors.data[0])
+            gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors.data[0])
             predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(
                 test_dataset.examples.astype(np.float32))))).data).numpy()
             gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
-            gan_summary_writer.add_scalar('Test Error/MAE', gan_test_label_errors.data[0])
-            gan_summary_writer.add_scalar('Test Error/Ratio MAE GAN DNN',
+            gan_summary_writer.add_scalar('1 Test Error/MAE', gan_test_label_errors.data[0])
+            gan_summary_writer.add_scalar('1 Test Error/Ratio MAE GAN DNN',
                                           gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
             z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
@@ -400,22 +400,25 @@ for unlabeled_multiplier in shuffled([1e-1]):
         settings_.fake_loss_multiplier = fake_multiplier
         settings_.unlabeled_loss_multiplier = unlabeled_multiplier
         settings_.steps_to_run = 3000000
-        settings_.learning_rate = 1e-5
+        settings_.learning_rate = 1e-4
         settings_.labeled_dataset_size = 15
         settings_.gradient_penalty_on = True
-        settings_.gradient_penalty_multiplier = 0
-        settings_.mean_offset = 0
+        settings_.gradient_penalty_multiplier = 10
+        settings_.norm_loss_multiplier = 1
+        settings_.mean_offset = 1
         settings_.fake_loss_order = 1
-        settings_.generator_training_step_period = 5
+        settings_.generator_training_step_period = 1
         settings_.should_save_models = True
         settings_.load_model_path = '/home/golmschenk/srgan/logs/save ul 1e-1 fl 1e-1 15le 1afgp1e1 zbrg0e0 lr 1e-5 seed 3 y2018m04d01h03m09s27'
-        trial_name = 'save '
+        trial_name = 'all'
         trial_name += ' ul{:e}'.format(unlabeled_multiplier)
         trial_name += ' fl{:e}'.format(fake_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
         trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
         trial_name += ' bg{:e}'.format(settings_.mean_offset)
         trial_name += ' lr{:e}'.format(settings_.learning_rate)
-        trial_name += ' load'
+        trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
+        trial_name += ' gs{}'.format(settings_.generator_training_step_period)
+        trial_name += ' l' if settings_.load_model_path else ''
         settings_.trial_name = clean_scientific_notation(trial_name)
         run_srgan(settings_)
