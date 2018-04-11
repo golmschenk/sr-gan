@@ -4,6 +4,8 @@ Regression semi-supervised GAN code.
 import datetime
 import os
 import random
+import select
+import sys
 
 import numpy as np
 from scipy.stats import norm, wasserstein_distance
@@ -149,7 +151,8 @@ def run_srgan(settings):
     observation_count = 10
     noise_size = 10
 
-    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count, seed=0)
+    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
+                               seed=settings.labeled_dataset_seed)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
     unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
@@ -369,6 +372,13 @@ def run_srgan(settings):
                                                             dnn_test_predictions_array, train_predictions_array,
                                                             dnn_train_predictions_array, step)
                 gan_summary_writer.add_image('Distributions', distribution_image)
+            while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                line = sys.stdin.readline()
+                if 'save' in line:
+                    torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model_{}.pth'.format(step)))
+                    torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model_{}.pth'.format(step)))
+                    torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model_{}.pth'.format(step)))
+                    print('\rSaved model for step {}...'.format(step))
 
     print('Completed {}'.format(trial_directory))
     if settings.should_save_models:
@@ -391,26 +401,26 @@ def shuffled(list_):
     return list_
 
 
-for unlabeled_multiplier in shuffled([1e-1]):
-    for fake_multiplier in shuffled([1e0]):
+for labeled_dataset_seed in shuffled([0]):
+    for labeled_dataset_size in [15]:
         scale_multiplier = 1e0
-        fake_multiplier = fake_multiplier * scale_multiplier
-        unlabeled_multiplier = unlabeled_multiplier * scale_multiplier
+        fake_multiplier = 1e-1 * scale_multiplier
+        unlabeled_multiplier = 1e0 * scale_multiplier
         settings_ = Settings()
         settings_.fake_loss_multiplier = fake_multiplier
         settings_.unlabeled_loss_multiplier = unlabeled_multiplier
         settings_.steps_to_run = 3000000
-        settings_.learning_rate = 1e-4
-        settings_.labeled_dataset_size = 15
-        settings_.gradient_penalty_on = True
-        settings_.gradient_penalty_multiplier = 10
-        settings_.norm_loss_multiplier = 1
+        settings_.learning_rate = 1e-6
+        settings_.labeled_dataset_size = labeled_dataset_size
+        settings_.gradient_penalty_multiplier = 1e2
+        settings_.norm_loss_multiplier = 0
         settings_.mean_offset = 1
         settings_.fake_loss_order = 1
         settings_.generator_training_step_period = 1
         settings_.should_save_models = True
-        settings_.load_model_path = '/home/golmschenk/srgan/logs/save ul 1e-1 fl 1e-1 15le 1afgp1e1 zbrg0e0 lr 1e-5 seed 3 y2018m04d01h03m09s27'
-        trial_name = 'all'
+        settings_.labeled_dataset_seed = labeled_dataset_seed
+        #settings_.load_model_path = '/home/golmschenk/srgan/logs/highgp-nonl ul1e-1 fl1e0 le15 gp1e2 bg1e0 lr1e-5 load y2018m04d08h14m33s18'
+        trial_name = 'highgp'
         trial_name += ' ul{:e}'.format(unlabeled_multiplier)
         trial_name += ' fl{:e}'.format(fake_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
@@ -419,6 +429,7 @@ for unlabeled_multiplier in shuffled([1e-1]):
         trial_name += ' lr{:e}'.format(settings_.learning_rate)
         trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
         trial_name += ' gs{}'.format(settings_.generator_training_step_period)
+        trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
         trial_name += ' l' if settings_.load_model_path else ''
         settings_.trial_name = clean_scientific_notation(trial_name)
         run_srgan(settings_)
