@@ -86,14 +86,14 @@ def generate_polynomial_concept_images():
     plt.close(figure)
 
 
-def generate_single_peak_double_peak():
+def generate_single_peak_double_peak(mean_offset=3):
     sns.set_style('darkgrid')
     figure, axes = plt.subplots(dpi=dpi)
     x_axis = np.arange(-5, 5, 0.001)
     axes.plot(x_axis, norm(0, 1).pdf(x_axis), color=sns.color_palette()[0])
-    axes.plot(x_axis, MixtureModel([norm(-3, 1), norm(3, 1)]).pdf(x_axis), color=sns.color_palette()[1], label='HHZ 1')
-    plt.show()
+    axes.plot(x_axis, MixtureModel([norm(-mean_offset, 1), norm(mean_offset, 1)]).pdf(x_axis), color=sns.color_palette()[1], label='HHZ 1')
     matplotlib2tikz.save(os.path.join('latex', 'single_peak_double_peak.tex'))
+    plt.show()
     plt.close(figure)
 
 
@@ -143,5 +143,32 @@ def generate_video_from_frames(trial_directory):
     print('\nMeans Video Complete.')
 
 
+def generate_dnn_vs_gan_average_per_number_of_examples():
+    dnn_results = {10: [1],
+                   30: [2],
+                   100: [3],
+                   300: [4],
+                   1000: [5]}
+    gan_results = {10: [2],
+                   30: [5],
+                   100: [5],
+                   300: [5],
+                   1000: [6]}
+    average_dnn_results = {example_count: np.mean(values) for example_count, values in dnn_results.items()}
+    average_gan_results = {example_count: np.mean(values) for example_count, values in gan_results.items()}
+    dnn_plot_x, dnn_plot_y = zip(*sorted(average_dnn_results.items()))
+    gan_plot_x, gan_plot_y = zip(*sorted(average_gan_results.items()))
+    figure, axes = plt.subplots(dpi=dpi)
+    axes.set_xscale('log')
+    axes.set_xticks(dnn_plot_x)
+    axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    axes.plot(dnn_plot_x, dnn_plot_y, color=sns.color_palette()[3], label='DNN')
+    axes.plot(gan_plot_x, gan_plot_y, color=sns.color_palette()[2], label='GAN')
+    matplotlib2tikz.save(os.path.join('latex', 'coefficient_dnn_vs_gan.tex'))
+    plt.show()
+    plt.close(figure)
+
+
 if __name__ == '__main__':
-    generate_single_peak_double_peak()
+    plt.switch_backend('module://backend_interagg')
+    generate_dnn_vs_gan_average_per_number_of_examples()
