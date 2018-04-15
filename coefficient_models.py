@@ -7,7 +7,6 @@ from data import irrelevant_data_multiplier, seed_all
 from hardware import gpu
 
 observation_count = 10
-noise_size = 10
 
 
 class Generator(Module):
@@ -15,7 +14,8 @@ class Generator(Module):
 
     def __init__(self):
         super().__init__()
-        self.linear1 = Linear(noise_size, 20)
+        self.input_size = 10
+        self.linear1 = Linear(self.input_size, 20)
         self.linear5 = Linear(20, 30)
         self.linear6 = Linear(30, observation_count * irrelevant_data_multiplier)
 

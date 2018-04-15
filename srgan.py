@@ -13,7 +13,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch
 
-from coefficient_models import observation_count, noise_size, Generator, MLP
+from coefficient_models import observation_count, Generator, MLP
 from settings import Settings
 from data import ToyDataset, MixtureModel, seed_all
 from hardware import gpu, cpu
@@ -80,14 +80,16 @@ def run_srgan(settings):
     unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
 
     for step in range(settings.steps_to_run):
-        labeled_examples, labels = next(train_dataset_generator)
         if step % settings.summary_step_period == 0 and step != 0:
             print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
             step_time_start = datetime.datetime.now()
         # DNN.
+        labeled_examples, labels = next(train_dataset_generator)
         dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, settings, step)
+        # GAN.
+        unlabeled_examples, _ = next(unlabeled_dataset_generator)
         gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, settings, step,
-                          unlabeled_dataset_generator)
+                          unlabeled_examples)
 
         if (dnn_summary_writer.step % dnn_summary_writer.summary_period == 0 or
                 dnn_summary_writer.step % settings.presentation_step_period == 0):
@@ -112,7 +114,7 @@ def run_srgan(settings):
                                           gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
 
             z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
-                size=[settings.batch_size, noise_size]).astype(np.float32))
+                size=[settings.batch_size, G.input_size]).astype(np.float32))
             fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
@@ -152,13 +154,13 @@ def run_srgan(settings):
 
 for labeled_dataset_seed in shuffled([0]):#, 3, 4, 5, 6]):
     for labeled_dataset_size in shuffled([100]):#, 10, 30, 100, 300, 1000]):
-        for mean_offset in shuffled([1]):
+        for mean_offset in shuffled([2]):
             for unlabeled_multiplier in shuffled([1e0]):
                 for fake_multiplier in shuffled([1e-1]):
-                    for gradient_penalty_multiplier in shuffled([1e2]):
+                    for gradient_penalty_multiplier in shuffled([1e1]):
                         for learning_rate in shuffled([1e-5]):
                             for unlabeled_loss_order in shuffled([2]):
-                                for fake_loss_order in shuffled([0.5]):
+                                for fake_loss_order in shuffled([1]):
                                     for generator_loss_order in shuffled([2]):
                                         seed_all(0)
                                         scale_multiplier = 1e0
@@ -179,8 +181,8 @@ for labeled_dataset_seed in shuffled([0]):#, 3, 4, 5, 6]):
                                         settings_.generator_training_step_period = 1
                                         settings_.should_save_models = True
                                         settings_.labeled_dataset_seed = labeled_dataset_seed
-                                        #settings_.load_model_path = '/home/golmschenk/srgan/logs/il load da'
-                                        trial_name = 'detachall sq'
+                                        settings_.load_model_path = '/home/golmschenk/srgan/logs/detachall ul1e0 fl1e-1 le100 gp1e1 bg1e0 lr1e-5 nl0 gs1 ls0 u2f1g2 l y2018m04d15h14m14s10'
+                                        trial_name = 'detachall c'
                                         trial_name += ' ul{:e}'.format(unlabeled_multiplier)
                                         trial_name += ' fl{:e}'.format(fake_multiplier)
                                         trial_name += ' le{}'.format(settings_.labeled_dataset_size)

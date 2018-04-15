@@ -3,7 +3,6 @@ import torch
 from scipy.stats import norm
 from torch.autograd import Variable
 
-from coefficient_models import noise_size
 from data import MixtureModel
 
 from hardware import gpu, cpu
@@ -91,7 +90,7 @@ def dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, 
 
 
 def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, settings, step,
-                      unlabeled_dataset_generator):
+                      unlabeled_examples):
     # Labeled.
     gan_summary_writer.step = step
     D_optimizer.zero_grad()
@@ -102,7 +101,6 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     # Unlabeled.
     gan_summary_writer.add_scalar('Feature Norm/Labeled',
                                   float(cpu(labeled_feature_layer.norm(dim=1).mean()).data.numpy()))
-    unlabeled_examples, _ = next(unlabeled_dataset_generator)
     _ = D(gpu(Variable(unlabeled_examples)))
     unlabeled_feature_layer = D.feature_layer
     gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
@@ -113,7 +111,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     # Fake.
     z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
                                        norm(settings.mean_offset, 1)]
-                                      ).rvs(size=[settings.batch_size, noise_size]).astype(np.float32))
+                                      ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
     fake_examples = G(gpu(Variable(z)), add_noise=False)
     _ = D(fake_examples.detach())
     fake_feature_layer = D.feature_layer
@@ -144,7 +142,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
         G_optimizer.zero_grad()
         _ = D(gpu(Variable(unlabeled_examples)), add_noise=False)
         unlabeled_feature_layer = D.feature_layer.detach()
-        z = torch.randn(settings.batch_size, noise_size)
+        z = torch.randn(settings.batch_size, G.input_size)
         fake_examples = G(gpu(Variable(z)))
         _ = D(fake_examples)
         fake_feature_layer = D.feature_layer
