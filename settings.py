@@ -25,6 +25,8 @@ class Settings():
         self.noise_scale = 5e-1
         self.mean_offset = 1e0
         self.fake_loss_order = 2
+        self.unlabeled_loss_order = 2
+        self.generator_loss_order = 2
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0
 

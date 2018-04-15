@@ -89,9 +89,11 @@ def feature_distance_loss(base_features, other_features, order=2, base_noise=0, 
     if base_noise:
         base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
     mean_feature_distance = (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1 / 2)
+    epsilon = 1e-6
     if scale:
-        epsilon = 1e-10
         mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + epsilon)
+    if order < 1:
+        mean_feature_distance += epsilon
     return mean_feature_distance.pow(order)
 
 
@@ -279,8 +281,8 @@ def run_srgan(settings):
         gan_summary_writer.add_histogram('Features/Unlabeled', cpu(unlabeled_feature_layer).data.numpy())
         gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                       float(cpu(unlabeled_feature_layer.norm(dim=1).mean()).data.numpy()))
-        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer,
-                                               labeled_feature_layer, scale=False) * settings.unlabeled_loss_multiplier
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
+                                               order=settings_.unlabeled_loss_order) * settings.unlabeled_loss_multiplier
         gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
         # Fake.
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
@@ -321,7 +323,8 @@ def run_srgan(settings):
             fake_examples = G(gpu(Variable(z)))
             _ = D(fake_examples)
             fake_feature_layer = D.feature_layer
-            generator_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer)
+            generator_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer,
+                                                   order=settings_.generator_loss_order)
             gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
             generator_loss.backward()
             G_optimizer.step()
@@ -404,39 +407,47 @@ def shuffled(list_):
 
 for labeled_dataset_seed in shuffled([0]):#, 3, 4, 5, 6]):
     for labeled_dataset_size in shuffled([15]):#, 10, 30, 100, 300, 1000]):
-        for fake_multiplier in shuffled([1e-1, 1e0]):
-            for unlabeled_multiplier in shuffled([1e-1, 1e0]):
-                for gradient_penalty_multiplier in shuffled([1e1]):
-                    for learning_rate in shuffled([1e-6]):
-                        for mean_offset in shuffled([0, 1, 2]):
-                            seed_all(0)
-                            scale_multiplier = 1e0
-                            fake_multiplier = fake_multiplier * scale_multiplier
-                            unlabeled_multiplier = unlabeled_multiplier * scale_multiplier
-                            settings_ = Settings()
-                            settings_.fake_loss_multiplier = fake_multiplier
-                            settings_.unlabeled_loss_multiplier = unlabeled_multiplier
-                            settings_.steps_to_run = 500000
-                            settings_.learning_rate = learning_rate
-                            settings_.labeled_dataset_size = labeled_dataset_size
-                            settings_.gradient_penalty_multiplier = gradient_penalty_multiplier
-                            settings_.norm_loss_multiplier = 0
-                            settings_.mean_offset = mean_offset
-                            settings_.fake_loss_order = 1
-                            settings_.generator_training_step_period = 1
-                            settings_.should_save_models = True
-                            settings_.labeled_dataset_seed = labeled_dataset_seed
-                            settings_.load_model_path = '/home/golmschenk/srgan/logs/il load'
-                            trial_name = 'il'
-                            trial_name += ' ul{:e}'.format(unlabeled_multiplier)
-                            trial_name += ' fl{:e}'.format(fake_multiplier)
-                            trial_name += ' le{}'.format(settings_.labeled_dataset_size)
-                            trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
-                            trial_name += ' bg{:e}'.format(settings_.mean_offset)
-                            trial_name += ' lr{:e}'.format(settings_.learning_rate)
-                            trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
-                            trial_name += ' gs{}'.format(settings_.generator_training_step_period)
-                            trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
-                            trial_name += ' l' if settings_.load_model_path else ''
-                            settings_.trial_name = clean_scientific_notation(trial_name)
-                            run_srgan(settings_)
+        for mean_offset in shuffled([0]):
+            for fake_multiplier in shuffled([1e-1, 1e0]):
+                for unlabeled_multiplier in shuffled([1e-1, 1e0]):
+                    for gradient_penalty_multiplier in shuffled([1e1, 1e2]):
+                        for learning_rate in shuffled([1e-5, 1e-6]):
+                            for unlabeled_loss_order in shuffled([2]):
+                                for fake_loss_order in shuffled([1/2]):
+                                    for generator_loss_order in shuffled([2]):
+                                        seed_all(0)
+                                        scale_multiplier = 1e0
+                                        fake_multiplier = fake_multiplier * scale_multiplier
+                                        unlabeled_multiplier = unlabeled_multiplier * scale_multiplier
+                                        settings_ = Settings()
+                                        settings_.fake_loss_multiplier = fake_multiplier
+                                        settings_.unlabeled_loss_multiplier = unlabeled_multiplier
+                                        settings_.steps_to_run = 500000
+                                        settings_.learning_rate = learning_rate
+                                        settings_.labeled_dataset_size = labeled_dataset_size
+                                        settings_.gradient_penalty_multiplier = gradient_penalty_multiplier
+                                        settings_.norm_loss_multiplier = 0
+                                        settings_.mean_offset = mean_offset
+                                        settings_.fake_loss_order = fake_loss_order
+                                        settings_.unlabeled_loss_order = unlabeled_loss_order
+                                        settings_.generator_loss_order = generator_loss_order
+                                        settings_.generator_training_step_period = 1
+                                        settings_.should_save_models = True
+                                        settings_.labeled_dataset_seed = labeled_dataset_seed
+                                        settings_.load_model_path = '/home/golmschenk/srgan/logs/il load'
+                                        trial_name = 'il'
+                                        trial_name += ' ul{:e}'.format(unlabeled_multiplier)
+                                        trial_name += ' fl{:e}'.format(fake_multiplier)
+                                        trial_name += ' le{}'.format(settings_.labeled_dataset_size)
+                                        trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
+                                        trial_name += ' bg{:e}'.format(settings_.mean_offset)
+                                        trial_name += ' lr{:e}'.format(settings_.learning_rate)
+                                        trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
+                                        trial_name += ' gs{}'.format(settings_.generator_training_step_period)
+                                        trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
+                                        trial_name += ' u{}f{}g{}'.format(settings_.unlabeled_loss_order,
+                                                                          settings_.fake_loss_order,
+                                                                          settings_.generator_loss_order)
+                                        trial_name += ' l' if settings_.load_model_path else ''
+                                        settings_.trial_name = clean_scientific_notation(trial_name)
+                                        run_srgan(settings_)
