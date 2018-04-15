@@ -30,7 +30,5 @@ class Settings():
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0
 
-        self.histogram_logging = False
-
         self.load_model_path = None
         self.should_save_models = False
