@@ -16,10 +16,9 @@ import torch
 from coefficient_models import observation_count, Generator, MLP
 from settings import Settings
 from data import ToyDataset, MixtureModel, seed_all
-from hardware import gpu, cpu
 from presentation import generate_display_frame
 from training_functions import dnn_training_step, gan_training_step
-from utility import SummaryWriter, infinite_iter, clean_scientific_notation, shuffled
+from utility import SummaryWriter, infinite_iter, clean_scientific_notation, shuffled, gpu, cpu
 
 global_trial_directory = None
 

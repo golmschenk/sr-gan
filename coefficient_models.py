@@ -4,7 +4,7 @@ from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
 
 from data import irrelevant_data_multiplier, seed_all
-from hardware import gpu
+from utility import gpu
 
 observation_count = 10
 

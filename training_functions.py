@@ -5,7 +5,7 @@ from torch.autograd import Variable
 
 from data import MixtureModel
 
-from hardware import gpu, cpu
+from utility import gpu, cpu
 
 
 def unit_vector(vector):
