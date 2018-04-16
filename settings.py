@@ -16,7 +16,7 @@ class Settings():
         self.summary_step_period = 1000
         self.labeled_dataset_size = 50
         self.unlabeled_dataset_size = 50000
-        self.test_dataset_size = 1000
+        self.validation_dataset_size = 1000
         self.learning_rate = 1e-5
 
         self.labeled_loss_multiplier = 1e0
@@ -63,5 +63,6 @@ def convert_to_settings_list(settings, shuffle=True):
         settings_list = next_settings_list
         next_settings_list = []
     if shuffle:
+        random.seed()
         random.shuffle(settings_list)
     return settings_list

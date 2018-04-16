@@ -45,10 +45,10 @@ def run_srgan(settings):
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
 
     unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
-                                   seed=1)
+                                   seed=100)
     unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
 
-    test_dataset = ToyDataset(settings.test_dataset_size, observation_count, seed=2)
+    validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101)
 
     G_model = gpu(Generator())
     D_mlp = MLP()
@@ -96,44 +96,44 @@ def run_srgan(settings):
                 train_dataset.examples.astype(np.float32))))).data).numpy()
             dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels), axis=0)
             dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors.data[0])
-            dnn_predicted_test_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
-                test_dataset.examples.astype(np.float32))))).data).numpy()
-            dnn_test_label_errors = np.mean(np.abs(dnn_predicted_test_labels - test_dataset.labels), axis=0)
-            dnn_summary_writer.add_scalar('1 Test Error/MAE', dnn_test_label_errors.data[0])
+            dnn_predicted_validation_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
+                validation_dataset.examples.astype(np.float32))))).data).numpy()
+            dnn_validation_label_errors = np.mean(np.abs(dnn_predicted_validation_labels - validation_dataset.labels), axis=0)
+            dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_errors.data[0])
 
             predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(
                 train_dataset.examples.astype(np.float32))))).data).numpy()
             gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
             gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors.data[0])
-            predicted_test_labels = cpu(D(gpu(Variable(torch.from_numpy(
-                test_dataset.examples.astype(np.float32))))).data).numpy()
-            gan_test_label_errors = np.mean(np.abs(predicted_test_labels - test_dataset.labels), axis=0)
-            gan_summary_writer.add_scalar('1 Test Error/MAE', gan_test_label_errors.data[0])
-            gan_summary_writer.add_scalar('1 Test Error/Ratio MAE GAN DNN',
-                                          gan_test_label_errors.data[0] / dnn_test_label_errors.data[0])
+            predicted_validation_labels = cpu(D(gpu(Variable(torch.from_numpy(
+                validation_dataset.examples.astype(np.float32))))).data).numpy()
+            gan_validation_label_errors = np.mean(np.abs(predicted_validation_labels - validation_dataset.labels), axis=0)
+            gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_errors.data[0])
+            gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN',
+                                          gan_validation_label_errors.data[0] / dnn_validation_label_errors.data[0])
 
             z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
                 size=[settings.batch_size, G.input_size]).astype(np.float32))
             fake_examples = G(gpu(Variable(z)), add_noise=False)
             fake_examples_array = cpu(fake_examples.data).numpy()
             fake_labels_array = np.mean(fake_examples_array, axis=1)
-            unlabeled_labels_array = unlabeled_dataset.labels[:settings.test_dataset_size][:, 0]
+            unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size][:, 0]
             label_wasserstein_distance = wasserstein_distance(fake_labels_array, unlabeled_labels_array)
             gan_summary_writer.add_scalar('Generator/Label Wasserstein', label_wasserstein_distance)
 
-            unlabeled_examples_array = unlabeled_dataset.examples[:settings.test_dataset_size]
+            unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
             unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
             unlabeled_predictions = D(gpu(Variable(unlabeled_examples)))
 
             if dnn_summary_writer.step % settings.presentation_step_period == 0:
                 unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
-                test_predictions_array = predicted_test_labels
+                validation_predictions_array = predicted_validation_labels
                 train_predictions_array = predicted_train_labels
-                dnn_test_predictions_array = dnn_predicted_test_labels
+                dnn_validation_predictions_array = dnn_predicted_validation_labels
                 dnn_train_predictions_array = dnn_predicted_train_labels
                 distribution_image = generate_display_frame(trial_directory, fake_examples_array,
-                                                            unlabeled_predictions_array, test_predictions_array,
-                                                            dnn_test_predictions_array, train_predictions_array,
+                                                            unlabeled_predictions_array, validation_predictions_array,
+                                                            dnn_validation_predictions_array, train_predictions_array,
                                                             dnn_train_predictions_array, step)
                 gan_summary_writer.add_image('Distributions', distribution_image)
             while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
@@ -152,15 +152,14 @@ def run_srgan(settings):
 
 
 if __name__ == '__main__':
-    seed_all(0)
     settings_ = Settings()
-    settings_.labeled_dataset_seed = 0
-    settings_.labeled_dataset_size = 100
-    settings_.unlabeled_loss_multiplier = 1e0
-    settings_.fake_loss_multiplier = 1e-1
-    settings_.steps_to_run = 500000
-    settings_.learning_rate = 1e-5
-    settings_.gradient_penalty_multiplier = 1e1
+    settings_.labeled_dataset_seed = [0, 1, 2, 3, 4]
+    settings_.labeled_dataset_size = 30
+    settings_.unlabeled_loss_multiplier = 1e2
+    settings_.fake_loss_multiplier = 1e2
+    settings_.steps_to_run = 3000000
+    settings_.learning_rate = 1e-6
+    settings_.gradient_penalty_multiplier = 1e2
     settings_.norm_loss_multiplier = 0
     settings_.mean_offset = 1
     settings_.unlabeled_loss_order = 2
@@ -168,10 +167,11 @@ if __name__ == '__main__':
     settings_.generator_loss_order = 2
     settings_.generator_training_step_period = 1
     settings_.should_save_models = True
-    settings_.load_model_path = '/home/golmschenk/srgan/logs/detachall ul1e0 fl1e-1 le100 gp1e1 bg1e0 lr1e-5 nl0 gs1 ls0 u2f1g2 l y2018m04d15h14m14s10'
+    #settings_.load_model_path = '/home/golmschenk/srgan/logs/detachall ul1e0 fl1e-1 le100 gp1e1 bg1e0 lr1e-5 nl0 gs1 ls0 u2f1g2 l y2018m04d15h14m14s10'
     settings_list = convert_to_settings_list(settings_)
+    seed_all(0)
     for settings_ in settings_list:
-        trial_name = 'detachall c'
+        trial_name = 'coef'
         trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
         trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
