@@ -15,10 +15,10 @@ import torch
 
 from coefficient_models import observation_count, Generator, MLP
 from settings import Settings, convert_to_settings_list
-from data import ToyDataset, MixtureModel, seed_all
+from coefficient_data import ToyDataset
 from presentation import generate_display_frame
 from training_functions import dnn_training_step, gan_training_step
-from utility import SummaryWriter, infinite_iter, clean_scientific_notation, shuffled, gpu, cpu
+from utility import SummaryWriter, infinite_iter, clean_scientific_notation, shuffled, gpu, cpu, MixtureModel, seed_all
 
 global_trial_directory = None
 

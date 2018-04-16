@@ -3,9 +3,7 @@ import torch
 from scipy.stats import norm
 from torch.autograd import Variable
 
-from data import MixtureModel
-
-from utility import gpu, cpu
+from utility import gpu, cpu, MixtureModel
 
 
 def unit_vector(vector):

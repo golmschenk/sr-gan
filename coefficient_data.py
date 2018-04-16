@@ -1,15 +1,13 @@
 """
 Code for the data generating models.
 """
-import random
 
 import numpy as np
-import time
-import torch
-from scipy.stats import rv_continuous, norm, gamma, uniform
+from scipy.stats import norm, gamma, uniform
 from torch.utils.data import Dataset
 
 from settings import Settings
+from utility import MixtureModel, seed_all
 
 settings = Settings()
 
@@ -93,30 +91,3 @@ def generate_examples_from_coefficients(a2, a3, a4, number_of_observations):
     examples = x + (a2 * (x ** 2)) + (a3 * (x ** 3)) + (a4 * (x ** 4))
     examples = examples.reshape(examples.shape[0], number_of_observations * irrelevant_data_multiplier)
     return examples.astype(dtype=np.float32)
-
-
-class MixtureModel(rv_continuous):
-    def __init__(self, submodels, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.submodels = submodels
-
-    def _pdf(self, x, **kwargs):
-        pdf = self.submodels[0].pdf(x)
-        for submodel in self.submodels[1:]:
-            pdf += submodel.pdf(x)
-        pdf /= len(self.submodels)
-        return pdf
-
-    def rvs(self, size):
-        submodel_choices = np.random.randint(len(self.submodels), size=size)
-        submodel_samples = [submodel.rvs(size=size) for submodel in self.submodels]
-        rvs = np.choose(submodel_choices, submodel_samples)
-        return rvs
-
-
-def seed_all(seed=None):
-    random.seed(seed)
-    np.random.seed(seed)
-    if seed is None:
-        seed = int(time.time())
-    torch.manual_seed(seed)

@@ -1,7 +1,10 @@
 import random
 import re
+import time
 
+import numpy as np
 import torch
+from scipy.stats import rv_continuous
 from tensorboardX import SummaryWriter as SummaryWriter_
 
 class SummaryWriter(SummaryWriter_):
@@ -98,3 +101,30 @@ def load(model_path):
         return torch.load(model_path, map_location=lambda storage, loc: storage)
     else:
         return torch.load(model_path)
+
+
+class MixtureModel(rv_continuous):
+    def __init__(self, submodels, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.submodels = submodels
+
+    def _pdf(self, x, **kwargs):
+        pdf = self.submodels[0].pdf(x)
+        for submodel in self.submodels[1:]:
+            pdf += submodel.pdf(x)
+        pdf /= len(self.submodels)
+        return pdf
+
+    def rvs(self, size):
+        submodel_choices = np.random.randint(len(self.submodels), size=size)
+        submodel_samples = [submodel.rvs(size=size) for submodel in self.submodels]
+        rvs = np.choose(submodel_choices, submodel_samples)
+        return rvs
+
+
+def seed_all(seed=None):
+    random.seed(seed)
+    np.random.seed(seed)
+    if seed is None:
+        seed = int(time.time())
+    torch.manual_seed(seed)

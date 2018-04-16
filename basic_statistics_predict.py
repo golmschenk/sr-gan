@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import curve_fit
 
-from data import ToyDataset
+from coefficient_data import ToyDataset
 
 
 

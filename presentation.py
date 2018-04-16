@@ -14,7 +14,7 @@ import seaborn as sns
 import matplotlib2tikz
 
 from settings import Settings
-from data import MixtureModel
+from utility import MixtureModel
 
 sns.set()
 dpi = 300
