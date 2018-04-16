@@ -154,11 +154,12 @@ def run_srgan(settings):
 if __name__ == '__main__':
     seed_all(0)
     settings_ = Settings()
+    settings_.labeled_dataset_seed = 0
+    settings_.labeled_dataset_size = 100
     settings_.unlabeled_loss_multiplier = 1e0
     settings_.fake_loss_multiplier = 1e-1
     settings_.steps_to_run = 500000
     settings_.learning_rate = 1e-5
-    settings_.labeled_dataset_size = 100
     settings_.gradient_penalty_multiplier = 1e1
     settings_.norm_loss_multiplier = 0
     settings_.mean_offset = 1
@@ -167,7 +168,6 @@ if __name__ == '__main__':
     settings_.generator_loss_order = 2
     settings_.generator_training_step_period = 1
     settings_.should_save_models = True
-    settings_.labeled_dataset_seed = 0
     settings_.load_model_path = '/home/golmschenk/srgan/logs/detachall ul1e0 fl1e-1 le100 gp1e1 bg1e0 lr1e-5 nl0 gs1 ls0 u2f1g2 l y2018m04d15h14m14s10'
     settings_list = convert_to_settings_list(settings_)
     for settings_ in settings_list:

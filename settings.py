@@ -1,6 +1,7 @@
 """
 General settings.
 """
+import random
 from copy import deepcopy
 
 
@@ -36,7 +37,7 @@ class Settings():
         self.should_save_models = False
 
 
-def convert_to_settings_list(settings):
+def convert_to_settings_list(settings, shuffle=True):
     """
     Creates permutations of settings for any setting that is a list.
     This function is black magic. Beware.
@@ -61,4 +62,6 @@ def convert_to_settings_list(settings):
                 next_settings_list.append(settings)
         settings_list = next_settings_list
         next_settings_list = []
+    if shuffle:
+        random.shuffle(settings_list)
     return settings_list
