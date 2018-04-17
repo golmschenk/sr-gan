@@ -11,7 +11,7 @@ import os
 
 import shutil
 
-from data_access import get_database_meta
+from age_data import get_database_meta
 
 
 def generate_age_distribution_image():
