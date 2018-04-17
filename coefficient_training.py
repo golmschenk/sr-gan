@@ -11,6 +11,24 @@ from presentation import generate_display_frame
 from utility import cpu, gpu, MixtureModel
 
 
+def dataset_setup(settings):
+    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
+                               seed=settings.labeled_dataset_seed)
+    train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
+    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
+                                   seed=100)
+    unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
+    validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101)
+    return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
+
+
+def model_setup():
+    G_model = gpu(Generator())
+    D_model = MLP()
+    DNN_model = MLP()
+    return DNN_model, D_model, G_model
+
+
 def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, settings, step, train_dataset,
                          trial_directory, unlabeled_dataset, validation_dataset):
     dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
@@ -53,21 +71,3 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
                                                     dnn_validation_predictions_array, train_predictions_array,
                                                     dnn_train_predictions_array, step)
         gan_summary_writer.add_image('Distributions', distribution_image)
-
-
-def model_setup():
-    G_model = gpu(Generator())
-    D_model = MLP()
-    DNN_model = MLP()
-    return DNN_model, D_model, G_model
-
-
-def dataset_setup(settings):
-    train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
-                               seed=settings.labeled_dataset_seed)
-    train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
-    unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
-                                   seed=100)
-    unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
-    validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101)
-    return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset

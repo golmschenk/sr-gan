@@ -40,7 +40,7 @@ class AgeDataset(Dataset):
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
         image = imageio.imread(image_path)
-        image = skimage.transform.resize(image, (128, 128))
+        image = skimage.transform.resize(image, (256, 256))
         age = self.ages[idx]
         return image, age
 

@@ -36,13 +36,13 @@ def run_srgan(settings):
     gan_summary_writer.summary_period = settings.summary_step_period
 
     if settings.application == 'coefficient':
-        validation_summaries = coefficient_training.validation_summaries
-        model_setup = coefficient_training.model_setup
         dataset_setup = coefficient_training.dataset_setup
+        model_setup = coefficient_training.model_setup
+        validation_summaries = coefficient_training.validation_summaries
     elif settings.application == 'age':
-        validation_summaries = age_training.validation_summaries
-        model_setup = age_training.model_setup
         dataset_setup = age_training.dataset_setup
+        model_setup = age_training.model_setup
+        validation_summaries = age_training.validation_summaries
     else:
         raise ValueError('`application` cannot be {}.'.format(settings.application))
 
@@ -108,7 +108,7 @@ def run_srgan(settings):
 
 if __name__ == '__main__':
     settings_ = Settings()
-    settings_.application = 'coefficient'
+    #settings_.application = 'age'
     settings_.labeled_dataset_seed = [0, 1, 2, 3, 4]
     settings_.labeled_dataset_size = 500
     settings_.unlabeled_loss_multiplier = 1e0
