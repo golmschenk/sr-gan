@@ -8,6 +8,7 @@ from copy import deepcopy
 class Settings():
     def __init__(self):
         self.trial_name = 'base'
+        self.application = 'coefficient'
         self.steps_to_run = 200000
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'

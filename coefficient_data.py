@@ -1,5 +1,5 @@
 """
-Code for the data generating models.
+Code for the polynomial coefficient data generating models.
 """
 
 import numpy as np
