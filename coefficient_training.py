@@ -23,7 +23,7 @@ def dataset_setup(settings):
 
 
 def model_setup():
-    G_model = gpu(Generator())
+    G_model = Generator()
     D_model = MLP()
     DNN_model = MLP()
     return DNN_model, D_model, G_model

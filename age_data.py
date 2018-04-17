@@ -2,10 +2,11 @@
 Code for accessing the data in the database easily.
 """
 import os
+import skimage
 
 import imageio
 import numpy as np
-import skimage
+from skimage import transform, color
 from torch.utils.data import Dataset
 from scipy.io import loadmat
 from datetime import datetime
@@ -14,7 +15,7 @@ from datetime import datetime
 class AgeDataset(Dataset):
     def __init__(self, start=None, end=None, gender_filter=None):
         mat_path = '../imdb_wiki_data/imdb_crop/imdb.mat'
-        dataset_path = '../imdb_wiki_data/imdb_crop/'
+        self.dataset_path = '../imdb_wiki_data/imdb_crop/'
         image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages = get_database_meta(mat_path)
         indexes = np.where(face_scores > 1.0)
         if gender_filter is not None:
@@ -24,7 +25,10 @@ class AgeDataset(Dataset):
         ages = ages[indexes]
         indexes = []
         for index, image_path in enumerate(image_paths):
-            image = imageio.imread(os.path.join(dataset_path, image_path))
+            try:
+                image = imageio.imread(os.path.join(self.dataset_path, image_path))
+            except FileNotFoundError:
+                continue
             if image.shape[0] > 256 and image.shape[1] > 256 and abs(image.shape[0] - image.shape[1]) < 5:
                 indexes.append(index)
                 if end is not None and len(indexes) > end:
@@ -39,8 +43,12 @@ class AgeDataset(Dataset):
 
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
-        image = imageio.imread(image_path)
-        image = skimage.transform.resize(image, (128, 128))
+        image = imageio.imread(os.path.join(self.dataset_path, image_path))
+        image = transform.resize(image, (128, 128))
+        if len(image.shape) == 2:
+            image = color.gray2rgb(image)
+        image = image.transpose((2, 0, 1))
+        image = image.astype(dtype=np.float32)
         age = self.ages[idx]
         return image, age
 
