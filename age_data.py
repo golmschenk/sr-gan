@@ -50,6 +50,7 @@ class AgeDataset(Dataset):
         image = image.transpose((2, 0, 1))
         image = image.astype(dtype=np.float32)
         age = self.ages[idx]
+        age = age.astype(dtype=np.float32)
         return image, age
 
 

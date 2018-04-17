@@ -31,11 +31,12 @@ def feature_distance_loss(base_features, other_features, order=2, base_noise=0, 
     if base_noise:
         base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
     mean_feature_distance = (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1 / 2)
-    epsilon = 1e-6
     if scale:
-        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + epsilon)
+        scale_epsilon = 1e-10
+        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + scale_epsilon)
     if order < 1:
-        mean_feature_distance += epsilon
+        order_epsilon = 1e-2
+        mean_feature_distance += order_epsilon
     return mean_feature_distance.pow(order)
 
 
@@ -77,7 +78,7 @@ def feature_covariance_loss(base_features, other_features):
 def dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, settings, step):
     dnn_summary_writer.step = step
     DNN_optimizer.zero_grad()
-    dnn_predicted_labels = DNN(gpu(Variable(labeled_examples)))
+    dnn_predicted_labels = DNN(gpu(Variable(labeled_examples))).squeeze()
     dnn_loss = coefficient_estimate_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
     dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
     dnn_feature_layer = DNN.feature_layer
@@ -92,7 +93,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     # Labeled.
     gan_summary_writer.step = step
     D_optimizer.zero_grad()
-    predicted_labels = D(gpu(Variable(labeled_examples)))
+    predicted_labels = D(gpu(Variable(labeled_examples))).squeeze()
     labeled_feature_layer = D.feature_layer
     labeled_loss = coefficient_estimate_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
     gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
@@ -103,7 +104,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     unlabeled_feature_layer = D.feature_layer
     gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                   float(cpu(unlabeled_feature_layer.norm(dim=1).mean()).data.numpy()))
-    unlabeled_loss = feature_distance_loss(unlabeled_feature_layer.detach(), labeled_feature_layer,
+    unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
                                            order=settings.unlabeled_loss_order) * settings.unlabeled_loss_multiplier
     gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
     # Fake.
@@ -113,7 +114,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     fake_examples = G(gpu(Variable(z)), add_noise=False)
     _ = D(fake_examples.detach())
     fake_feature_layer = D.feature_layer
-    fake_loss = feature_distance_loss(unlabeled_feature_layer.detach(), fake_feature_layer,
+    fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True,
                                       order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
     gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
     # Feature norm loss.
@@ -125,7 +126,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
                     alpha[1] * gpu(Variable(fake_examples.detach().data, requires_grad=True)))
     _ = D(interpolates)
     interpolates_feature_layer = D.feature_layer
-    interpolates_loss = feature_distance_loss(unlabeled_feature_layer.detach(), interpolates_feature_layer, scale=False,
+    interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer, scale=True,
                                               order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
     gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
                                     grad_outputs=gpu(torch.ones(interpolates_loss.size())),
