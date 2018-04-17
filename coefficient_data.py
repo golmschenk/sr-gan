@@ -73,7 +73,7 @@ def generate_polynomial_examples(number_of_examples, number_of_observations):
     a2, a3, a4 = generate_double_a2_single_a3_coefficients(number_of_examples)
     examples = generate_examples_from_coefficients(a2, a3, a4, number_of_observations)
     examples += np.random.normal(0, 0.1, examples.shape)
-    return examples, a3[:, 0, :]
+    return examples, np.squeeze(a3[:, 0], axis=-1)
 
 
 def generate_double_a2_single_a3_coefficients(number_of_examples):

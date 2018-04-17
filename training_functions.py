@@ -21,7 +21,7 @@ def angle_between(vector0, vector1):
 
 def coefficient_estimate_loss(predicted_labels, labels, order=2):
     """Calculate the loss from the coefficient prediction."""
-    return (predicted_labels[:, 0] - gpu(Variable(labels[:, 0]))).abs().pow(2).sum().pow(1/2).pow(order)
+    return (predicted_labels - gpu(Variable(labels))).abs().pow(2).sum().pow(1/2).pow(order)
 
 
 def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):

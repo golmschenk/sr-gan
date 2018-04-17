@@ -54,7 +54,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     fake_examples = G(gpu(Variable(z)), add_noise=False)
     fake_examples_array = cpu(fake_examples.data).numpy()
     fake_labels_array = np.mean(fake_examples_array, axis=1)
-    unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size][:, 0]
+    unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size]
     label_wasserstein_distance = wasserstein_distance(fake_labels_array, unlabeled_labels_array)
     gan_summary_writer.add_scalar('Generator/Label Wasserstein', label_wasserstein_distance)
     unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
