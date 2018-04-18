@@ -100,18 +100,18 @@ def generate_single_peak_double_peak(mean_offset=3):
 def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions, test_predictions, dnn_test_predictions, train_predictions, dnn_train_predictions, step):
     sns.set_style('darkgrid')
     bandwidth = 0.1
-    fake_a3 = np.transpose(np.polyfit(np.linspace(-1, 1, num=10), np.transpose(fake_examples[:, :10]), 3))[:, 0]
+    fake_a3 = np.transpose(np.polyfit(np.linspace(-1, 1, num=10), np.transpose(fake_examples[:, :10]), 3))
     x_axis_limits = [-4, 4]
     x_axis = np.arange(*x_axis_limits, 0.001)
     figure, axes = plt.subplots(dpi=dpi)
     axes.text(0.98, 0.98, 'Step: {}'.format(step), horizontalalignment='right', verticalalignment='top', family='monospace', fontsize=10, transform=axes.transAxes)
     axes.plot(x_axis, MixtureModel([uniform(-1, 2)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
-    axes = sns.kdeplot(fake_a3, ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
-    axes = sns.kdeplot(unlabeled_predictions[:, 0], ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
-    axes = sns.kdeplot(test_predictions[:, 0], ax=axes, color=sns.color_palette()[2], bw=bandwidth, label='GAN Test Predictions')
-    axes = sns.kdeplot(train_predictions[:, 0], ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth, label='GAN Train Predictions')
-    axes = sns.kdeplot(dnn_test_predictions[:, 0], ax=axes, color=sns.color_palette()[3], bw=bandwidth, label='DNN Test Predictions')
-    axes = sns.kdeplot(dnn_train_predictions[:, 0], ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth, label='DNN Train Predictions')
+    axes = sns.kdeplot(fake_a3[0, :], ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
+    axes = sns.kdeplot(unlabeled_predictions, ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
+    axes = sns.kdeplot(test_predictions, ax=axes, color=sns.color_palette()[2], bw=bandwidth, label='GAN Test Predictions')
+    axes = sns.kdeplot(train_predictions, ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth, label='GAN Train Predictions')
+    axes = sns.kdeplot(dnn_test_predictions, ax=axes, color=sns.color_palette()[3], bw=bandwidth, label='DNN Test Predictions')
+    axes = sns.kdeplot(dnn_train_predictions, ax=axes, color=sns.color_palette()[3], linewidth=0.5, bw=bandwidth, label='DNN Train Predictions')
     axes.set_xlim(*x_axis_limits)
     axes.set_ylim(0, 1)
     axes.legend(loc='upper left')
@@ -144,16 +144,16 @@ def generate_video_from_frames(trial_directory):
 
 
 def generate_dnn_vs_gan_average_per_number_of_examples():
-    dnn_results = {10: [1],
-                   30: [2],
-                   100: [3],
-                   300: [4],
-                   1000: [5]}
-    gan_results = {10: [2],
-                   30: [5],
-                   100: [5],
-                   300: [5],
-                   1000: [6]}
+    dnn_results = {15: [0.3970],
+                   30: [0.3393],
+                   100: [0.0883],
+                   300: [0.0721],
+                   1000: [0.0545]}
+    gan_results = {15: [0.2067],
+                   30: [0.1975],
+                   100: [0.0827],
+                   300: [0.0711],
+                   1000: [0.0543]}
     average_dnn_results = {example_count: np.mean(values) for example_count, values in dnn_results.items()}
     average_gan_results = {example_count: np.mean(values) for example_count, values in gan_results.items()}
     dnn_plot_x, dnn_plot_y = zip(*sorted(average_dnn_results.items()))
@@ -162,6 +162,9 @@ def generate_dnn_vs_gan_average_per_number_of_examples():
     axes.set_xscale('log')
     axes.set_xticks(dnn_plot_x)
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    axes.set_yscale('log')
+    axes.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    axes.get_yaxis().set_minor_formatter(matplotlib.ticker.ScalarFormatter())
     axes.plot(dnn_plot_x, dnn_plot_y, color=sns.color_palette()[3], label='DNN')
     axes.plot(gan_plot_x, gan_plot_y, color=sns.color_palette()[2], label='GAN')
     matplotlib2tikz.save(os.path.join('latex', 'coefficient_dnn_vs_gan.tex'))
