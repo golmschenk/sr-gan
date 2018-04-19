@@ -109,20 +109,20 @@ def run_srgan(settings):
 if __name__ == '__main__':
     settings_ = Settings()
     settings_.application = 'age'
-    settings_.unlabeled_dataset_size = 1000
+    settings_.unlabeled_dataset_size = 100
     settings_.batch_size = 25
     settings_.summary_step_period = 25
     settings_.labeled_dataset_seed = [0]
-    settings_.labeled_dataset_size = [30]
-    settings_.unlabeled_loss_multiplier = [1e-1, 1e0, 1e1]
-    settings_.fake_loss_multiplier = [1e-1, 1e0, 1e1]
+    settings_.labeled_dataset_size = [100]
+    settings_.unlabeled_loss_multiplier = [1e0]
+    settings_.fake_loss_multiplier = [1e0]
     settings_.steps_to_run = 1000000
     settings_.learning_rate = [1e-5]
-    settings_.gradient_penalty_multiplier = [1e-1, 1e0, 1e1, 1e2]
-    settings_.norm_loss_multiplier = [0, 0.1]
+    settings_.gradient_penalty_multiplier = [1e1]
+    settings_.norm_loss_multiplier = [0]
     settings_.mean_offset = 2
     settings_.unlabeled_loss_order = 2
-    settings_.fake_loss_order = [0.5, 1]
+    settings_.fake_loss_order = [0.5]
     settings_.generator_loss_order = 2
     settings_.generator_training_step_period = 1
     settings_.should_save_models = True
@@ -130,7 +130,7 @@ if __name__ == '__main__':
     settings_list = convert_to_settings_list(settings_)
     seed_all(0)
     for settings_ in settings_list:
-        trial_name = 'ff3 gpu'
+        trial_name = 'age'
         trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
         trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
