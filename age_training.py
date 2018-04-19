@@ -34,43 +34,40 @@ def model_setup():
 
 def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, settings, step, train_dataset,
                          trial_directory, unlabeled_dataset, validation_dataset):
-    dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
-        train_dataset.examples.astype(np.float32))))).data).numpy()
-    dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels), axis=0)
-    dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors.data[0])
-    dnn_predicted_validation_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
-        validation_dataset.examples.astype(np.float32))))).data).numpy()
-    dnn_validation_label_errors = np.mean(np.abs(dnn_predicted_validation_labels - validation_dataset.labels), axis=0)
-    dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_errors.data[0])
-    predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(
-        train_dataset.examples.astype(np.float32))))).data).numpy()
-    gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels), axis=0)
-    gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors.data[0])
-    predicted_validation_labels = cpu(D(gpu(Variable(torch.from_numpy(
-        validation_dataset.examples.astype(np.float32))))).data).numpy()
-    gan_validation_label_errors = np.mean(np.abs(predicted_validation_labels - validation_dataset.labels), axis=0)
-    gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_errors.data[0])
-    gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN',
-                                  gan_validation_label_errors.data[0] / dnn_validation_label_errors.data[0])
-    z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
-        size=[settings.batch_size, G.input_size]).astype(np.float32))
-    fake_examples = G(gpu(Variable(z)), add_noise=False)
-    fake_examples_array = cpu(fake_examples.data).numpy()
-    fake_labels_array = np.mean(fake_examples_array, axis=1)
-    unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size][:, 0]
-    label_wasserstein_distance = wasserstein_distance(fake_labels_array, unlabeled_labels_array)
-    gan_summary_writer.add_scalar('Generator/Label Wasserstein', label_wasserstein_distance)
-    # unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
-    # unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
-    # unlabeled_predictions = D(gpu(Variable(unlabeled_examples)))
-    # if dnn_summary_writer.step % settings.presentation_step_period == 0:
-    #     unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
-    #     validation_predictions_array = predicted_validation_labels
-    #     train_predictions_array = predicted_train_labels
-    #     dnn_validation_predictions_array = dnn_predicted_validation_labels
-    #     dnn_train_predictions_array = dnn_predicted_train_labels
-    #     distribution_image = generate_display_frame(trial_directory, fake_examples_array,
-    #                                                 unlabeled_predictions_array, validation_predictions_array,
-    #                                                 dnn_validation_predictions_array, train_predictions_array,
-    #                                                 dnn_train_predictions_array, step)
-    #     gan_summary_writer.add_image('Distributions', distribution_image)
+    # DNN training evaluation.
+    dnn_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
+    dnn_train_predicted_ages, dnn_train_ages = np.array([]), np.array([])
+    for images, ages in dnn_train_dataset_loader:
+        predicted_ages = cpu(DNN(gpu(Variable(images))).squeeze().data).numpy()
+        dnn_train_predicted_ages = np.concatenate([dnn_train_predicted_ages, predicted_ages])
+        dnn_train_ages = np.concatenate([dnn_train_ages, ages])
+    dnn_train_label_error = np.mean(np.abs(dnn_train_predicted_ages - dnn_train_ages))
+    dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_error)
+    # DNN validation evaluation.
+    dnn_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
+    dnn_validation_predicted_ages, dnn_validation_ages = np.array([]), np.array([])
+    for images, ages in dnn_validation_dataset_loader:
+        predicted_ages = cpu(DNN(gpu(Variable(images))).squeeze().data).numpy()
+        dnn_validation_predicted_ages = np.concatenate([dnn_validation_predicted_ages, predicted_ages])
+        dnn_validation_ages = np.concatenate([dnn_validation_ages, ages])
+    dnn_validation_label_error = np.mean(np.abs(dnn_validation_predicted_ages - dnn_validation_ages))
+    dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_error)
+    # GAN training evaluation.
+    gan_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
+    gan_train_predicted_ages, gan_train_ages = np.array([]), np.array([])
+    for images, ages in gan_train_dataset_loader:
+        predicted_ages = cpu(D(gpu(Variable(images))).squeeze().data).numpy()
+        gan_train_predicted_ages = np.concatenate([gan_train_predicted_ages, predicted_ages])
+        gan_train_ages = np.concatenate([gan_train_ages, ages])
+    gan_train_label_error = np.mean(np.abs(gan_train_predicted_ages - gan_train_ages))
+    gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_error)
+    # GAN validation evaluation.
+    gan_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
+    gan_validation_predicted_ages, gan_validation_ages = np.array([]), np.array([])
+    for images, ages in gan_validation_dataset_loader:
+        predicted_ages = cpu(D(gpu(Variable(images))).squeeze().data).numpy()
+        gan_validation_predicted_ages = np.concatenate([gan_validation_predicted_ages, predicted_ages])
+        gan_validation_ages = np.concatenate([gan_validation_ages, ages])
+    gan_validation_label_error = np.mean(np.abs(gan_validation_predicted_ages - gan_validation_ages))
+    gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_error)
+    gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN', gan_validation_label_error / dnn_validation_label_error)
