@@ -109,11 +109,11 @@ def run_srgan(settings):
 if __name__ == '__main__':
     settings_ = Settings()
     settings_.application = 'age'
-    settings_.unlabeled_dataset_size = 100
-    settings_.batch_size = 25
-    settings_.summary_step_period = 25
+    settings_.unlabeled_dataset_size = 10000
+    settings_.batch_size = 100
+    settings_.summary_step_period = 1000
     settings_.labeled_dataset_seed = [0]
-    settings_.labeled_dataset_size = [100]
+    settings_.labeled_dataset_size = [30]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.steps_to_run = 1000000

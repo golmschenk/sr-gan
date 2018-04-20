@@ -1,9 +1,8 @@
-import numpy as np
 
+import numpy as np
 import torch
 import torchvision as torchvision
-from scipy.stats import norm, wasserstein_distance
-
+from scipy.stats import norm
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
@@ -55,7 +54,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     dnn_validation_label_error = np.mean(np.abs(dnn_validation_predicted_ages - dnn_validation_ages))
     dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_error)
     # GAN training evaluation.
-    gan_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
+    gan_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
     gan_train_predicted_ages, gan_train_ages = np.array([]), np.array([])
     for images, ages in gan_train_dataset_loader:
         predicted_ages = cpu(D(gpu(Variable(images))).squeeze().data).numpy()
@@ -80,13 +79,13 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     gan_summary_writer.add_image('Real', images_image)
     # Generated images.
     z = torch.randn(settings.batch_size, G.input_size)
-    fake_examples = G(Variable(z))
+    fake_examples = cpu(G(gpu(Variable(z))))
     fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], nrow=3)
     gan_summary_writer.add_image('Fake/Standard', fake_images_image)
     z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
                                        norm(settings.mean_offset, 1)]
                                       ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
-    fake_examples = G(Variable(z))
+    fake_examples = cpu(G(gpu(Variable(z))))
     fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], nrow=3)
     gan_summary_writer.add_image('Fake/Offset', fake_images_image)
 

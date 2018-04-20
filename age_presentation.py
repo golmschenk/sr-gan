@@ -6,7 +6,6 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib2tikz as matplotlib2tikz
 import seaborn as sns
-import numpy as np
 import os
 
 import shutil
