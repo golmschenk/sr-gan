@@ -81,6 +81,8 @@ def run_srgan(settings):
             step_time_start = datetime.datetime.now()
         # DNN.
         labeled_examples, labels = next(train_dataset_generator)
+        if len(labels.size()) > 1:
+            labels = labels.squeeze()
         dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, settings, step)
         # GAN.
         unlabeled_examples, _ = next(unlabeled_dataset_generator)

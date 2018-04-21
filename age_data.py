@@ -2,6 +2,8 @@
 Code for accessing the data in the database easily.
 """
 import os
+import torch
+
 import skimage
 
 import imageio
@@ -35,7 +37,7 @@ class AgeDataset(Dataset):
                     break
         indexes = indexes[start:end]
         self.image_paths = np.copy(image_paths[indexes])
-        self.ages = np.copy(ages[indexes])
+        self.ages = ages[indexes].astype(np.float32)
         self.length = self.ages.shape[0]
 
     def __len__(self):
@@ -48,9 +50,9 @@ class AgeDataset(Dataset):
         if len(image.shape) == 2:
             image = color.gray2rgb(image)
         image = image.transpose((2, 0, 1))
-        image = image.astype(dtype=np.float32)
+        image = torch.from_numpy(image.astype(np.float32))
         age = self.ages[idx]
-        age = age.astype(dtype=np.float32)
+        age = torch.from_numpy(np.array([age]))
         return image, age
 
 

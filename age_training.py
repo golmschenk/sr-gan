@@ -15,10 +15,10 @@ def dataset_setup(settings):
     print('Selecting dataset...')
     seed_all(settings.labeled_dataset_seed)
     train_dataset = AgeDataset(start=0, end=settings.labeled_dataset_size)
-    train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
+    train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
     unlabeled_dataset = AgeDataset(start=train_dataset.length,
                                    end=train_dataset.length + settings.unlabeled_dataset_size)
-    unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
+    unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
     train_and_unlabeled_dataset_size = train_dataset.length + unlabeled_dataset.length
     validation_dataset = AgeDataset(start=train_and_unlabeled_dataset_size,
                                     end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
@@ -39,6 +39,8 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     dnn_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
     dnn_train_predicted_ages, dnn_train_ages = np.array([]), np.array([])
     for images, ages in dnn_train_dataset_loader:
+        if len(ages.size()) > 1:
+            ages = ages.squeeze()
         predicted_ages = cpu(DNN(gpu(Variable(images))).squeeze().data).numpy()
         dnn_train_predicted_ages = np.concatenate([dnn_train_predicted_ages, predicted_ages])
         dnn_train_ages = np.concatenate([dnn_train_ages, ages])
@@ -48,6 +50,8 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     dnn_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
     dnn_validation_predicted_ages, dnn_validation_ages = np.array([]), np.array([])
     for images, ages in dnn_validation_dataset_loader:
+        if len(ages.size()) > 1:
+            ages = ages.squeeze()
         predicted_ages = cpu(DNN(gpu(Variable(images))).squeeze().data).numpy()
         dnn_validation_predicted_ages = np.concatenate([dnn_validation_predicted_ages, predicted_ages])
         dnn_validation_ages = np.concatenate([dnn_validation_ages, ages])
@@ -57,6 +61,8 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     gan_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
     gan_train_predicted_ages, gan_train_ages = np.array([]), np.array([])
     for images, ages in gan_train_dataset_loader:
+        if len(ages.size()) > 1:
+            ages = ages.squeeze()
         predicted_ages = cpu(D(gpu(Variable(images))).squeeze().data).numpy()
         gan_train_predicted_ages = np.concatenate([gan_train_predicted_ages, predicted_ages])
         gan_train_ages = np.concatenate([gan_train_ages, ages])
@@ -66,6 +72,8 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     gan_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
     gan_validation_predicted_ages, gan_validation_ages = np.array([]), np.array([])
     for images, ages in gan_validation_dataset_loader:
+        if len(ages.size()) > 1:
+            ages = ages.squeeze()
         predicted_ages = cpu(D(gpu(Variable(images))).squeeze().data).numpy()
         gan_validation_predicted_ages = np.concatenate([gan_validation_predicted_ages, predicted_ages])
         gan_validation_ages = np.concatenate([gan_validation_ages, ages])
