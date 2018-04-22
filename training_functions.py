@@ -19,9 +19,9 @@ def angle_between(vector0, vector1):
     return unit_vector0.dot(unit_vector1).clamp(-1.0 + epsilon, 1.0 - epsilon).acos()
 
 
-def coefficient_estimate_loss(predicted_labels, labels, order=2):
-    """Calculate the loss from the coefficient prediction."""
-    return (predicted_labels - gpu(Variable(labels))).abs().pow(2).sum().pow(1/2).pow(order)
+def labeled_loss_function(predicted_labels, labels, order=2):
+    """Calculate the loss from the label difference prediction."""
+    return (predicted_labels - gpu(Variable(labels))).abs().pow(order).mean()
 
 
 def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):
@@ -79,7 +79,7 @@ def dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, 
     dnn_summary_writer.step = step
     DNN_optimizer.zero_grad()
     dnn_predicted_labels = DNN(gpu(Variable(labeled_examples))).squeeze()
-    dnn_loss = coefficient_estimate_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
+    dnn_loss = labeled_loss_function(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
     dnn_feature_layer = DNN.feature_layer
     dnn_loss.backward()
     DNN_optimizer.step()
@@ -97,7 +97,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     D_optimizer.zero_grad()
     predicted_labels = D(gpu(Variable(labeled_examples))).squeeze()
     labeled_feature_layer = D.feature_layer
-    labeled_loss = coefficient_estimate_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
+    labeled_loss = labeled_loss_function(predicted_labels, labels) * settings.labeled_loss_multiplier
     # Unlabeled.
     _ = D(gpu(Variable(unlabeled_examples)))
     unlabeled_feature_layer = D.feature_layer
