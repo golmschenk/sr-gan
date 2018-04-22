@@ -91,8 +91,14 @@ def run_srgan(settings):
 
         if (dnn_summary_writer.step % dnn_summary_writer.summary_period == 0 or
                 dnn_summary_writer.step % settings.presentation_step_period == 0):
+            D.eval()
+            DNN.eval()
+            G.eval()
             validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, settings, step, train_dataset,
                                  trial_directory, unlabeled_dataset, validation_dataset)
+            D.train()
+            DNN.train()
+            G.train()
             while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                 line = sys.stdin.readline()
                 if 'save' in line:
@@ -111,12 +117,11 @@ def run_srgan(settings):
 if __name__ == '__main__':
     settings_ = Settings()
     settings_.application = 'age'
-    settings_.unlabeled_dataset_size = 10
-    settings_.batch_size = 10
-    settings_.summary_step_period = 10
+    settings_.unlabeled_dataset_size = 10000
+    settings_.batch_size = 100
+    settings_.summary_step_period = 1000
     settings_.labeled_dataset_seed = [1]
-    settings_.labeled_dataset_size = [10]
-    settings_.validation_dataset_size = 10
+    settings_.labeled_dataset_size = [100]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.steps_to_run = 1000000
