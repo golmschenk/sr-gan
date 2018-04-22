@@ -80,12 +80,14 @@ def dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, 
     DNN_optimizer.zero_grad()
     dnn_predicted_labels = DNN(gpu(Variable(labeled_examples))).squeeze()
     dnn_loss = coefficient_estimate_loss(dnn_predicted_labels, labels) * settings.labeled_loss_multiplier
-    dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
     dnn_feature_layer = DNN.feature_layer
-    dnn_summary_writer.add_scalar('Feature Norm/Labeled',
-                                  float(cpu(dnn_feature_layer.norm(dim=1).mean()).data.numpy()))
     dnn_loss.backward()
     DNN_optimizer.step()
+    # Summaries.
+    if dnn_summary_writer.is_summary_step():
+        dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.data[0])
+        dnn_summary_writer.add_scalar('Feature Norm/Labeled',
+                                      float(cpu(dnn_feature_layer.norm(dim=1).mean()).data.numpy()))
 
 
 def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, settings, step,
@@ -96,17 +98,11 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     predicted_labels = D(gpu(Variable(labeled_examples))).squeeze()
     labeled_feature_layer = D.feature_layer
     labeled_loss = coefficient_estimate_loss(predicted_labels, labels) * settings.labeled_loss_multiplier
-    gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
     # Unlabeled.
-    gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                  float(cpu(labeled_feature_layer.norm(dim=1).mean()).data.numpy()))
     _ = D(gpu(Variable(unlabeled_examples)))
     unlabeled_feature_layer = D.feature_layer
-    gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                  float(cpu(unlabeled_feature_layer.norm(dim=1).mean()).data.numpy()))
     unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
                                            order=settings.unlabeled_loss_order) * settings.unlabeled_loss_multiplier
-    gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
     # Fake.
     z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
                                        norm(settings.mean_offset, 1)]
@@ -116,7 +112,6 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     fake_feature_layer = D.feature_layer
     fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True,
                                       order=settings.fake_loss_order).neg() * settings.fake_loss_multiplier
-    gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])
     # Feature norm loss.
     feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2) * settings.norm_loss_multiplier
     # Gradient penalty.
@@ -140,13 +135,23 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     if step % settings.generator_training_step_period == 0:
         G_optimizer.zero_grad()
         _ = D(gpu(Variable(unlabeled_examples)))
-        unlabeled_feature_layer = D.feature_layer.detach()
+        detached_unlabeled_feature_layer = D.feature_layer.detach()
         z = torch.randn(unlabeled_examples.size(0), G.input_size)
         fake_examples = G(gpu(Variable(z)))
         _ = D(fake_examples)
         fake_feature_layer = D.feature_layer
-        generator_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer,
+        generator_loss = feature_distance_loss(detached_unlabeled_feature_layer, fake_feature_layer,
                                                order=settings.generator_loss_order)
-        gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
         generator_loss.backward()
         G_optimizer.step()
+        if gan_summary_writer.is_summary_step():
+            gan_summary_writer.add_scalar('Generator/Loss', generator_loss.data[0])
+    # Summaries.
+    if gan_summary_writer.is_summary_step():
+        gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.data[0])
+        gan_summary_writer.add_scalar('Feature Norm/Labeled',
+                                      float(cpu(labeled_feature_layer.norm(dim=1).mean()).data.numpy()))
+        gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
+                                      float(cpu(unlabeled_feature_layer.norm(dim=1).mean()).data.numpy()))
+        gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.data[0])
+        gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.data[0])

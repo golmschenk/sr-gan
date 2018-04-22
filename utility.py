@@ -35,6 +35,9 @@ class SummaryWriter(SummaryWriter_):
         if self.step % self.summary_period == 0:
             super().add_image(tag, img_tensor, global_step)
 
+    def is_summary_step(self):
+        return self.step % self.summary_period == 0
+
 
 def infinite_iter(dataset):
     """Create an infinite generator from a dataset."""
