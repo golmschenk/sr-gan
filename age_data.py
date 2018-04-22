@@ -3,10 +3,9 @@ Code for accessing the data in the database easily.
 """
 import os
 import torch
-
-import skimage
-
+from urllib.request import urlretrieve
 import imageio
+import tarfile
 import numpy as np
 from skimage import transform, color
 from torch.utils.data import Dataset
@@ -81,6 +80,20 @@ def get_database_meta(mat_path, database_name='imdb', shuffle=True):
     return image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages
 
 
+def download_database():
+    database_directory = '../imdb_wiki_data'
+    if os.path.exists(database_directory):
+        print('imdb-wiki database already seems to exist. Delete it for fresh download.')
+        return
+    os.makedirs(database_directory)
+    print('Downloading...')
+    urlretrieve('https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/imdb_crop.tar',
+                os.path.join(database_directory, 'imdb_crop.tar'))
+    with tarfile.open(os.path.join(database_directory, 'imdb_crop.tar')) as tar_file:
+        tar_file.extractall(path=database_directory)
+        os.remove(os.path.join(database_directory, 'imdb_crop.tar'))
+    print('Done.')
+
+
 if __name__ == '__main__':
-    examples = AgeDataset(end=1000)
-    print()
+    download_database()

@@ -27,6 +27,7 @@ def run_srgan(settings):
     """
     datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
     trial_directory = os.path.join(settings.logs_directory, '{} {}'.format(settings.trial_name, datetime_string))
+    print(trial_directory)
     global global_trial_directory
     global_trial_directory = trial_directory
     os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
@@ -71,7 +72,6 @@ def run_srgan(settings):
     DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
 
     step_time_start = datetime.datetime.now()
-    print(trial_directory)
     train_dataset_generator = infinite_iter(train_dataset_loader)
     unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
 
@@ -111,15 +111,16 @@ def run_srgan(settings):
 if __name__ == '__main__':
     settings_ = Settings()
     settings_.application = 'age'
-    settings_.unlabeled_dataset_size = 10000
-    settings_.batch_size = 100
-    settings_.summary_step_period = 1000
-    settings_.labeled_dataset_seed = [0]
-    settings_.labeled_dataset_size = [30]
+    settings_.unlabeled_dataset_size = 10
+    settings_.batch_size = 10
+    settings_.summary_step_period = 10
+    settings_.labeled_dataset_seed = [1]
+    settings_.labeled_dataset_size = [10]
+    settings_.validation_dataset_size = 10
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.steps_to_run = 1000000
-    settings_.learning_rate = [1e-5]
+    settings_.learning_rate = [1e-4]
     settings_.gradient_penalty_multiplier = [1e1]
     settings_.norm_loss_multiplier = [0]
     settings_.mean_offset = 2
