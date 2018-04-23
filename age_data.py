@@ -19,6 +19,10 @@ class AgeDataset(Dataset):
         self.dataset_path = '../imdb_wiki_data/imdb_crop/'
         image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages = get_database_meta(mat_path)
         indexes = np.where(face_scores > 1.0)
+        age_min_indexes = np.where(ages >= 10.0)
+        age_max_indexes = np.where(ages <= 95.0)
+        age_indexes = np.intersect1d(age_min_indexes, age_max_indexes)
+        indexes = np.intersect1d(indexes, age_indexes)
         if gender_filter is not None:
             gender_indexes = np.where(genders == gender_filter)
             indexes = np.intersect1d(indexes, gender_indexes)

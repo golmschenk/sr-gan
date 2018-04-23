@@ -76,9 +76,6 @@ def run_srgan(settings):
     unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
 
     for step in range(settings.steps_to_run):
-        if gan_summary_writer.is_summary_step():
-            print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
-            step_time_start = datetime.datetime.now()
         # DNN.
         labeled_examples, labels = next(train_dataset_generator)
         if len(labels.size()) > 1:
@@ -90,6 +87,9 @@ def run_srgan(settings):
                           unlabeled_examples)
 
         if gan_summary_writer.is_summary_step():
+            print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
+            step_time_start = datetime.datetime.now()
+
             D.eval()
             DNN.eval()
             G.eval()
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     settings_.batch_size = 50
     settings_.summary_step_period = 1000
     settings_.labeled_dataset_seed = [2]
-    settings_.labeled_dataset_size = [10000]
+    settings_.labeled_dataset_size = [500]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.steps_to_run = 300000
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     settings_list = convert_to_settings_list(settings_)
     seed_all(0)
     for settings_ in settings_list:
-        trial_name = 'age2'
+        trial_name = 'age3'
         trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
         trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
