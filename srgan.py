@@ -76,7 +76,7 @@ def run_srgan(settings):
     unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
 
     for step in range(settings.steps_to_run):
-        if step % settings.summary_step_period == 0 and step != 0:
+        if gan_summary_writer.is_summary_step():
             print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
             step_time_start = datetime.datetime.now()
         # DNN.
@@ -89,8 +89,7 @@ def run_srgan(settings):
         gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, settings, step,
                           unlabeled_examples)
 
-        if (dnn_summary_writer.step % dnn_summary_writer.summary_period == 0 or
-                dnn_summary_writer.step % settings.presentation_step_period == 0):
+        if gan_summary_writer.is_summary_step():
             D.eval()
             DNN.eval()
             G.eval()
@@ -118,13 +117,13 @@ if __name__ == '__main__':
     settings_ = Settings()
     settings_.application = 'age'
     settings_.unlabeled_dataset_size = 10000
-    settings_.batch_size = 100
+    settings_.batch_size = 50
     settings_.summary_step_period = 1000
-    settings_.labeled_dataset_seed = [1]
-    settings_.labeled_dataset_size = [100]
+    settings_.labeled_dataset_seed = [2]
+    settings_.labeled_dataset_size = [10000]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
-    settings_.steps_to_run = 1000000
+    settings_.steps_to_run = 300000
     settings_.learning_rate = [1e-4]
     settings_.gradient_penalty_multiplier = [1e1]
     settings_.norm_loss_multiplier = [0]
@@ -134,11 +133,12 @@ if __name__ == '__main__':
     settings_.generator_loss_order = 2
     settings_.generator_training_step_period = 1
     settings_.should_save_models = True
-    #settings_.load_model_path = '/home/golmschenk/srgan/logs/detachall ul1e0 fl1e-1 le100 gp1e1 bg1e0 lr1e-5 nl0 gs1 ls0 u2f1g2 l y2018m04d15h14m14s10'
+    #settings_.load_model_path = '/home/golmschenk/srgan/logs/age ul1e0 fl1e0 le3000 gp1e1 bg2e0 lr1e-5 nl0 gs1 ls0 u2f0.5g2 y2018m04d20h22m58s03'
+    settings_.local_setup()
     settings_list = convert_to_settings_list(settings_)
     seed_all(0)
     for settings_ in settings_list:
-        trial_name = 'age'
+        trial_name = 'age2'
         trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
         trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)

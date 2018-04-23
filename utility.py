@@ -107,6 +107,7 @@ def load(model_path):
 
 
 class MixtureModel(rv_continuous):
+    """Creates a combination distribution of multiple scipy.stats model distributions."""
     def __init__(self, submodels, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.submodels = submodels
@@ -126,6 +127,7 @@ class MixtureModel(rv_continuous):
 
 
 def seed_all(seed=None):
+    """Seed every type of random used by the SRGAN."""
     random.seed(seed)
     np.random.seed(seed)
     if seed is None:

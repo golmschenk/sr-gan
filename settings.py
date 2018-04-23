@@ -1,11 +1,13 @@
 """
 General settings.
 """
+import platform
 import random
 from copy import deepcopy
 
 
-class Settings():
+class Settings:
+    """Represents the settings for a given run of SRGAN."""
     def __init__(self):
         self.trial_name = 'base'
         self.application = 'coefficient'
@@ -13,7 +15,6 @@ class Settings():
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'
         self.batch_size = 1000
-        self.presentation_step_period = 1000
         self.summary_step_period = 1000
         self.labeled_dataset_size = 50
         self.unlabeled_dataset_size = 50000
@@ -37,10 +38,20 @@ class Settings():
         self.load_model_path = None
         self.should_save_models = False
 
+    def local_setup(self):
+        """Code to override some settings when debugging on the local (low power) machine."""
+        if 'Carbon' in platform.node():
+            self.batch_size = 10
+            self.summary_step_period = 10
+            self.labeled_dataset_size = 10
+            self.unlabeled_dataset_size = 10
+            self.validation_dataset_size = 10
+
 
 def convert_to_settings_list(settings, shuffle=True):
     """
     Creates permutations of settings for any setting that is a list.
+    (e.g. if `learning_rate = [1e-4, 1e-5]` and `batch_size = [10, 100]`, a list of 4 settings objects will return)
     This function is black magic. Beware.
     """
     settings_list = [settings]
