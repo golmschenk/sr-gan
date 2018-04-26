@@ -319,15 +319,15 @@ def file_string_replace(file_name, old_string, new_string):
         file.write(contents)
 
 
-def plot_coefficient_dnn_vs_gan_average_error_by_labeled_dataset_size():
-    logs = Log.create_all_in_directory('logs')
+def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory):
+    logs = Log.create_all_in_directory(logs_directory)
     dnn_results = collections.defaultdict(list)
     gan_results = collections.defaultdict(list)
     for log in logs:
         labeled_dataset_size = int(re.search(r' le(\d+) ', log.event_file_name).group(1))
         model_type = re.search(r'/(DNN|GAN)/', log.event_file_name).group(1)
-        last_errors = log.scalars_data_frame.iloc[-10:]['1_Test_Error/MAE'].tolist()
-        error = np.mean(last_errors)
+        last_errors = log.scalars_data_frame.iloc[-3:]['1_Validation_Error/MAE'].tolist()
+        error = np.nanmean(last_errors)
         if model_type == 'GAN':
             gan_results[labeled_dataset_size].append(error)
         else:
@@ -336,13 +336,27 @@ def plot_coefficient_dnn_vs_gan_average_error_by_labeled_dataset_size():
     average_gan_results = {example_count: np.mean(values) for example_count, values in gan_results.items()}
     dnn_plot_x, dnn_plot_y = zip(*sorted(average_dnn_results.items()))
     gan_plot_x, gan_plot_y = zip(*sorted(average_gan_results.items()))
+    dnn_plot_y, gan_plot_y = np.array(dnn_plot_y), np.array(gan_plot_y)
     figure, axes = plt.subplots()
     axes.set_xscale('log')
     axes.set_xticks(dnn_plot_x)
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    axes.set_xlabel('Labeled Dataset Size')
+    axes.set_ylabel('Age MAE')
     axes.plot(dnn_plot_x, dnn_plot_y, color=dnn_color, label='DNN')
     axes.plot(gan_plot_x, gan_plot_y, color=gan_color, label='GAN')
-    matplotlib2tikz.save(os.path.join('latex', 'coefficient_dnn_vs_gan.tex'))
+    axes.legend().set_visible(True)
+    matplotlib2tikz.save(os.path.join('latex', 'dnn-vs-gan.tex'))
+    plt.show()
+    plt.close(figure)
+    figure, axes = plt.subplots()
+    axes.set_xscale('log')
+    axes.set_xticks(dnn_plot_x)
+    axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    axes.set_xlabel('Labeled Dataset Size')
+    axes.set_ylabel('GAN to DNN Relative Error')
+    axes.plot(gan_plot_x, gan_plot_y / dnn_plot_y, color=gan_color)
+    matplotlib2tikz.save(os.path.join('latex', 'gan-to-dnn-relative-error.tex'))
     plt.show()
     plt.close(figure)
 
@@ -354,11 +368,11 @@ def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
     else:
         dnn_log, gan_log = logs[0], logs[1]
     figure, axes = plt.subplots()
-    gan_log.scalars_data_frame.plot(y='1_Test_Error/MAE', ax=axes, label='GAN', color=gan_color)
-    dnn_log.scalars_data_frame.plot(y='1_Test_Error/MAE', ax=axes, label='DNN', color=dnn_color)
+    gan_log.scalars_data_frame.plot(y='1_Validation_Error/MAE', ax=axes, label='GAN', color=gan_color)
+    dnn_log.scalars_data_frame.plot(y='1_Validation_Error/MAE', ax=axes, label='DNN', color=dnn_color)
     plt.show()
 
 
 
 if __name__ == '__main__':
-    plot_coefficient_dnn_vs_gan_error_over_training('/Users/golmschenk/Code/srgan/logs/test ul1e0 fl1e-1 le15 gp1e2 bg2e0 lr1e-5 nl0 gs1 ls0 y2018m04d13h13m40s28')
+    plot_dnn_vs_gan_average_error_by_labeled_dataset_size('/Users/golmschenk/Desktop/Preliminary Age Results')
