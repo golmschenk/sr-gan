@@ -41,6 +41,7 @@ class Settings:
     def local_setup(self):
         """Code to override some settings when debugging on the local (low power) machine."""
         if 'Carbon' in platform.node():
+            self.labeled_dataset_seed = 0
             self.batch_size = 10
             self.summary_step_period = 10
             self.labeled_dataset_size = 10

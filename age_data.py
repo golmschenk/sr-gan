@@ -18,26 +18,27 @@ class AgeDataset(Dataset):
         mat_path = '../imdb_wiki_data/imdb_crop/imdb.mat'
         self.dataset_path = '../imdb_wiki_data/imdb_crop/'
         image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages = get_database_meta(mat_path)
-        indexes = np.where(face_scores > 1.0)
-        age_min_indexes = np.where(ages >= 10.0)
-        age_max_indexes = np.where(ages <= 95.0)
-        age_indexes = np.intersect1d(age_min_indexes, age_max_indexes)
-        indexes = np.intersect1d(indexes, age_indexes)
-        if gender_filter is not None:
-            gender_indexes = np.where(genders == gender_filter)
-            indexes = np.intersect1d(indexes, gender_indexes)
-        image_paths = image_paths[indexes]
-        ages = ages[indexes]
         indexes = []
         for index, image_path in enumerate(image_paths):
+            if face_scores[index] < 1.0:
+                continue
+            if (~np.isnan(second_face_scores[index])) and second_face_scores[index] > 0.0:
+                continue
+            if ~(10 <= ages[index] <= 95):
+                continue
+            if np.isnan(genders[index]):
+                continue
+            if gender_filter is not None and genders[index] != gender_filter:
+                continue
             try:
                 image = imageio.imread(os.path.join(self.dataset_path, image_path))
             except FileNotFoundError:
                 continue
-            if image.shape[0] > 256 and image.shape[1] > 256 and abs(image.shape[0] - image.shape[1]) < 5:
-                indexes.append(index)
-                if end is not None and len(indexes) > end:
-                    break
+            if image.shape[0] < 256 or image.shape[1] < 256 or abs(image.shape[0] - image.shape[1]) > 5:
+                continue
+            indexes.append(index)
+            if end is not None and len(indexes) > end:
+                break
         indexes = indexes[start:end]
         self.image_paths = np.copy(image_paths[indexes])
         self.ages = ages[indexes].astype(np.float32)
