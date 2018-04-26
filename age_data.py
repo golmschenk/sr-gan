@@ -37,8 +37,10 @@ class AgeDataset(Dataset):
             if image.shape[0] < 256 or image.shape[1] < 256 or abs(image.shape[0] - image.shape[1]) > 5:
                 continue
             indexes.append(index)
-            if end is not None and len(indexes) > end:
+            if end is not None and len(indexes) >= end:
                 break
+        if end is not None and len(indexes) < end:
+            raise ValueError('Not enough viable images. Needed {}, but found {}'.format(end, len(indexes)))
         indexes = indexes[start:end]
         self.image_paths = np.copy(image_paths[indexes])
         self.ages = ages[indexes].astype(np.float32)
