@@ -15,10 +15,10 @@ def dataset_setup(settings):
     print('Selecting dataset...')
     seed_all(settings.labeled_dataset_seed)
     train_dataset = AgeDataset(start=0, end=settings.labeled_dataset_size)
-    train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
+    train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     unlabeled_dataset = AgeDataset(start=train_dataset.length,
                                    end=train_dataset.length + settings.unlabeled_dataset_size)
-    unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
+    unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     train_and_unlabeled_dataset_size = train_dataset.length + unlabeled_dataset.length
     validation_dataset = AgeDataset(start=train_and_unlabeled_dataset_size,
                                     end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)

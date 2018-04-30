@@ -16,6 +16,8 @@ from training_functions import dnn_training_step, gan_training_step
 from utility import SummaryWriter, infinite_iter, clean_scientific_notation, gpu, seed_all, make_directory_name_unique
 
 
+should_quit = False
+
 
 def run_srgan(settings):
     """
@@ -105,6 +107,9 @@ def run_srgan(settings):
                     torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model_{}.pth'.format(step)))
                     torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model_{}.pth'.format(step)))
                     print('\rSaved model for step {}...'.format(step))
+                if 'quit' in line:
+                    global should_quit
+                    should_quit = True
 
     print('Completed {}'.format(trial_directory))
     if settings.should_save_models:
@@ -116,14 +121,14 @@ def run_srgan(settings):
 if __name__ == '__main__':
     settings_ = Settings()
     settings_.application = 'age'
-    settings_.unlabeled_dataset_size = 10000
+    settings_.unlabeled_dataset_size = [50000]
     settings_.batch_size = 50
     settings_.summary_step_period = 1000
-    settings_.labeled_dataset_seed = [2]
-    settings_.labeled_dataset_size = [500]
+    settings_.labeled_dataset_seed = [0]
+    settings_.labeled_dataset_size = [1000]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
-    settings_.steps_to_run = 300000
+    settings_.steps_to_run = 150000
     settings_.learning_rate = [1e-4]
     settings_.gradient_penalty_multiplier = [1e1]
     settings_.norm_loss_multiplier = [0]
@@ -138,12 +143,12 @@ if __name__ == '__main__':
     settings_list = convert_to_settings_list(settings_)
     seed_all(0)
     for settings_ in settings_list:
-        trial_name = 'age3'
+        trial_name = 'check'
         trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
         trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
         trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
-        trial_name += ' bg{:e}'.format(settings_.mean_offset)
+        trial_name += ' mo{:e}'.format(settings_.mean_offset)
         trial_name += ' lr{:e}'.format(settings_.learning_rate)
         trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
         trial_name += ' gs{}'.format(settings_.generator_training_step_period)
@@ -151,6 +156,9 @@ if __name__ == '__main__':
         trial_name += ' u{}f{}g{}'.format(settings_.unlabeled_loss_order,
                                           settings_.fake_loss_order,
                                           settings_.generator_loss_order)
+        trial_name += ' ue{}'.format(settings_.unlabeled_dataset_size)
         trial_name += ' l' if settings_.load_model_path else ''
         settings_.trial_name = clean_scientific_notation(trial_name)
         run_srgan(settings_)
+        if should_quit:
+            break
