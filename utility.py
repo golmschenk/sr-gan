@@ -1,3 +1,4 @@
+import os
 import random
 import re
 import time
@@ -133,3 +134,12 @@ def seed_all(seed=None):
     if seed is None:
         seed = int(time.time())
     torch.manual_seed(seed)
+
+
+def make_directory_name_unique(trial_directory):
+    if os.path.exists(trial_directory):
+        run_number = 1
+        while os.path.exists(trial_directory + ' r{}'.format(run_number)):
+            run_number += 1
+        trial_directory += ' r{}'.format(run_number)
+    return trial_directory

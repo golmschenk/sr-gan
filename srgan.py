@@ -13,9 +13,8 @@ import coefficient_training
 import age_training
 from settings import Settings, convert_to_settings_list
 from training_functions import dnn_training_step, gan_training_step
-from utility import SummaryWriter, infinite_iter, clean_scientific_notation, gpu, seed_all
+from utility import SummaryWriter, infinite_iter, clean_scientific_notation, gpu, seed_all, make_directory_name_unique
 
-global_trial_directory = None
 
 
 def run_srgan(settings):
@@ -25,11 +24,12 @@ def run_srgan(settings):
     :param settings: The settings object.
     :type settings: Settings
     """
-    datetime_string = datetime.datetime.now().strftime('y%Ym%md%dh%Hm%Ms%S')
-    trial_directory = os.path.join(settings.logs_directory, '{} {}'.format(settings.trial_name, datetime_string))
+    trial_directory = os.path.join(settings.logs_directory, settings.trial_name)
+    if settings.skip_completed_experiment and os.path.exists(trial_directory):
+        print('{} experiment already exists. Skipping...'.format(trial_directory))
+        return
+    trial_directory = make_directory_name_unique(trial_directory)
     print(trial_directory)
-    global global_trial_directory
-    global_trial_directory = trial_directory
     os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
     dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
     gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))

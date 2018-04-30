@@ -319,7 +319,7 @@ def file_string_replace(file_name, old_string, new_string):
         file.write(contents)
 
 
-def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory):
+def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_units='years'):
     logs = Log.create_all_in_directory(logs_directory)
     dnn_results = collections.defaultdict(list)
     gan_results = collections.defaultdict(list)
@@ -342,7 +342,7 @@ def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory):
     axes.set_xticks(dnn_plot_x)
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
     axes.set_xlabel('Labeled Dataset Size')
-    axes.set_ylabel('Age MAE')
+    axes.set_ylabel('Age MAE ({})'.format(error_units))
     axes.plot(dnn_plot_x, dnn_plot_y, color=dnn_color, label='DNN')
     axes.plot(gan_plot_x, gan_plot_y, color=gan_color, label='GAN')
     axes.legend().set_visible(True)

@@ -37,6 +37,7 @@ class Settings:
 
         self.load_model_path = None
         self.should_save_models = False
+        self.skip_completed_experiment = True
 
     def local_setup(self):
         """Code to override some settings when debugging on the local (low power) machine."""
