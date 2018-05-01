@@ -48,6 +48,7 @@ class Settings:
             self.labeled_dataset_size = 10
             self.unlabeled_dataset_size = 10
             self.validation_dataset_size = 10
+            self.skip_completed_experiment = False
 
 
 def convert_to_settings_list(settings, shuffle=True):

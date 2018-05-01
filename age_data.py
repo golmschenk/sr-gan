@@ -2,6 +2,8 @@
 Code for accessing the data in the database easily.
 """
 import os
+import warnings
+
 import torch
 from urllib.request import urlretrieve
 import imageio
@@ -52,7 +54,9 @@ class AgeDataset(Dataset):
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
         image = imageio.imread(os.path.join(self.dataset_path, image_path))
-        image = transform.resize(image, (128, 128))
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore')
+            image = transform.resize(image, (128, 128))
         if len(image.shape) == 2:
             image = color.gray2rgb(image)
         image = image.transpose((2, 0, 1))
