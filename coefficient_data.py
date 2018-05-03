@@ -5,17 +5,13 @@ Code for the polynomial coefficient data generating models.
 import numpy as np
 from scipy.stats import norm, gamma, uniform
 from torch.utils.data import Dataset
-
-from settings import Settings
 from utility import MixtureModel, seed_all
-
-settings = Settings()
 
 irrelevant_data_multiplier = 5
 
 
 class ToyDataset(Dataset):
-    def __init__(self, dataset_size, observation_count, seed=None):
+    def __init__(self, dataset_size, observation_count, settings, seed=None):
         seed_all(seed)
         self.examples, self.labels = generate_polynomial_examples(dataset_size, observation_count)
         if self.labels.shape[0] < settings.batch_size:

@@ -13,12 +13,12 @@ from utility import cpu, gpu, MixtureModel
 
 def dataset_setup(settings):
     train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
-                               seed=settings.labeled_dataset_seed)
+                               settings=settings, seed=settings.labeled_dataset_seed)
     train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
     unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
-                                   seed=100)
+                                   settings=settings, seed=100)
     unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
-    validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101)
+    validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101, settings=settings)
     return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
 
@@ -54,14 +54,14 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     fake_examples = G(gpu(Variable(z)), add_noise=False)
     fake_examples_array = cpu(fake_examples.data).numpy()
     fake_predicted_labels = D(fake_examples).squeeze()
-    fake_predicted_labels_array = np.mean(cpu(fake_predicted_labels.data).numpy())
+    fake_predicted_labels_array = cpu(fake_predicted_labels.data).numpy()
     unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size]
     label_wasserstein_distance = wasserstein_distance(fake_predicted_labels_array, unlabeled_labels_array)
     gan_summary_writer.add_scalar('Generator/Predicted Label Wasserstein', label_wasserstein_distance)
     unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
     unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
     unlabeled_predictions = D(gpu(Variable(unlabeled_examples))).squeeze()
-    if dnn_summary_writer.step % settings.presentation_step_period == 0:
+    if dnn_summary_writer.step % settings.summary_step_period == 0:
         unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
         validation_predictions_array = predicted_validation_labels
         train_predictions_array = predicted_train_labels
