@@ -32,25 +32,25 @@ def model_setup():
 def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, settings, step, train_dataset,
                          trial_directory, unlabeled_dataset, validation_dataset):
     dnn_predicted_train_labels = DNN(torch.tensor(
-        train_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
+        train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
     dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels))
     dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors)
     dnn_predicted_validation_labels = DNN(torch.tensor(
-        validation_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
+        validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
     dnn_validation_label_errors = np.mean(np.abs(dnn_predicted_validation_labels - validation_dataset.labels))
     dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_errors)
     predicted_train_labels = D(torch.tensor(
-        train_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
+        train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
     gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels))
     gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors)
     predicted_validation_labels = D(torch.tensor(
-        validation_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
+        validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
     gan_validation_label_errors = np.mean(np.abs(predicted_validation_labels - validation_dataset.labels))
     gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_errors)
     gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN',
                                   gan_validation_label_errors / dnn_validation_label_errors)
     z = torch.tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
-        size=[settings.batch_size, G.input_size]).astype(np.float32), device=gpu)
+        size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
     fake_examples = G(z, add_noise=False)
     fake_examples_array = fake_examples.to('cpu').detach().numpy()
     fake_predicted_labels = D(fake_examples).squeeze()
@@ -59,7 +59,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     label_wasserstein_distance = wasserstein_distance(fake_predicted_labels_array, unlabeled_labels_array)
     gan_summary_writer.add_scalar('Generator/Predicted Label Wasserstein', label_wasserstein_distance)
     unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
-    unlabeled_examples = torch.tensor(unlabeled_examples_array.astype(np.float32), device=gpu)
+    unlabeled_examples = torch.tensor(unlabeled_examples_array.astype(np.float32)).to(gpu)
     unlabeled_predictions = D(unlabeled_examples).squeeze()
     if dnn_summary_writer.step % settings.summary_step_period == 0:
         unlabeled_predictions_array = unlabeled_predictions.to('cpu').detach().numpy()

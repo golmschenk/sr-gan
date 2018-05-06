@@ -38,7 +38,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     dnn_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
     dnn_train_predicted_ages, dnn_train_ages = np.array([]), np.array([])
     for images, ages in dnn_train_dataset_loader:
-        predicted_ages = DNN(images).detach().squeeze().to('cpu').numpy()
+        predicted_ages = DNN(images.to(gpu)).detach().squeeze().to('cpu').numpy()
         dnn_train_predicted_ages = np.concatenate([dnn_train_predicted_ages, predicted_ages])
         dnn_train_ages = np.concatenate([dnn_train_ages, ages])
     dnn_train_label_error = np.mean(np.abs(dnn_train_predicted_ages - dnn_train_ages))
@@ -47,7 +47,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     dnn_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
     dnn_validation_predicted_ages, dnn_validation_ages = np.array([]), np.array([])
     for images, ages in dnn_validation_dataset_loader:
-        predicted_ages = DNN(images).detach().squeeze().to('cpu').numpy()
+        predicted_ages = DNN(images.to(gpu)).detach().squeeze().to('cpu').numpy()
         dnn_validation_predicted_ages = np.concatenate([dnn_validation_predicted_ages, predicted_ages])
         dnn_validation_ages = np.concatenate([dnn_validation_ages, ages])
     dnn_validation_label_error = np.mean(np.abs(dnn_validation_predicted_ages - dnn_validation_ages))
@@ -56,7 +56,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     gan_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
     gan_train_predicted_ages, gan_train_ages = np.array([]), np.array([])
     for images, ages in gan_train_dataset_loader:
-        predicted_ages = D(images).detach().squeeze().to('cpu').numpy()
+        predicted_ages = D(images.to(gpu)).detach().squeeze().to('cpu').numpy()
         gan_train_predicted_ages = np.concatenate([gan_train_predicted_ages, predicted_ages])
         gan_train_ages = np.concatenate([gan_train_ages, ages])
     gan_train_label_error = np.mean(np.abs(gan_train_predicted_ages - gan_train_ages))
@@ -65,7 +65,7 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     gan_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
     gan_validation_predicted_ages, gan_validation_ages = np.array([]), np.array([])
     for images, ages in gan_validation_dataset_loader:
-        predicted_ages = D(images).detach().squeeze().to('cpu').numpy()
+        predicted_ages = D(images.to(gpu)).detach().squeeze().to('cpu').numpy()
         gan_validation_predicted_ages = np.concatenate([gan_validation_predicted_ages, predicted_ages])
         gan_validation_ages = np.concatenate([gan_validation_ages, ages])
     gan_validation_label_error = np.mean(np.abs(gan_validation_predicted_ages - gan_validation_ages))
@@ -75,16 +75,16 @@ def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, sett
     train_iterator = iter(gan_train_dataset_loader)
     examples, _ = next(train_iterator)
     images_image = torchvision.utils.make_grid(examples[:9], nrow=3)
-    gan_summary_writer.add_image('Real', images_image)
+    gan_summary_writer.add_image('Real', np.transpose(images_image.numpy(), [1, 2, 0]))
     # Generated images.
-    z = torch.randn(settings.batch_size, G.input_size, device=gpu)
+    z = torch.randn(settings.batch_size, G.input_size).to(gpu)
     fake_examples = G(z).to('cpu')
     fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], nrow=3)
-    gan_summary_writer.add_image('Fake/Standard', fake_images_image)
+    gan_summary_writer.add_image('Fake/Standard', np.transpose(fake_images_image.numpy(), [1, 2, 0]))
     z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
                                        norm(settings.mean_offset, 1)]
-                                      ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
+                                      ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
     fake_examples = G(z).to('cpu')
     fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], nrow=3)
-    gan_summary_writer.add_image('Fake/Offset', fake_images_image)
+    gan_summary_writer.add_image('Fake/Offset', np.transpose(fake_images_image.numpy(), [1, 2, 0]))
 

@@ -1,5 +1,4 @@
 import torch
-from torch.autograd import Variable
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
 
@@ -60,4 +59,4 @@ class MLP(Module):
 
     def zero_gradient_sum(self):
         """Zeros the sum gradients to allow for a new summing for logging."""
-        self.gradient_sum = gpu(Variable(torch.zeros(1)))
+        self.gradient_sum = torch.tensor(0, device=gpu)

@@ -104,9 +104,9 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
     unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
                                            order=settings.unlabeled_loss_order) * settings.unlabeled_loss_multiplier
     # Fake.
-    z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
-                                       norm(settings.mean_offset, 1)]
-                                      ).rvs(size=[unlabeled_examples.size(0), G.input_size]).astype(np.float32))
+    z = torch.tensor(MixtureModel([norm(-settings.mean_offset, 1),
+                                   norm(settings.mean_offset, 1)]
+                                 ).rvs(size=[unlabeled_examples.size(0), G.input_size]).astype(np.float32)).to(gpu)
     fake_examples = G(z)
     _ = D(fake_examples.detach())
     fake_feature_layer = D.feature_layer
@@ -136,7 +136,7 @@ def gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labele
         G_optimizer.zero_grad()
         _ = D(unlabeled_examples)
         detached_unlabeled_feature_layer = D.feature_layer.detach()
-        z = torch.randn(unlabeled_examples.size(0), G.input_size)
+        z = torch.randn(unlabeled_examples.size(0), G.input_size).to(gpu)
         fake_examples = G(z)
         _ = D(fake_examples)
         fake_feature_layer = D.feature_layer

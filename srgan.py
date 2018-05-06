@@ -27,7 +27,7 @@ def run_srgan(settings):
     :type settings: Settings
     """
     trial_directory = os.path.join(settings.logs_directory, settings.trial_name)
-    if settings.skip_completed_experiment and os.path.exists(trial_directory):
+    if settings.skip_completed_experiment and os.path.exists(trial_directory) and '/check' not in trial_directory:
         print('{} experiment already exists. Skipping...'.format(trial_directory))
         return
     trial_directory = make_directory_name_unique(trial_directory)
@@ -80,9 +80,11 @@ def run_srgan(settings):
     for step in range(settings.steps_to_run):
         # DNN.
         labeled_examples, labels = next(train_dataset_generator)
+        labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
         dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, settings, step)
         # GAN.
         unlabeled_examples, _ = next(unlabeled_dataset_generator)
+        unlabeled_examples = unlabeled_examples.to(gpu)
         gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, settings, step,
                           unlabeled_examples)
 
