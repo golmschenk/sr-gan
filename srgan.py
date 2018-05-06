@@ -61,9 +61,9 @@ def run_srgan(settings):
         DNN_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'DNN_model.pth'), map_location))
         D_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'D_model.pth'), map_location))
         G_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'G_model.pth'), map_location))
-    G = gpu(G_model)
-    D = gpu(D_model)
-    DNN = gpu(DNN_model)
+    G = G_model.to(gpu)
+    D = D_model.to(gpu)
+    DNN = DNN_model.to(gpu)
     d_lr = settings.learning_rate
     g_lr = d_lr
 
@@ -80,8 +80,6 @@ def run_srgan(settings):
     for step in range(settings.steps_to_run):
         # DNN.
         labeled_examples, labels = next(train_dataset_generator)
-        if len(labels.size()) > 1:
-            labels = labels.squeeze()
         dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, settings, step)
         # GAN.
         unlabeled_examples, _ = next(unlabeled_dataset_generator)

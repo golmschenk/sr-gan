@@ -8,7 +8,7 @@ from coefficient_data import ToyDataset
 from coefficient_models import Generator, MLP, observation_count
 
 from presentation import generate_display_frame
-from utility import cpu, gpu, MixtureModel
+from utility import gpu, MixtureModel
 
 
 def dataset_setup(settings):
@@ -31,38 +31,38 @@ def model_setup():
 
 def validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, settings, step, train_dataset,
                          trial_directory, unlabeled_dataset, validation_dataset):
-    dnn_predicted_train_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
-        train_dataset.examples.astype(np.float32))))).squeeze().data).numpy()
+    dnn_predicted_train_labels = DNN(torch.tensor(
+        train_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
     dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels))
     dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors)
-    dnn_predicted_validation_labels = cpu(DNN(gpu(Variable(torch.from_numpy(
-        validation_dataset.examples.astype(np.float32))))).squeeze().data).numpy()
+    dnn_predicted_validation_labels = DNN(torch.tensor(
+        validation_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
     dnn_validation_label_errors = np.mean(np.abs(dnn_predicted_validation_labels - validation_dataset.labels))
     dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_errors)
-    predicted_train_labels = cpu(D(gpu(Variable(torch.from_numpy(
-        train_dataset.examples.astype(np.float32))))).squeeze().data).numpy()
+    predicted_train_labels = D(torch.tensor(
+        train_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
     gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels))
     gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors)
-    predicted_validation_labels = cpu(D(gpu(Variable(torch.from_numpy(
-        validation_dataset.examples.astype(np.float32))))).squeeze().data).numpy()
+    predicted_validation_labels = D(torch.tensor(
+        validation_dataset.examples.astype(np.float32), device=gpu)).to('cpu').squeeze().detach().numpy()
     gan_validation_label_errors = np.mean(np.abs(predicted_validation_labels - validation_dataset.labels))
     gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_errors)
     gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN',
                                   gan_validation_label_errors / dnn_validation_label_errors)
-    z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
-        size=[settings.batch_size, G.input_size]).astype(np.float32))
-    fake_examples = G(gpu(Variable(z)), add_noise=False)
-    fake_examples_array = cpu(fake_examples.data).numpy()
+    z = torch.tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
+        size=[settings.batch_size, G.input_size]).astype(np.float32), device=gpu)
+    fake_examples = G(z, add_noise=False)
+    fake_examples_array = fake_examples.to('cpu').detach().numpy()
     fake_predicted_labels = D(fake_examples).squeeze()
-    fake_predicted_labels_array = cpu(fake_predicted_labels.data).numpy()
+    fake_predicted_labels_array = fake_predicted_labels.to('cpu').detach().numpy()
     unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size]
     label_wasserstein_distance = wasserstein_distance(fake_predicted_labels_array, unlabeled_labels_array)
     gan_summary_writer.add_scalar('Generator/Predicted Label Wasserstein', label_wasserstein_distance)
     unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
-    unlabeled_examples = torch.from_numpy(unlabeled_examples_array.astype(np.float32))
-    unlabeled_predictions = D(gpu(Variable(unlabeled_examples))).squeeze()
+    unlabeled_examples = torch.tensor(unlabeled_examples_array.astype(np.float32), device=gpu)
+    unlabeled_predictions = D(unlabeled_examples).squeeze()
     if dnn_summary_writer.step % settings.summary_step_period == 0:
-        unlabeled_predictions_array = cpu(unlabeled_predictions.data).numpy()
+        unlabeled_predictions_array = unlabeled_predictions.to('cpu').detach().numpy()
         validation_predictions_array = predicted_validation_labels
         train_predictions_array = predicted_train_labels
         dnn_validation_predictions_array = dnn_predicted_validation_labels

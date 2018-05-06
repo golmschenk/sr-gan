@@ -37,7 +37,7 @@ class MLP(Module):
         self.linear3 = Linear(16, 4)
         self.linear4 = Linear(4, 1)
         self.feature_layer = None
-        self.gradient_sum = gpu(Variable(torch.zeros(1)))
+        self.gradient_sum = torch.tensor(0, device=gpu)
 
     def forward(self, x, add_noise=False):
         """The forward pass of the module."""

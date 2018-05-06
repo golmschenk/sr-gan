@@ -62,7 +62,7 @@ class AgeDataset(Dataset):
         image = image.transpose((2, 0, 1))
         image = torch.from_numpy(image.astype(np.float32))
         age = self.ages[idx]
-        age = torch.from_numpy(np.array([age]))
+        age = torch.tensor(age, dtype=torch.float)
         return image, age
 
 
