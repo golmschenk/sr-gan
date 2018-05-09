@@ -19,108 +19,109 @@ from utility import SummaryWriter, infinite_iter, clean_scientific_notation, gpu
 should_quit = False
 
 
-def run_srgan(settings):
-    """
-    Train the SRGAN
+class Experiment:
+    def __init__(self, settings: Settings):
+        self.settings = settings
 
-    :param settings: The settings object.
-    :type settings: Settings
-    """
-    trial_directory = os.path.join(settings.logs_directory, settings.trial_name)
-    if settings.skip_completed_experiment and os.path.exists(trial_directory) and '/check' not in trial_directory:
-        print('{} experiment already exists. Skipping...'.format(trial_directory))
-        return
-    trial_directory = make_directory_name_unique(trial_directory)
-    print(trial_directory)
-    os.makedirs(os.path.join(trial_directory, settings.temporary_directory))
-    dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
-    gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
-    dnn_summary_writer.summary_period = settings.summary_step_period
-    gan_summary_writer.summary_period = settings.summary_step_period
+    def train(self):
+        """
+        Run the SRGAN training for the experiment.
+        """
+        trial_directory = os.path.join(self.settings.logs_directory, self.settings.trial_name)
+        if self.settings.skip_completed_experiment and os.path.exists(trial_directory) and '/check' not in trial_directory:
+            print('{} experiment already exists. Skipping...'.format(trial_directory))
+            return
+        trial_directory = make_directory_name_unique(trial_directory)
+        print(trial_directory)
+        os.makedirs(os.path.join(trial_directory, self.settings.temporary_directory))
+        dnn_summary_writer = SummaryWriter(os.path.join(trial_directory, 'DNN'))
+        gan_summary_writer = SummaryWriter(os.path.join(trial_directory, 'GAN'))
+        dnn_summary_writer.summary_period = self.settings.summary_step_period
+        gan_summary_writer.summary_period = self.settings.summary_step_period
 
-    if settings.application == 'coefficient':
-        dataset_setup = coefficient_training.dataset_setup
-        model_setup = coefficient_training.model_setup
-        validation_summaries = coefficient_training.validation_summaries
-    elif settings.application == 'age':
-        dataset_setup = age_training.dataset_setup
-        model_setup = age_training.model_setup
-        validation_summaries = age_training.validation_summaries
-    else:
-        raise ValueError('`application` cannot be {}.'.format(settings.application))
-
-    train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset = dataset_setup(
-        settings)
-    DNN_model, D_model, G_model = model_setup()
-
-    if settings.load_model_path:
-        if not torch.cuda.is_available():
-            map_location = 'cpu'
+        if self.settings.application == 'coefficient':
+            dataset_setup = coefficient_training.dataset_setup
+            model_setup = coefficient_training.model_setup
+            validation_summaries = coefficient_training.validation_summaries
+        elif self.settings.application == 'age':
+            dataset_setup = age_training.dataset_setup
+            model_setup = age_training.model_setup
+            validation_summaries = age_training.validation_summaries
         else:
-            map_location = None
-        DNN_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'DNN_model.pth'), map_location))
-        D_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'D_model.pth'), map_location))
-        G_model.load_state_dict(torch.load(os.path.join(settings.load_model_path, 'G_model.pth'), map_location))
-    G = G_model.to(gpu)
-    D = D_model.to(gpu)
-    DNN = DNN_model.to(gpu)
-    d_lr = settings.learning_rate
-    g_lr = d_lr
+            raise ValueError('`application` cannot be {}.'.format(self.settings.application))
 
-    betas = (0.9, 0.999)
-    weight_decay = 1e-2
-    D_optimizer = Adam(D.parameters(), lr=d_lr, weight_decay=weight_decay)
-    G_optimizer = Adam(G.parameters(), lr=g_lr)
-    DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+        train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset = dataset_setup(
+            self.settings)
+        DNN_model, D_model, G_model = model_setup()
 
-    step_time_start = datetime.datetime.now()
-    train_dataset_generator = infinite_iter(train_dataset_loader)
-    unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
+        if self.settings.load_model_path:
+            if not torch.cuda.is_available():
+                map_location = 'cpu'
+            else:
+                map_location = None
+            DNN_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'), map_location))
+            D_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'), map_location))
+            G_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'), map_location))
+        G = G_model.to(gpu)
+        D = D_model.to(gpu)
+        DNN = DNN_model.to(gpu)
+        d_lr = self.settings.learning_rate
+        g_lr = d_lr
 
-    for step in range(settings.steps_to_run):
-        # DNN.
-        labeled_examples, labels = next(train_dataset_generator)
-        labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
-        dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, settings, step)
-        # GAN.
-        unlabeled_examples, _ = next(unlabeled_dataset_generator)
-        unlabeled_examples = unlabeled_examples.to(gpu)
-        gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, settings, step,
-                          unlabeled_examples)
+        betas = (0.9, 0.999)
+        weight_decay = 1e-2
+        D_optimizer = Adam(D.parameters(), lr=d_lr, weight_decay=weight_decay)
+        G_optimizer = Adam(G.parameters(), lr=g_lr)
+        DNN_optimizer = Adam(DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
 
-        if gan_summary_writer.is_summary_step():
-            print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
-            step_time_start = datetime.datetime.now()
+        step_time_start = datetime.datetime.now()
+        train_dataset_generator = infinite_iter(train_dataset_loader)
+        unlabeled_dataset_generator = infinite_iter(unlabeled_dataset_loader)
 
-            D.eval()
-            DNN.eval()
-            G.eval()
-            validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, settings, step, train_dataset,
-                                 trial_directory, unlabeled_dataset, validation_dataset)
-            D.train()
-            DNN.train()
-            G.train()
-            while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                line = sys.stdin.readline()
-                if 'save' in line:
-                    torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model_{}.pth'.format(step)))
-                    torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model_{}.pth'.format(step)))
-                    torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model_{}.pth'.format(step)))
-                    print('\rSaved model for step {}...'.format(step))
-                if 'quit' in line:
-                    global should_quit
-                    should_quit = True
+        for step in range(self.settings.steps_to_run):
+            # DNN.
+            labeled_examples, labels = next(train_dataset_generator)
+            labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
+            dnn_training_step(DNN, DNN_optimizer, dnn_summary_writer, labeled_examples, labels, self.settings, step)
+            # GAN.
+            unlabeled_examples, _ = next(unlabeled_dataset_generator)
+            unlabeled_examples = unlabeled_examples.to(gpu)
+            gan_training_step(D, D_optimizer, G, G_optimizer, gan_summary_writer, labeled_examples, labels, self.settings, step,
+                              unlabeled_examples)
 
-    print('Completed {}'.format(trial_directory))
-    if settings.should_save_models:
-        torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model.pth'))
-        torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model.pth'))
-        torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model.pth'))
+            if gan_summary_writer.is_summary_step():
+                print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
+                step_time_start = datetime.datetime.now()
+
+                D.eval()
+                DNN.eval()
+                G.eval()
+                validation_summaries(D, DNN, G, dnn_summary_writer, gan_summary_writer, self.settings, step, train_dataset,
+                                     trial_directory, unlabeled_dataset, validation_dataset)
+                D.train()
+                DNN.train()
+                G.train()
+                while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                    line = sys.stdin.readline()
+                    if 'save' in line:
+                        torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model_{}.pth'.format(step)))
+                        torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model_{}.pth'.format(step)))
+                        torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model_{}.pth'.format(step)))
+                        print('\rSaved model for step {}...'.format(step))
+                    if 'quit' in line:
+                        global should_quit
+                        should_quit = True
+
+        print('Completed {}'.format(trial_directory))
+        if self.settings.should_save_models:
+            torch.save(DNN.state_dict(), os.path.join(trial_directory, 'DNN_model.pth'))
+            torch.save(D.state_dict(), os.path.join(trial_directory, 'D_model.pth'))
+            torch.save(G.state_dict(), os.path.join(trial_directory, 'G_model.pth'))
 
 
 if __name__ == '__main__':
     settings_ = Settings()
-    settings_.application = 'age'
+    settings_.application = 'coefficient'
     settings_.unlabeled_dataset_size = [50000]
     settings_.batch_size = 50
     settings_.summary_step_period = 1000
@@ -159,6 +160,7 @@ if __name__ == '__main__':
         trial_name += ' ue{}'.format(settings_.unlabeled_dataset_size)
         trial_name += ' l' if settings_.load_model_path else ''
         settings_.trial_name = clean_scientific_notation(trial_name)
-        run_srgan(settings_)
+        experiment = Experiment(settings_)
+        experiment.train()
         if should_quit:
             break
