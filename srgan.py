@@ -6,19 +6,15 @@ import os
 import select
 import sys
 
+import numpy as np
+from scipy.stats import norm
 from torch.nn import Module
-from torch.optim import Adam
+from torch.optim import Adam, Optimizer
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from coefficient_application import CoefficientApplication
-from age_application import AgeApplication
-from settings import Settings, convert_to_settings_list
-from training_functions import dnn_training_step, gan_training_step
-from utility import SummaryWriter, infinite_iter, clean_scientific_notation, gpu, seed_all, make_directory_name_unique
-
-
-should_quit = False
+from settings import Settings
+from utility import SummaryWriter, infinite_iter, gpu, make_directory_name_unique, MixtureModel
 
 
 class Experiment:
@@ -33,8 +29,12 @@ class Experiment:
         self.unlabeled_dataset_loader: DataLoader = None
         self.validation_dataset: Dataset = None
         self.DNN: Module = None
+        self.DNN_optimizer: Optimizer = None
         self.D: Module = None
+        self.D_optimizer: Optimizer = None
         self.G: Module = None
+        self.G_optimizer: Optimizer = None
+        self.signal_quit = False
 
     def train(self):
         """
@@ -76,9 +76,9 @@ class Experiment:
 
         betas = (0.9, 0.999)
         weight_decay = 1e-2
-        D_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
-        G_optimizer = Adam(self.G.parameters(), lr=g_lr)
-        DNN_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.D_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.G_optimizer = Adam(self.G.parameters(), lr=g_lr)
+        self.DNN_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
 
         step_time_start = datetime.datetime.now()
         train_dataset_generator = infinite_iter(self.train_dataset_loader)
@@ -88,12 +88,11 @@ class Experiment:
             # DNN.
             labeled_examples, labels = next(train_dataset_generator)
             labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
-            dnn_training_step(self.DNN, DNN_optimizer, self.dnn_summary_writer, labeled_examples, labels, self.settings, step)
+            self.dnn_training_step(labeled_examples, labels, step)
             # GAN.
             unlabeled_examples, _ = next(unlabeled_dataset_generator)
             unlabeled_examples = unlabeled_examples.to(gpu)
-            gan_training_step(self.D, D_optimizer, self.G, G_optimizer, self.gan_summary_writer, labeled_examples, labels, self.settings, step,
-                              unlabeled_examples)
+            self.gan_training_step(labeled_examples, labels, unlabeled_examples, step)
 
             if self.gan_summary_writer.is_summary_step():
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
@@ -114,8 +113,7 @@ class Experiment:
                         torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model_{}.pth'.format(step)))
                         print('\rSaved model for step {}...'.format(step))
                     if 'quit' in line:
-                        global should_quit
-                        should_quit = True
+                        self.signal_quit = True
 
         print('Completed {}'.format(self.trial_directory))
         if self.settings.should_save_models:
@@ -123,49 +121,150 @@ class Experiment:
             torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model.pth'))
             torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model.pth'))
 
+    def dnn_training_step(self, examples, labels, step):
+        self.dnn_summary_writer.step = step
+        self.DNN_optimizer.zero_grad()
+        dnn_predicted_labels = self.DNN(examples).squeeze()
+        dnn_loss = labeled_loss_function(dnn_predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        dnn_feature_layer = self.DNN.feature_layer
+        dnn_loss.backward()
+        self.DNN_optimizer.step()
+        # Summaries.
+        if self.dnn_summary_writer.is_summary_step():
+            self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
+            self.dnn_summary_writer.add_scalar('Feature Norm/Labeled',
+                                          dnn_feature_layer.norm(dim=1).mean().item())
 
-if __name__ == '__main__':
-    settings_ = Settings()
-    settings_.application = AgeApplication()
-    settings_.unlabeled_dataset_size = [50000]
-    settings_.batch_size = 50
-    settings_.summary_step_period = 1000
-    settings_.labeled_dataset_seed = [0]
-    settings_.labeled_dataset_size = [1000]
-    settings_.unlabeled_loss_multiplier = [1e0]
-    settings_.fake_loss_multiplier = [1e0]
-    settings_.steps_to_run = 150000
-    settings_.learning_rate = [1e-4]
-    settings_.gradient_penalty_multiplier = [1e1]
-    settings_.norm_loss_multiplier = [0]
-    settings_.mean_offset = 2
-    settings_.unlabeled_loss_order = 2
-    settings_.fake_loss_order = [0.5]
-    settings_.generator_loss_order = 2
-    settings_.generator_training_step_period = 1
-    settings_.should_save_models = True
-    #settings_.load_model_path = '/home/golmschenk/srgan/logs/age ul1e0 fl1e0 le3000 gp1e1 bg2e0 lr1e-5 nl0 gs1 ls0 u2f0.5g2 y2018m04d20h22m58s03'
-    settings_.local_setup()
-    settings_list = convert_to_settings_list(settings_)
-    seed_all(0)
-    for settings_ in settings_list:
-        trial_name = 'check'
-        trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
-        trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
-        trial_name += ' le{}'.format(settings_.labeled_dataset_size)
-        trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
-        trial_name += ' mo{:e}'.format(settings_.mean_offset)
-        trial_name += ' lr{:e}'.format(settings_.learning_rate)
-        trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
-        trial_name += ' gs{}'.format(settings_.generator_training_step_period)
-        trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
-        trial_name += ' u{}f{}g{}'.format(settings_.unlabeled_loss_order,
-                                          settings_.fake_loss_order,
-                                          settings_.generator_loss_order)
-        trial_name += ' ue{}'.format(settings_.unlabeled_dataset_size)
-        trial_name += ' l' if settings_.load_model_path else ''
-        settings_.trial_name = clean_scientific_notation(trial_name)
-        experiment = Experiment(settings_)
-        experiment.train()
-        if should_quit:
-            break
+    def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
+        # Labeled.
+        self.gan_summary_writer.step = step
+        self.D_optimizer.zero_grad()
+        predicted_labels = self.D(labeled_examples).squeeze()
+        labeled_feature_layer = self.D.feature_layer
+        labeled_loss = labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        # Unlabeled.
+        _ = self.D(unlabeled_examples)
+        unlabeled_feature_layer = self.D.feature_layer
+        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
+                                               order=self.settings.unlabeled_loss_order) * self.settings.unlabeled_loss_multiplier
+        # Fake.
+        z = torch.tensor(MixtureModel([norm(-self.settings.mean_offset, 1),
+                                       norm(self.settings.mean_offset, 1)]
+                                      ).rvs(size=[unlabeled_examples.size(0), self.G.input_size]).astype(np.float32)).to(gpu)
+        fake_examples = self.G(z)
+        _ = self.D(fake_examples.detach())
+        fake_feature_layer = self.D.feature_layer
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True,
+                                          order=self.settings.fake_loss_order).neg() * self.settings.fake_loss_multiplier
+        # Feature norm loss.
+        feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2) * self.settings.norm_loss_multiplier
+        # Gradient penalty.
+        alpha = torch.rand(2, device=gpu)
+        alpha = alpha / alpha.sum(0)
+        interpolates = (alpha[0] * torch.tensor(unlabeled_examples, requires_grad=True) +
+                        alpha[1] * torch.tensor(fake_examples.detach(), requires_grad=True))
+        _ = self.D(interpolates)
+        interpolates_feature_layer = self.D.feature_layer
+        interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer, scale=True,
+                                                  order=self.settings.fake_loss_order).neg() * self.settings.fake_loss_multiplier
+        gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
+                                        grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
+                                        create_graph=True, only_inputs=True)[0]
+        gradient_penalty = ((gradients.norm(dim=1) - 1) ** 2).mean() * self.settings.gradient_penalty_multiplier
+        # Discriminator update.
+        loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
+        loss.backward()
+        self.D_optimizer.step()
+        # Generator.
+        if step % self.settings.generator_training_step_period == 0:
+            self.G_optimizer.zero_grad()
+            _ = self.D(unlabeled_examples)
+            detached_unlabeled_feature_layer = self.D.feature_layer.detach()
+            z = torch.randn(unlabeled_examples.size(0), self.G.input_size).to(gpu)
+            fake_examples = self.G(z)
+            _ = self.D(fake_examples)
+            fake_feature_layer = self.D.feature_layer
+            generator_loss = feature_distance_loss(detached_unlabeled_feature_layer, fake_feature_layer,
+                                                   order=self.settings.generator_loss_order)
+            generator_loss.backward()
+            self.G_optimizer.step()
+            if self.gan_summary_writer.is_summary_step():
+                self.gan_summary_writer.add_scalar('Generator/Loss', generator_loss.item())
+        # Summaries.
+        if self.gan_summary_writer.is_summary_step():
+            self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
+            self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
+                                          labeled_feature_layer.norm(dim=1).mean().item())
+            self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
+                                          unlabeled_feature_layer.norm(dim=1).mean().item())
+            self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
+            self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
+
+
+def unit_vector(vector):
+    """Gets the unit vector version of a vector."""
+    return vector.div(vector.norm() + 1e-10)
+
+
+def angle_between(vector0, vector1):
+    """Calculates the angle between two vectors."""
+    unit_vector0 = unit_vector(vector0)
+    unit_vector1 = unit_vector(vector1)
+    epsilon = 1e-6
+    return unit_vector0.dot(unit_vector1).clamp(-1.0 + epsilon, 1.0 - epsilon).acos()
+
+
+def labeled_loss_function(predicted_labels, labels, order=2):
+    """Calculate the loss from the label difference prediction."""
+    return (predicted_labels - labels).abs().pow(order).mean()
+
+
+def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):
+    """Calculate the loss based on the distance between feature vectors."""
+    base_mean_features = base_features.mean(0)
+    other_mean_features = other_features.mean(0)
+    if base_noise:
+        base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
+    mean_feature_distance = (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1 / 2)
+    if scale:
+        scale_epsilon = 1e-10
+        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + scale_epsilon)
+    if order < 1:
+        order_epsilon = 1e-2
+        mean_feature_distance += order_epsilon
+    return mean_feature_distance.pow(order)
+
+
+def feature_angle_loss(base_features, other_features, target=0, summary_writer=None):
+    """Calculate the loss based on the angle between feature vectors."""
+    angle = angle_between(base_features.mean(0), other_features.mean(0))
+    if summary_writer:
+        summary_writer.add_scalar('Feature Vector/Angle', angle.item())
+    return (angle - target).abs().pow(2)
+
+
+def feature_corrcoef(x):
+    """Calculate the feature vector's correlation coefficients."""
+    transposed_x = x.transpose(0, 1)
+    return corrcoef(transposed_x)
+
+
+def corrcoef(x):
+    """Calculate the correlation coefficients."""
+    mean_x = x.mean(1, keepdim=True)
+    xm = x.sub(mean_x)
+    c = xm.mm(xm.t())
+    c = c / (x.size(1) - 1)
+    d = torch.diag(c)
+    stddev = torch.pow(d, 0.5)
+    c = c.div(stddev.expand_as(c))
+    c = c.div(stddev.expand_as(c).t())
+    c = torch.clamp(c, -1.0, 1.0)
+    return c
+
+
+def feature_covariance_loss(base_features, other_features):
+    """Calculate the loss between feature vector correlation coefficient distances."""
+    base_corrcoef = feature_corrcoef(base_features)
+    other_corrcoef = feature_corrcoef(other_features)
+    return (base_corrcoef - other_corrcoef).abs().sum()
