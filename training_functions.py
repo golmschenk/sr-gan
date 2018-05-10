@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from scipy.stats import norm
-from torch.autograd import Variable
 
 from utility import gpu, MixtureModel
 

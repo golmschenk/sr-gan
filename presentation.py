@@ -13,12 +13,10 @@ from scipy.stats import norm, gamma, uniform
 import seaborn as sns
 import matplotlib2tikz
 
-from settings import Settings
 from utility import MixtureModel
 
 sns.set()
 dpi = 300
-settings = Settings()
 
 
 def generate_data_concept_images():
@@ -130,7 +128,7 @@ def natural_sort_key(string, natural_sort_regex=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(natural_sort_regex, string)]
 
 
-def generate_video_from_frames(trial_directory):
+def generate_video_from_frames(trial_directory, settings):
     fps = 20
     file_names = [file for file in os.listdir(os.path.join(trial_directory, settings.temporary_directory)) if file.endswith('.png')]
     file_names.sort(key=natural_sort_key)

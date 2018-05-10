@@ -5,12 +5,15 @@ import platform
 import random
 from copy import deepcopy
 
+from application import Application
+from coefficient_application import CoefficientApplication
+
 
 class Settings:
     """Represents the settings for a given run of SRGAN."""
     def __init__(self):
         self.trial_name = 'base'
-        self.application = 'coefficient'
+        self.application: Application = CoefficientApplication()
         self.steps_to_run = 200000
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'
