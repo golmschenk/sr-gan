@@ -161,8 +161,8 @@ class Experiment:
         # Gradient penalty.
         alpha = torch.rand(2, device=gpu)
         alpha = alpha / alpha.sum(0)
-        interpolates = (alpha[0] * torch.tensor(unlabeled_examples, requires_grad=True) +
-                        alpha[1] * torch.tensor(fake_examples.detach(), requires_grad=True))
+        interpolates = (alpha[0] * unlabeled_examples.detach().requires_grad_() +
+                        alpha[1] * fake_examples.detach().requires_grad_())
         _ = self.D(interpolates)
         interpolates_feature_layer = self.D.feature_layer
         interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer, scale=True,
