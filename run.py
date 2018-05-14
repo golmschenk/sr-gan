@@ -1,11 +1,17 @@
 """
 Runs a batch of experiments.
 """
+import torch
+
 from age_application import AgeApplication
 from coefficient_application import CoefficientApplication
 from settings import Settings, convert_to_settings_list
 from srgan import Experiment
 from utility import seed_all, clean_scientific_notation
+
+
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.fastest = True
 
 
 settings_ = Settings()

@@ -104,7 +104,10 @@ def generate_display_frame(trial_directory, fake_examples, unlabeled_predictions
     figure, axes = plt.subplots(dpi=dpi)
     axes.text(0.98, 0.98, 'Step: {}'.format(step), horizontalalignment='right', verticalalignment='top', family='monospace', fontsize=10, transform=axes.transAxes)
     axes.plot(x_axis, MixtureModel([uniform(-1, 2)]).pdf(x_axis), color=sns.color_palette()[0], label='Real Data Distribution')
-    axes = sns.kdeplot(fake_a3[0, :], ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
+    try:
+        axes = sns.kdeplot(fake_a3[0, :], ax=axes, color=sns.color_palette()[4], bw=bandwidth, label='Fake Data Distribution')
+    except ValueError:
+        pass
     axes = sns.kdeplot(unlabeled_predictions, ax=axes, color=sns.color_palette()[1], bw=bandwidth, label='Unlabeled Predictions')
     axes = sns.kdeplot(test_predictions, ax=axes, color=sns.color_palette()[2], bw=bandwidth, label='GAN Test Predictions')
     axes = sns.kdeplot(train_predictions, ax=axes, color=sns.color_palette()[2], linewidth=0.5, bw=bandwidth, label='GAN Train Predictions')

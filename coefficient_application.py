@@ -15,10 +15,10 @@ class CoefficientApplication(Application):
         settings = experiment.settings
         train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
                                    settings=settings, seed=settings.labeled_dataset_seed)
-        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
+        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
         unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
                                        settings=settings, seed=100)
-        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True)
+        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
         validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101, settings=settings)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 

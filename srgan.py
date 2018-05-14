@@ -114,6 +114,7 @@ class Experiment:
                         print('\rSaved model for step {}...'.format(step))
                     if 'quit' in line:
                         self.signal_quit = True
+                        print('\rQuit requested after current experiment...')
 
         print('Completed {}'.format(self.trial_directory))
         if self.settings.should_save_models:
