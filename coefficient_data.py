@@ -66,16 +66,27 @@ def generate_double_mean_single_std_data(number_of_examples, number_of_observati
 
 
 def generate_polynomial_examples(number_of_examples, number_of_observations):
-    a2, a3, a4 = generate_double_a2_single_a3_coefficients(number_of_examples)
+    a2, a3, a4 = generate_double_a2_a3_a4_coefficients(number_of_examples)
     examples = generate_examples_from_coefficients(a2, a3, a4, number_of_observations)
     examples += np.random.normal(0, 0.1, examples.shape)
-    return examples, np.squeeze(a3[:, 0], axis=-1)
+    labels = np.squeeze(a3[:, 0], axis=-1)
+    return examples, labels
 
 
-def generate_double_a2_single_a3_coefficients(number_of_examples):
+def generate_single_a3_double_a2_a4_coefficients(number_of_examples):
     a2_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
-    a3_distribution = MixtureModel([uniform(loc=-1, scale=2)])
     a2 = a2_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    a3_distribution = MixtureModel([uniform(loc=-1, scale=2)])
+    a3 = a3_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    a4_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
+    a4 = a4_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    return a2, a3, a4
+
+
+def generate_double_a2_a3_a4_coefficients(number_of_examples):
+    a2_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
+    a2 = a2_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
+    a3_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
     a3 = a3_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)
     a4_distribution = MixtureModel([uniform(-2, 1), uniform(1, 1)])
     a4 = a4_distribution.rvs(size=[number_of_examples, irrelevant_data_multiplier, 1]).astype(dtype=np.float32)

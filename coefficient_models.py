@@ -14,15 +14,17 @@ class Generator(Module):
     def __init__(self):
         super().__init__()
         self.input_size = 10
-        self.linear1 = Linear(self.input_size, 20)
-        self.linear5 = Linear(20, 30)
-        self.linear6 = Linear(30, observation_count * irrelevant_data_multiplier)
+        self.linear1 = Linear(self.input_size, 100)
+        self.linear2 = Linear(100, 100)
+        self.linear3 = Linear(100, 100)
+        self.linear4 = Linear(100, observation_count * irrelevant_data_multiplier)
 
     def forward(self, x, add_noise=False):
         """The forward pass of the module."""
         x = leaky_relu(self.linear1(x))
-        x = leaky_relu(self.linear5(x))
-        x = self.linear6(x)
+        x = leaky_relu(self.linear2(x))
+        x = leaky_relu(self.linear3(x))
+        x = self.linear4(x)
         return x
 
 
@@ -32,15 +34,17 @@ class MLP(Module):
     def __init__(self):
         super().__init__()
         seed_all(0)
-        self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 16)
-        self.linear3 = Linear(16, 4)
-        self.linear4 = Linear(4, 1)
+        self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 100)
+        self.linear2 = Linear(100, 100)
+        self.linear3 = Linear(100, 100)
+        self.linear4 = Linear(100, 1)
         self.feature_layer = None
         self.gradient_sum = torch.tensor(0, device=gpu)
 
     def forward(self, x, add_noise=False):
         """The forward pass of the module."""
         x = leaky_relu(self.linear1(x))
+        x = leaky_relu(self.linear2(x))
         x = leaky_relu(self.linear3(x))
         self.feature_layer = x
         x = self.linear4(x)
