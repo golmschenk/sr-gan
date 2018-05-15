@@ -2,8 +2,9 @@
 Code for accessing the data in the database easily.
 """
 import os
+import shutil
 import warnings
-
+import json
 import torch
 from urllib.request import urlretrieve
 import imageio
@@ -106,5 +107,49 @@ def download_database():
     print('Done.')
 
 
+def preprocess_database():
+    preprocessed_directory = '../imdb_wiki_data/imdb_preprocessed'
+    if os.path.exists(preprocessed_directory):
+        shutil.rmtree(preprocessed_directory)
+    os.makedirs(preprocessed_directory)
+    mat_path = '../imdb_wiki_data/imdb_crop/imdb.mat'
+    dataset_base = '../imdb_wiki_data/imdb_crop/'
+    # Get viable examples.
+    image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages = get_database_meta(mat_path)
+    indexes = []
+    for index, image_path in enumerate(image_paths):
+        if face_scores[index] < 1.0:
+            continue
+        if (~np.isnan(second_face_scores[index])) and second_face_scores[index] > 0.0:
+            continue
+        if ~(10 <= ages[index] <= 95):
+            continue
+        if np.isnan(genders[index]):
+            continue
+        try:
+            image = imageio.imread(os.path.join(dataset_base, image_path))
+        except FileNotFoundError:
+            continue
+        if image.shape[0] < 256 or image.shape[1] < 256 or abs(image.shape[0] - image.shape[1]) > 5:
+            continue
+        indexes.append(index)
+    image_paths = image_paths[indexes]
+    ages = ages[indexes].astype(np.float32)
+    genders = genders[indexes]
+    # Preprocess images and create JSON.
+    json_list = []
+    for image_path, age, gender in zip(image_paths, ages, genders):
+        image = imageio.imread(os.path.join(dataset_base, image_path))
+        image = transform.resize(image, (128, 128))
+        if len(image.shape) == 2:
+            image = color.gray2rgb(image)
+        image_name = os.path.basename(image_path)
+        imageio.imsave(os.path.join(preprocessed_directory, image_name), image)
+        gender = {0: 'female', 1: 'male'}[gender]
+        json_list.append([image_name, age, gender])
+    with open(os.path.join(preprocessed_directory, 'meta.json')) as json_file:
+        json.dump(json_list, json_file)
+
+
 if __name__ == '__main__':
-    download_database()
+    preprocess_database()
