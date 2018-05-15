@@ -14,7 +14,6 @@ from utility import seed_all, gpu, MixtureModel
 class AgeApplication(Application):
     def dataset_setup(self, experiment):
         settings = experiment.settings
-        print('Selecting dataset...')
         seed_all(settings.labeled_dataset_seed)
         train_dataset = AgeDataset(start=0, end=settings.labeled_dataset_size)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=2)
@@ -24,7 +23,6 @@ class AgeApplication(Application):
         train_and_unlabeled_dataset_size = train_dataset.length + unlabeled_dataset.length
         validation_dataset = AgeDataset(start=train_and_unlabeled_dataset_size,
                                         end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
-        print('Dataset selected.')
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
 

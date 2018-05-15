@@ -15,7 +15,7 @@ torch.backends.cudnn.fastest = True
 
 
 settings_ = Settings()
-settings_.application = CoefficientApplication()
+settings_.application = AgeApplication()
 settings_.unlabeled_dataset_size = [50000]
 settings_.batch_size = 50
 settings_.summary_step_period = 1000
