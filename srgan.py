@@ -195,9 +195,9 @@ class Experiment:
         if self.gan_summary_writer.is_summary_step():
             self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
             self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                          labeled_feature_layer.norm(dim=1).mean().item())
+                                          labeled_feature_layer.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                          unlabeled_feature_layer.norm(dim=1).mean().item())
+                                          unlabeled_feature_layer.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
 
