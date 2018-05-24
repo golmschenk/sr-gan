@@ -187,6 +187,15 @@ def generate_dnn_vs_gan_average_per_number_of_examples():
     plt.close(figure)
 
 
+def nash_equilibrium_plot():
+    figure, axes = plt.subplots(dpi=dpi)
+    points = np.array([(1, 0), (0, -1), (-1, 0), (0, 1), (1, 0)])
+    axes.plot(*zip(*points), color=sns.color_palette()[0], label='DNN')
+    matplotlib2tikz.save(os.path.join('latex', 'nash_equilibrium.tex'))
+    #plt.savefig('nash_equilibrium.png', dpi=dpi, ax=axes, transparent=True)
+    plt.show()
+    plt.close(figure)
+
 if __name__ == '__main__':
     plt.switch_backend('module://backend_interagg')
-    generate_dnn_vs_gan_average_per_number_of_examples()
+    nash_equilibrium_plot()

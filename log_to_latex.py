@@ -230,7 +230,7 @@ class Log:
         return self.directory_name
 
     @classmethod
-    def create_all_in_directory(cls, directory):
+    def create_all_in_directory(cls, directory, exclude_if_no_final_model_exists=False):
         """
         Generate all logs in directory.
 
@@ -241,6 +241,10 @@ class Log:
         """
         glob_string = os.path.join(directory, '**', 'events.out.tfevents*')
         event_file_names = glob.glob(glob_string, recursive=True)
+        if exclude_if_no_final_model_exists:
+            event_file_names = [event_file_name for event_file_name in event_file_names
+                                if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(event_file_name)),
+                                                               'D_model.pth'))]
         return [Log(event_file_name) for event_file_name in event_file_names]
 
     @classmethod
@@ -319,19 +323,26 @@ def file_string_replace(file_name, old_string, new_string):
         file.write(contents)
 
 
-def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_units='years'):
-    logs = Log.create_all_in_directory(logs_directory)
+def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_units='years', filter=None,
+                                                          include_full_scatter=False):
+    logs = Log.create_all_in_directory(logs_directory, exclude_if_no_final_model_exists=True)
     dnn_results = collections.defaultdict(list)
     gan_results = collections.defaultdict(list)
+    dnn_points = []
+    gan_points = []
     for log in logs:
+        if filter is not None and not re.search(filter, log.event_file_name):
+            continue
         labeled_dataset_size = int(re.search(r' le(\d+) ', log.event_file_name).group(1))
         model_type = re.search(r'/(DNN|GAN)/', log.event_file_name).group(1)
         last_errors = log.scalars_data_frame.iloc[-3:]['1_Validation_Error/MAE'].tolist()
         error = np.nanmean(last_errors)
         if model_type == 'GAN':
             gan_results[labeled_dataset_size].append(error)
+            gan_points.append((labeled_dataset_size, error))
         else:
             dnn_results[labeled_dataset_size].append(error)
+            dnn_points.append((labeled_dataset_size, error))
     average_dnn_results = {example_count: np.mean(values) for example_count, values in dnn_results.items()}
     average_gan_results = {example_count: np.mean(values) for example_count, values in gan_results.items()}
     dnn_plot_x, dnn_plot_y = zip(*sorted(average_dnn_results.items()))
@@ -343,6 +354,9 @@ def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
     axes.set_xlabel('Labeled Dataset Size')
     axes.set_ylabel('Age MAE ({})'.format(error_units))
+    if include_full_scatter:
+        axes.scatter(*np.array(dnn_points).transpose(), color=dnn_color, alpha=0.2)
+        axes.scatter(*np.array(gan_points).transpose(), color=gan_color, alpha=0.2)
     axes.plot(dnn_plot_x, dnn_plot_y, color=dnn_color, label='DNN')
     axes.plot(gan_plot_x, gan_plot_y, color=gan_color, label='GAN')
     axes.legend().set_visible(True)
@@ -355,6 +369,9 @@ def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
     axes.set_xlabel('Labeled Dataset Size')
     axes.set_ylabel('GAN to DNN Relative Error')
+    if include_full_scatter:
+        relative_points = [(dnn_point[0], gan_point[1]/dnn_point[1]) for dnn_point, gan_point in zip(dnn_points, gan_points)]
+        axes.scatter(*np.array(relative_points).transpose(), color=gan_color, alpha=0.2)
     axes.plot(gan_plot_x, gan_plot_y / dnn_plot_y, color=gan_color)
     matplotlib2tikz.save(os.path.join('latex', 'gan-to-dnn-relative-error.tex'))
     plt.show()
@@ -373,6 +390,5 @@ def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
     plt.show()
 
 
-
 if __name__ == '__main__':
-    plot_dnn_vs_gan_average_error_by_labeled_dataset_size('/Users/golmschenk/Desktop/Preliminary Age Results')
+    plot_dnn_vs_gan_average_error_by_labeled_dataset_size('logs', filter=r'age systematic', include_full_scatter=True)
