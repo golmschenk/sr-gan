@@ -10,14 +10,11 @@ import matplotlib.ticker
 import matplotlib.colors
 import matplotlib2tikz
 import pandas as pd
-import seaborn as sns
 import glob
 import os
 import itertools
 import math
-import pickle
 import numpy as np
-import importlib.util
 import seaborn as sns
 
 latex_document_directory = 'logs'
@@ -221,6 +218,7 @@ class Log:
     """
 
     def __init__(self, event_file_name):
+        self.experiment = None
         self.event_file_name = event_file_name
         self.directory_name = os.path.dirname(self.event_file_name)
         self.scalars_data_frame = None
@@ -379,16 +377,21 @@ def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_
 
 
 def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
-    logs = Log.create_all_in_directory('logs')
+    logs = Log.create_all_in_directory(single_log_directory)
     if re.search(r'/GAN/', logs[0].event_file_name):
         gan_log, dnn_log = logs[0], logs[1]
     else:
         dnn_log, gan_log = logs[0], logs[1]
     figure, axes = plt.subplots()
-    gan_log.scalars_data_frame.plot(y='1_Validation_Error/MAE', ax=axes, label='GAN', color=gan_color)
+    axes.set_xlabel('Training Step')
+    axes.set_ylabel('MAE')
     dnn_log.scalars_data_frame.plot(y='1_Validation_Error/MAE', ax=axes, label='DNN', color=dnn_color)
+    gan_log.scalars_data_frame.plot(y='1_Validation_Error/MAE', ax=axes, label='GAN', color=gan_color)
+    matplotlib2tikz.save(os.path.join('latex', 'error-over-training.tex'))
     plt.show()
+    plt.close(figure)
 
 
 if __name__ == '__main__':
-    plot_dnn_vs_gan_average_error_by_labeled_dataset_size('logs', filter=r'age systematic', include_full_scatter=True)
+    #plot_dnn_vs_gan_average_error_by_labeled_dataset_size('logs', filter=r'age systematic', include_full_scatter=True)
+    plot_coefficient_dnn_vs_gan_error_over_training('/Users/golmschenk/Desktop/coef hunt ul1e-1 fl1e-1 le50 gp0e0 mo2e0 lr1e-4 nl0 gs1 ls0 u2f0.5g2 ue50000')

@@ -155,7 +155,7 @@ class Experiment:
         fake_examples = self.G(z)
         _ = self.D(fake_examples.detach())
         fake_feature_layer = self.D.feature_layer
-        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=True,
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=self.settings.normalize_fake_loss,
                                           order=self.settings.fake_loss_order).neg() * self.settings.fake_loss_multiplier
         # Feature norm loss.
         feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2) * self.settings.norm_loss_multiplier
@@ -166,7 +166,7 @@ class Experiment:
                         alpha[1] * fake_examples.detach().requires_grad_())
         _ = self.D(interpolates)
         interpolates_feature_layer = self.D.feature_layer
-        interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer, scale=True,
+        interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer, scale=self.settings.normalize_fake_loss,
                                                   order=self.settings.fake_loss_order).neg() * self.settings.fake_loss_multiplier
         gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
                                         grad_outputs=torch.ones_like(interpolates_loss, device=gpu),

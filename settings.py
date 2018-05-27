@@ -37,6 +37,7 @@ class Settings:
         self.generator_loss_order = 2
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0
+        self.normalize_fake_loss = False
 
         self.load_model_path = None
         self.should_save_models = False
