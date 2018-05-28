@@ -135,71 +135,72 @@ def preprocess_imdb_wiki_database():
         json.dump(json_list, json_file)
 
 
-def preprocess_lap_2016_database():
-    database_root = '../LAP Apparent Age V2'
-    preprocessed_directory = os.path.join(database_root, 'preprocessed')
-    if os.path.exists(preprocessed_directory):
-        shutil.rmtree(preprocessed_directory)
-    os.makedirs(preprocessed_directory)
-    for data_type in ['train', 'validation', 'test']:
-        preprocessed_data_type_directory = os.path.join(preprocessed_directory, data_type)
-        os.makedirs(preprocessed_data_type_directory)
-        for item in os.listdir(os.path.join(database_root, data_type)):
-            item_path = os.path.join(database_root, data_type, item)
-            if item.startswith('.'):
-                continue
-            elif os.path.isdir(item_path):
-                for image_name in os.listdir(item_path):
-                    if not image_name.endswith('.jpg'):
-                        raise NotImplementedError()
-                    crop_image_to_face(item_path, image_name, preprocessed_data_type_directory)
-            elif item.endswith('_gt.csv'):
-                with open(item_path) as csv_file:
-                    csv_reader = csv.reader(csv_file)
-                    json_list = []
-                    next(csv_reader)  # Skip header line.
-                    for csv_line in csv_reader:
-                        image_name, age, age_standard_deviation = csv_line
-                        example_meta_dict = {'image_name': image_name, 'age': age,
-                                             'age_standard_deviation': age_standard_deviation}
-                        json_list.append(example_meta_dict)
-                with open(os.path.join(preprocessed_data_type_directory, 'meta.json'), 'w+') as json_file:
-                    json.dump(json_list, json_file)
+class LapDatabasePreparer():
+    def __init__(self):
+        self.face_detector = MTCNN(steps_threshold=[0.5, 0.6, 0.6])
 
+    def preprocess_lap_2016_database(self):
+        database_root = '../LAP Apparent Age V2'
+        preprocessed_directory = os.path.join(database_root, 'preprocessed')
+        if os.path.exists(preprocessed_directory):
+            shutil.rmtree(preprocessed_directory)
+        os.makedirs(preprocessed_directory)
+        for data_type in ['train', 'validation', 'test']:
+            preprocessed_data_type_directory = os.path.join(preprocessed_directory, data_type)
+            os.makedirs(preprocessed_data_type_directory)
+            for item in os.listdir(os.path.join(database_root, data_type)):
+                item_path = os.path.join(database_root, data_type, item)
+                if item.startswith('.'):
+                    continue
+                elif os.path.isdir(item_path):
+                    for image_name in os.listdir(item_path):
+                        if not image_name.endswith('.jpg'):
+                            raise NotImplementedError()
+                        self.crop_image_to_face(item_path, image_name, preprocessed_data_type_directory)
+                elif item.endswith('_gt.csv'):
+                    with open(item_path) as csv_file:
+                        csv_reader = csv.reader(csv_file)
+                        json_list = []
+                        next(csv_reader)  # Skip header line.
+                        for csv_line in csv_reader:
+                            image_name, age, age_standard_deviation = csv_line
+                            example_meta_dict = {'image_name': image_name, 'age': age,
+                                                 'age_standard_deviation': age_standard_deviation}
+                            json_list.append(example_meta_dict)
+                    with open(os.path.join(preprocessed_data_type_directory, 'meta.json'), 'w+') as json_file:
+                        json.dump(json_list, json_file)
 
-def crop_image_to_face(directory, image_name, output_directory):
-    tf.reset_default_graph()
-    face_detector = MTCNN(steps_threshold=[0.5, 0.6, 0.6])
-    image_path = os.path.join(directory, image_name)
-    image = imageio.imread(image_path, pilmode='RGB')
-    detected_faces = face_detector.detect_faces(image)
-    if len(detected_faces) == 0:
-        cropped_image = image
-        print('Failed for {}. Image was stretched and not cropped.'.format(image_path))
-    else:
-        detected_faces = sorted(detected_faces, key=lambda item: item['confidence'], reverse=True)
-        x, y, width, height = detected_faces[0]['box']
-        center_x = x + int(width / 2)
-        center_y = y + int(height / 2)
-        longer_side_length = max(width, height)
-        margin_multiplier = 1.2
-        half_crop_size = int((longer_side_length * margin_multiplier) / 2)
-        crop_x_start = center_x - half_crop_size
-        crop_x_end = center_x + half_crop_size
-        crop_y_start = center_y - half_crop_size
-        crop_y_end = center_y + half_crop_size
-        unchecked_crop_box = [crop_y_start, crop_x_start, crop_y_end, crop_x_end]
-        crop_x_start = max(crop_x_start, 0)
-        crop_y_start = max(crop_y_start, 0)
-        crop_x_end = min(crop_x_end, image.shape[1])
-        crop_y_end = min(crop_y_end, image.shape[0])
-        crop_box = [crop_y_start, crop_x_start, crop_y_end, crop_x_end]
-        if unchecked_crop_box != crop_box:
-            print('Bad crop for {}. Cropped image is stretched.'.format(image_path))
-        cropped_image = image[crop_y_start:crop_y_end, crop_x_start:crop_x_end]
-    cropped_image = transform.resize(cropped_image, (128, 128), preserve_range=True)
-    imageio.imwrite(os.path.join(output_directory, image_name), cropped_image.astype(np.uint8))
+    def crop_image_to_face(self, directory, image_name, output_directory):
+        image_path = os.path.join(directory, image_name)
+        image = imageio.imread(image_path, pilmode='RGB')
+        detected_faces = self.face_detector.detect_faces(image)
+        if len(detected_faces) == 0:
+            cropped_image = image
+            print('Failed for {}. Image was stretched and not cropped.'.format(image_path))
+        else:
+            detected_faces = sorted(detected_faces, key=lambda item: item['confidence'], reverse=True)
+            x, y, width, height = detected_faces[0]['box']
+            center_x = x + int(width / 2)
+            center_y = y + int(height / 2)
+            longer_side_length = max(width, height)
+            margin_multiplier = 1.2
+            half_crop_size = int((longer_side_length * margin_multiplier) / 2)
+            crop_x_start = center_x - half_crop_size
+            crop_x_end = center_x + half_crop_size
+            crop_y_start = center_y - half_crop_size
+            crop_y_end = center_y + half_crop_size
+            unchecked_crop_box = [crop_y_start, crop_x_start, crop_y_end, crop_x_end]
+            crop_x_start = max(crop_x_start, 0)
+            crop_y_start = max(crop_y_start, 0)
+            crop_x_end = min(crop_x_end, image.shape[1])
+            crop_y_end = min(crop_y_end, image.shape[0])
+            crop_box = [crop_y_start, crop_x_start, crop_y_end, crop_x_end]
+            if unchecked_crop_box != crop_box:
+                print('Bad crop for {}. Cropped image is stretched.'.format(image_path))
+            cropped_image = image[crop_y_start:crop_y_end, crop_x_start:crop_x_end]
+        cropped_image = transform.resize(cropped_image, (128, 128), preserve_range=True)
+        imageio.imwrite(os.path.join(output_directory, image_name), cropped_image.astype(np.uint8))
 
 
 if __name__ == '__main__':
-    preprocess_lap_2016_database()
+    LapDatabasePreparer().preprocess_lap_2016_database()
