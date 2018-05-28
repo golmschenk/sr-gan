@@ -19,10 +19,10 @@ from datetime import datetime
 
 
 class AgeDataset(Dataset):
-    def __init__(self, start=None, end=None, gender_filter=None):
+    def __init__(self, start=None, end=None, gender_filter=None, dataset_path='../imdb_wiki_data/imdb_preprocessed'):
         if gender_filter is not None:
             raise NotImplementedError()
-        self.dataset_path = '../imdb_wiki_data/imdb_preprocessed'
+        self.dataset_path = dataset_path
         with open(os.path.join(self.dataset_path, 'meta.json')) as json_file:
             json_contents = json.load(json_file)
         image_names, ages = [], []
