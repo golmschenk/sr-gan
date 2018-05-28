@@ -9,9 +9,9 @@ import torch
 from urllib.request import urlretrieve
 import tarfile
 import numpy as np
-import tensorflow as tf
-from mtcnn.mtcnn import MTCNN
+import zipfile
 import imageio
+from mtcnn.mtcnn import MTCNN
 from skimage import transform, color
 from torch.utils.data import Dataset
 from scipy.io import loadmat
@@ -135,23 +135,68 @@ def preprocess_imdb_wiki_database():
         json.dump(json_list, json_file)
 
 
+def download_and_extract_file(directory, download_link, file_name, password=None):
+    urlretrieve(download_link, os.path.join(directory, file_name))
+    with zipfile.ZipFile(os.path.join(directory, file_name), 'r') as zip_file:
+        zip_file.extractall(directory, pwd=password)
+    os.remove(os.path.join(directory, file_name))
+
+
 class LapDatabasePreparer():
     def __init__(self):
+        self.database_directory = '../LAP Apparent Age V2'
         self.face_detector = MTCNN(steps_threshold=[0.5, 0.6, 0.6])
 
-    def preprocess_lap_2016_database(self):
-        database_root = '../LAP Apparent Age V2'
-        preprocessed_directory = os.path.join(database_root, 'preprocessed')
+    def download_and_preprocess(self):
+        print('Preparing LAP Apparent Age V2 database.')
+        print('Downloading...')
+        self.download()
+        print('Preprocessing...')
+        self.preprocess()
+
+    def download(self):
+        if os.path.exists(self.database_directory):
+            shutil.rmtree(self.database_directory)
+        os.makedirs(self.database_directory)
+        os.makedirs(os.path.join(self.database_directory, 'train'))
+        os.makedirs(os.path.join(self.database_directory, 'validation'))
+        os.makedirs(os.path.join(self.database_directory, 'test'))
+        download_and_extract_file(os.path.join(self.database_directory, 'train'),
+                                  'http://158.109.8.102/ApparentAgeV2/train_1.zip', 'train1.zip')
+        download_and_extract_file(os.path.join(self.database_directory, 'train'),
+                                  'http://158.109.8.102/ApparentAgeV2/train_2.zip', 'train2.zip')
+        download_and_extract_file(os.path.join(self.database_directory, 'train'),
+                                  'http://158.109.8.102/ApparentAgeV2/train_gt.zip', 'train_gt.zip')
+        download_and_extract_file(os.path.join(self.database_directory, 'validation'),
+                                  'http://158.109.8.102/ApparentAgeV2/valid.zip', 'valid.zip')
+        download_and_extract_file(os.path.join(self.database_directory, 'validation'),
+                                  'http://158.109.8.102/ApparentAgeV2/valid_gt.zip', 'valid_gt.zip',
+                                  password=b'Aj9WUCc5LJagn4')
+        download_and_extract_file(os.path.join(self.database_directory, 'test'),
+                                  'http://158.109.8.102/ApparentAgeV2/test_1.zip', 'test1.zip',
+                                  password=b'0PWW7nh@5wTuAS')
+        download_and_extract_file(os.path.join(self.database_directory, 'test'),
+                                  'http://158.109.8.102/ApparentAgeV2/test_2.zip', 'test2.zip',
+                                  password=b'0PWW7nh@5wTuAS')
+        download_and_extract_file(os.path.join(self.database_directory, 'test'),
+                                  'http://158.109.8.102/ApparentAgeV2/test_gt.zip', 'test_gt.zip',
+                                  password=b'0PWW7nh@5wTuAS')
+
+    def preprocess(self):
+        preprocessed_directory = os.path.join(self.database_directory, 'preprocessed')
         if os.path.exists(preprocessed_directory):
             shutil.rmtree(preprocessed_directory)
         os.makedirs(preprocessed_directory)
         for data_type in ['train', 'validation', 'test']:
             preprocessed_data_type_directory = os.path.join(preprocessed_directory, data_type)
             os.makedirs(preprocessed_data_type_directory)
-            for item in os.listdir(os.path.join(database_root, data_type)):
-                item_path = os.path.join(database_root, data_type, item)
+            for item in os.listdir(os.path.join(self.database_directory, data_type)):
+                item_path = os.path.join(self.database_directory, data_type, item)
                 if item.startswith('.'):
                     continue
+                elif item.endswith('.jpg'):
+                    item_directory = os.path.dirname(item_path)
+                    self.crop_image_to_face(item_directory, item, preprocessed_data_type_directory)
                 elif os.path.isdir(item_path):
                     for image_name in os.listdir(item_path):
                         if not image_name.endswith('.jpg'):
@@ -203,4 +248,4 @@ class LapDatabasePreparer():
 
 
 if __name__ == '__main__':
-    LapDatabasePreparer().preprocess_lap_2016_database()
+    LapDatabasePreparer().download_and_preprocess()
