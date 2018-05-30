@@ -4,11 +4,15 @@ import torch
 import torchvision as torchvision
 from scipy.stats import norm
 from torch.utils.data import DataLoader
+from torchvision.models import vgg16
 
 from age_data import AgeDataset
 from age_models import Generator, Discriminator
 from application import Application
 from utility import seed_all, gpu, MixtureModel
+
+
+model_architecture = 'dcgan'  # dcgan or vgg
 
 
 class AgeApplication(Application):
@@ -27,9 +31,16 @@ class AgeApplication(Application):
 
 
     def model_setup(self):
-        G_model = Generator()
-        D_model = Discriminator()
-        DNN_model = Discriminator()
+        if model_architecture == 'dcgan':
+            G_model = Generator()
+            D_model = Discriminator()
+            DNN_model = Discriminator()
+        elif model_architecture == 'vgg':
+            G_model = Generator(image_size=256)
+            D_model = vgg16(num_classes=1)
+            DNN_model = vgg16(num_classes=1)
+        else:
+            raise NotImplementedError()
         return DNN_model, D_model, G_model
 
 

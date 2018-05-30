@@ -29,7 +29,7 @@ def convolution(c_in, c_out, k_size, stride=2, pad=1, bn=batch_norm):
 class Generator(nn.Module):
     def __init__(self, z_dim=256, image_size=128, conv_dim=64):
         seed_all(0)
-        super(Generator, self).__init__()
+        super().__init__()
         self.fc = transpose_convolution(z_dim, conv_dim * 8, int(image_size / 16), 1, 0, bn=False)
         self.layer1 = transpose_convolution(conv_dim * 8, conv_dim * 4, 4)
         self.layer2 = transpose_convolution(conv_dim * 4, conv_dim * 2, 4)
@@ -50,7 +50,7 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, image_size=128, conv_dim=64):
         seed_all(0)
-        super(Discriminator, self).__init__()
+        super().__init__()
         self.layer1 = convolution(3, conv_dim, 4, bn=False)
         self.layer2 = convolution(conv_dim, conv_dim * 2, 4)
         self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
