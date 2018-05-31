@@ -19,7 +19,7 @@ from datetime import datetime
 
 
 class AgeDataset(Dataset):
-    def __init__(self, start=None, end=None, gender_filter=None, dataset_path='../imdb_wiki_data/imdb_preprocessed_128'):
+    def __init__(self, dataset_path, start=None, end=None, gender_filter=None):
         if gender_filter is not None:
             raise NotImplementedError()
         self.dataset_path = dataset_path

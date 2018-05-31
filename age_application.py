@@ -17,30 +17,32 @@ model_architecture = 'dcgan'  # dcgan or vgg
 
 class AgeApplication(Application):
     def dataset_setup(self, experiment):
+        if model_architecture == 'vgg':
+            dataset_path = '../imdb_wiki_data/imdb_preprocessed_256'
+        else:
+            dataset_path = '../imdb_wiki_data/imdb_preprocessed_128'
         settings = experiment.settings
         seed_all(settings.labeled_dataset_seed)
-        train_dataset = AgeDataset(start=0, end=settings.labeled_dataset_size)
+        train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=2)
-        unlabeled_dataset = AgeDataset(start=train_dataset.length,
+        unlabeled_dataset = AgeDataset(dataset_path, start=train_dataset.length,
                                        end=train_dataset.length + settings.unlabeled_dataset_size)
         unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=2)
         train_and_unlabeled_dataset_size = train_dataset.length + unlabeled_dataset.length
-        validation_dataset = AgeDataset(start=train_and_unlabeled_dataset_size,
+        validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
                                         end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
 
     def model_setup(self):
-        if model_architecture == 'dcgan':
-            G_model = Generator()
-            D_model = Discriminator()
-            DNN_model = Discriminator()
-        elif model_architecture == 'vgg':
+        if model_architecture == 'vgg':
             G_model = Generator(image_size=256)
             D_model = vgg16(num_classes=1)
             DNN_model = vgg16(num_classes=1)
         else:
-            raise NotImplementedError()
+            G_model = Generator()
+            D_model = Discriminator()
+            DNN_model = Discriminator()
         return DNN_model, D_model, G_model
 
 
