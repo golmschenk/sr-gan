@@ -11,11 +11,12 @@ import tarfile
 import numpy as np
 import zipfile
 import imageio
-from mtcnn.mtcnn import MTCNN
 from skimage import transform, color
 from torch.utils.data import Dataset
 from scipy.io import loadmat
 from datetime import datetime
+
+from utility import to_normalized_range
 
 
 class AgeDataset(Dataset):
@@ -46,6 +47,7 @@ class AgeDataset(Dataset):
         image = imageio.imread(os.path.join(self.dataset_path, image_name))
         image = image.transpose((2, 0, 1))
         image = torch.tensor(image.astype(np.float32))
+        image = to_normalized_range(image)
         age = self.ages[idx]
         age = torch.tensor(age, dtype=torch.float)
         return image, age
@@ -147,6 +149,7 @@ def download_and_extract_file(directory, download_link, file_name, password=None
 
 class LapDatabasePreparer():
     def __init__(self, preprocessed_image_size=128):
+        from mtcnn.mtcnn import MTCNN
         self.database_directory = '../LAP Apparent Age V2'
         self.face_detector = MTCNN(steps_threshold=[0.5, 0.6, 0.6])
         self.preprocessed_image_size = preprocessed_image_size

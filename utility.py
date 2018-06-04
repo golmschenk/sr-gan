@@ -115,3 +115,11 @@ def make_directory_name_unique(trial_directory):
             run_number += 1
         trial_directory += ' r{}'.format(run_number)
     return trial_directory
+
+
+def to_normalized_range(tensor_: torch.Tensor) -> torch.Tensor:
+    return (tensor_ / 127.5) - 1
+
+
+def to_image_range(tensor_: torch.Tensor) -> torch.Tensor:
+    return (tensor_ + 1) * 127.5
