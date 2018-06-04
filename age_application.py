@@ -96,16 +96,15 @@ class AgeApplication(Application):
         train_iterator = iter(gan_train_dataset_loader)
         examples, _ = next(train_iterator)
         images_image = torchvision.utils.make_grid(examples[:9], nrow=3)
-        gan_summary_writer.add_image('Real', np.transpose(images_image.numpy(), [1, 2, 0]))
+        gan_summary_writer.add_image('Real', images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], nrow=3)
-        gan_summary_writer.add_image('Fake/Standard', np.transpose(fake_images_image.numpy(), [1, 2, 0]))
+        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
                                            norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], nrow=3)
-        gan_summary_writer.add_image('Fake/Offset', np.transpose(fake_images_image.numpy(), [1, 2, 0]))
-
+        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
