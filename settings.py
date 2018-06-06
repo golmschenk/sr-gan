@@ -22,14 +22,14 @@ class Settings:
         self.labeled_dataset_size = 50
         self.unlabeled_dataset_size = 50000
         self.validation_dataset_size = 1000
-        self.learning_rate = 1e-5
+        self.learning_rate = 1e-4
 
         self.labeled_loss_multiplier = 1e0
         self.unlabeled_loss_multiplier = 1e0
         self.fake_loss_multiplier = 1e0
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
-        self.norm_loss_multiplier = 1
+        self.norm_loss_multiplier = 0
         self.noise_scale = 5e-1
         self.mean_offset = 1e0
         self.fake_loss_order = 2
@@ -40,7 +40,7 @@ class Settings:
         self.normalize_fake_loss = False
 
         self.load_model_path = None
-        self.should_save_models = False
+        self.should_save_models = True
         self.skip_completed_experiment = True
 
     def local_setup(self):
