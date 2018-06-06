@@ -321,57 +321,75 @@ def file_string_replace(file_name, old_string, new_string):
         file.write(contents)
 
 
-def plot_dnn_vs_gan_average_error_by_labeled_dataset_size(logs_directory, error_units='years', filter=None,
-                                                          include_full_scatter=False):
+def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_label='Age MAE (years)',
+                                                     x_axis_label='Labeled Dataset Size',
+                                                     include_filter=None,
+                                                     exclude_filter=None,
+                                                     include_full_scatter=True,
+                                                     match_hyper_parameter_regex=r' le(\d+) ',
+                                                     hyper_parameter_type=int,
+                                                     experiment_name='age', linthreshx=0.1,
+                                                     x_axis_scale='symlog'):
+    alpha = 0.2
     logs = Log.create_all_in_directory(logs_directory, exclude_if_no_final_model_exists=True)
     dnn_results = collections.defaultdict(list)
     gan_results = collections.defaultdict(list)
     dnn_points = []
     gan_points = []
     for log in logs:
-        if filter is not None and not re.search(filter, log.event_file_name):
+        if include_filter is not None and not re.search(include_filter, log.event_file_name):
             continue
-        labeled_dataset_size = int(re.search(r' le(\d+) ', log.event_file_name).group(1))
+        if exclude_filter is not None and re.search(exclude_filter, log.event_file_name):
+            continue
+        match_hyper_parameter = hyper_parameter_type(re.search(match_hyper_parameter_regex,
+                                                               log.event_file_name).group(1))
+        match_hyper_parameter = 0.001 if match_hyper_parameter == 0 else match_hyper_parameter # TODO: figure out a better solution than this for showing 0 on the log plot.
         model_type = re.search(r'/(DNN|GAN)/', log.event_file_name).group(1)
         last_errors = log.scalars_data_frame.iloc[-3:]['1_Validation_Error/MAE'].tolist()
         error = np.nanmean(last_errors)
         if model_type == 'GAN':
-            gan_results[labeled_dataset_size].append(error)
-            gan_points.append((labeled_dataset_size, error))
+            gan_results[match_hyper_parameter].append(error)
+            gan_points.append((match_hyper_parameter, error))
         else:
-            dnn_results[labeled_dataset_size].append(error)
-            dnn_points.append((labeled_dataset_size, error))
+            dnn_results[match_hyper_parameter].append(error)
+            dnn_points.append((match_hyper_parameter, error))
     average_dnn_results = {example_count: np.mean(values) for example_count, values in dnn_results.items()}
     average_gan_results = {example_count: np.mean(values) for example_count, values in gan_results.items()}
     dnn_plot_x, dnn_plot_y = zip(*sorted(average_dnn_results.items()))
     gan_plot_x, gan_plot_y = zip(*sorted(average_gan_results.items()))
     dnn_plot_y, gan_plot_y = np.array(dnn_plot_y), np.array(gan_plot_y)
     figure, axes = plt.subplots()
-    axes.set_xscale('log')
+    if x_axis_scale == 'symlog':
+        axes.set_xscale(x_axis_scale, linthreshx=linthreshx)
+    else:
+        axes.set_xscale(x_axis_scale)
     axes.set_xticks(dnn_plot_x)
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    axes.set_xlabel('Labeled Dataset Size')
-    axes.set_ylabel('Age MAE ({})'.format(error_units))
+    axes.set_xlabel(x_axis_label)
+    axes.set_ylabel(y_axis_label)
     if include_full_scatter:
-        axes.scatter(*np.array(dnn_points).transpose(), color=dnn_color, alpha=0.2)
-        axes.scatter(*np.array(gan_points).transpose(), color=gan_color, alpha=0.2)
+        axes.scatter(*np.array(dnn_points).transpose(), color=dnn_color, alpha=alpha)
+        axes.scatter(*np.array(gan_points).transpose(), color=gan_color, alpha=alpha)
     axes.plot(dnn_plot_x, dnn_plot_y, color=dnn_color, label='DNN')
     axes.plot(gan_plot_x, gan_plot_y, color=gan_color, label='GAN')
     axes.legend().set_visible(True)
-    matplotlib2tikz.save(os.path.join('latex', 'dnn-vs-gan.tex'))
+    matplotlib2tikz.save(os.path.join('latex', '{}-gan-vs-dnn.tex'.format(experiment_name)))
     plt.show()
     plt.close(figure)
     figure, axes = plt.subplots()
-    axes.set_xscale('log')
+    if x_axis_scale == 'symlog':
+        axes.set_xscale(x_axis_scale, linthreshx=linthreshx)
+    else:
+        axes.set_xscale(x_axis_scale)
     axes.set_xticks(dnn_plot_x)
     axes.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    axes.set_xlabel('Labeled Dataset Size')
+    axes.set_xlabel(x_axis_label)
     axes.set_ylabel('GAN to DNN Relative Error')
     if include_full_scatter:
         relative_points = [(dnn_point[0], gan_point[1]/dnn_point[1]) for dnn_point, gan_point in zip(dnn_points, gan_points)]
-        axes.scatter(*np.array(relative_points).transpose(), color=gan_color, alpha=0.2)
+        axes.scatter(*np.array(relative_points).transpose(), color=gan_color, alpha=alpha)
     axes.plot(gan_plot_x, gan_plot_y / dnn_plot_y, color=gan_color)
-    matplotlib2tikz.save(os.path.join('latex', 'gan-to-dnn-relative-error.tex'))
+    matplotlib2tikz.save(os.path.join('latex', '{}-gan-to-dnn-relative-error.tex'.format(experiment_name)))
     plt.show()
     plt.close(figure)
 
@@ -393,5 +411,12 @@ def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
 
 
 if __name__ == '__main__':
-    #plot_dnn_vs_gan_average_error_by_labeled_dataset_size('logs', filter=r'age systematic', include_full_scatter=True)
-    plot_coefficient_dnn_vs_gan_error_over_training('/Users/golmschenk/Desktop/coef hunt ul1e-1 fl1e-1 le50 gp0e0 mo2e0 lr1e-4 nl0 gs1 ls0 u2f0.5g2 ue50000')
+    plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Documents/CVIU ALCV SR-GAN Results/coef mo le100 2',
+                                                     y_axis_label='MAE',
+                                                     x_axis_label='Noise Mean Offset',
+                                                     match_hyper_parameter_regex=r' mo(\d+e-?\d+) ',
+                                                     hyper_parameter_type=float,
+                                                     exclude_filter=r' mo1e0 ',
+                                                     experiment_name='coef-mo',
+                                                     x_axis_scale='log')
+    #plot_coefficient_dnn_vs_gan_error_over_training('/Users/golmschenk/Desktop/coef hunt ul1e-1 fl1e-1 le50 gp0e0 mo2e0 lr1e-4 nl0 gs1 ls0 u2f0.5g2 ue50000')
