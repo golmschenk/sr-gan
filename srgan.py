@@ -173,7 +173,7 @@ class Experiment:
         gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
                                         grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
                                         create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1)) ** 2).mean() * self.settings.gradient_penalty_multiplier
+        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2).mean() * self.settings.gradient_penalty_multiplier
         # Discriminator update.
         loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
         loss.backward()

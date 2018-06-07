@@ -40,19 +40,19 @@ class CoefficientApplication(Application):
         validation_dataset = experiment.validation_dataset
         unlabeled_dataset = experiment.unlabeled_dataset
         dnn_predicted_train_labels = DNN(torch.tensor(
-            train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
+            train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
         dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels))
         dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors)
         dnn_predicted_validation_labels = DNN(torch.tensor(
-            validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
+            validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
         dnn_validation_label_errors = np.mean(np.abs(dnn_predicted_validation_labels - validation_dataset.labels))
         dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_errors)
         predicted_train_labels = D(torch.tensor(
-            train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
+            train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
         gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels))
         gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors)
         predicted_validation_labels = D(torch.tensor(
-            validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').squeeze().detach().numpy()
+            validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
         gan_validation_label_errors = np.mean(np.abs(predicted_validation_labels - validation_dataset.labels))
         gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_errors)
         gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN',
@@ -61,14 +61,14 @@ class CoefficientApplication(Application):
             size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z, add_noise=False)
         fake_examples_array = fake_examples.to('cpu').detach().numpy()
-        fake_predicted_labels = D(fake_examples).squeeze()
+        fake_predicted_labels = D(fake_examples)
         fake_predicted_labels_array = fake_predicted_labels.to('cpu').detach().numpy()
         unlabeled_labels_array = unlabeled_dataset.labels[:settings.validation_dataset_size]
         label_wasserstein_distance = wasserstein_distance(fake_predicted_labels_array, unlabeled_labels_array)
         gan_summary_writer.add_scalar('Generator/Predicted Label Wasserstein', label_wasserstein_distance)
         unlabeled_examples_array = unlabeled_dataset.examples[:settings.validation_dataset_size]
         unlabeled_examples = torch.tensor(unlabeled_examples_array.astype(np.float32)).to(gpu)
-        unlabeled_predictions = D(unlabeled_examples).squeeze()
+        unlabeled_predictions = D(unlabeled_examples)
         if dnn_summary_writer.step % settings.summary_step_period == 0:
             unlabeled_predictions_array = unlabeled_predictions.to('cpu').detach().numpy()
             validation_predictions_array = predicted_validation_labels
