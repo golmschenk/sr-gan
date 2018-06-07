@@ -26,3 +26,7 @@ class Application(ABC):
     @abstractmethod
     def validation_summaries(self, experiment: 'Experiment', step: int):
         pass
+
+    def labeled_loss_function(self, predicted_labels, labels, order=2):
+        """Calculate the loss from the label difference prediction."""
+        return (predicted_labels - labels).abs().pow(order).mean()

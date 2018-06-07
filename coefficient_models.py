@@ -48,7 +48,7 @@ class MLP(Module):
         x = leaky_relu(self.linear3(x))
         self.feature_layer = x
         x = self.linear4(x)
-        return x
+        return x.squeeze()
 
     def register_gradient_sum_hooks(self):
         """A hook to remember the sum gradients of a backwards call."""

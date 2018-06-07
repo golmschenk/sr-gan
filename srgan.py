@@ -35,6 +35,7 @@ class Experiment:
         self.G: Module = None
         self.G_optimizer: Optimizer = None
         self.signal_quit = False
+        self.labeled_loss_function = None
 
     def train(self):
         """
@@ -56,6 +57,7 @@ class Experiment:
         dataset_setup = self.settings.application.dataset_setup
         model_setup = self.settings.application.model_setup
         validation_summaries = self.settings.application.validation_summaries
+        self.labeled_loss_function = self.settings.application.labeled_loss_function
 
         self.train_dataset, self.train_dataset_loader, self.unlabeled_dataset, self.unlabeled_dataset_loader, self.validation_dataset = dataset_setup(self)
         DNN_model, D_model, G_model = model_setup()
@@ -125,8 +127,8 @@ class Experiment:
     def dnn_training_step(self, examples, labels, step):
         self.dnn_summary_writer.step = step
         self.DNN_optimizer.zero_grad()
-        dnn_predicted_labels = self.DNN(examples).squeeze()
-        dnn_loss = labeled_loss_function(dnn_predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        dnn_predicted_labels = self.DNN(examples)
+        dnn_loss = self.labeled_loss_function(dnn_predicted_labels, labels) * self.settings.labeled_loss_multiplier
         dnn_feature_layer = self.DNN.feature_layer
         dnn_loss.backward()
         self.DNN_optimizer.step()
@@ -140,9 +142,9 @@ class Experiment:
         # Labeled.
         self.gan_summary_writer.step = step
         self.D_optimizer.zero_grad()
-        predicted_labels = self.D(labeled_examples).squeeze()
+        predicted_labels = self.D(labeled_examples)
         labeled_feature_layer = self.D.feature_layer
-        labeled_loss = labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
         # Unlabeled.
         _ = self.D(unlabeled_examples)
         unlabeled_feature_layer = self.D.feature_layer
@@ -171,7 +173,7 @@ class Experiment:
         gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
                                         grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
                                         create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2).mean() * self.settings.gradient_penalty_multiplier
+        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1)) ** 2).mean() * self.settings.gradient_penalty_multiplier
         # Discriminator update.
         loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
         loss.backward()
@@ -213,11 +215,6 @@ def angle_between(vector0, vector1):
     unit_vector1 = unit_vector(vector1)
     epsilon = 1e-6
     return unit_vector0.dot(unit_vector1).clamp(-1.0 + epsilon, 1.0 - epsilon).acos()
-
-
-def labeled_loss_function(predicted_labels, labels, order=2):
-    """Calculate the loss from the label difference prediction."""
-    return (predicted_labels - labels).abs().pow(order).mean()
 
 
 def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):
