@@ -9,9 +9,9 @@ import torchvision
 from torch.utils.data import DataLoader
 
 import crowd_data
-from crowd_data import CrowdDataset
+from crowd_data import CrowdDataset, resized_patch_size
 from application import Application
-from crowd_models import Generator, JointCNN
+from crowd_models import Generator, JointCNN, DCGenerator, JointDCDiscriminator
 from utility import seed_all, gpu, to_image_range, MixtureModel
 
 
@@ -29,17 +29,17 @@ class CrowdApplication(Application):
         seed_all(settings.labeled_dataset_seed)  # Note, not seeding the dataset currently.
         train_dataset = CrowdDataset(os.path.join(datasets_path, 'train'), train_transform)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
-                                          num_workers=2)
+                                          num_workers=0)
         unlabeled_dataset = CrowdDataset(os.path.join(datasets_path, 'unlabeled'), train_transform)
         unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                              pin_memory=True, num_workers=2)
+                                              pin_memory=True, num_workers=0)
         validation_dataset = CrowdDataset(os.path.join(datasets_path, 'validation'), validation_transform)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
     def model_setup(self):
-        G_model = Generator()
-        D_model = JointCNN()
-        DNN_model = JointCNN()
+        G_model = DCGenerator()
+        D_model = JointDCDiscriminator()
+        DNN_model = JointDCDiscriminator()
         return DNN_model, D_model, G_model
 
     def validation_summaries(self, experiment, step):
@@ -120,10 +120,10 @@ class CrowdApplication(Application):
         predicted_label_array = predicted_label.numpy()
         mappable.set_clim(vmin=min(label_array.min(), predicted_label_array.min()),
                           vmax=max(label_array.max(), predicted_label_array.max()))
-        resized_label_array = scipy.misc.imresize(label_array, (72, 72), mode='F')
+        resized_label_array = scipy.misc.imresize(label_array, (resized_patch_size, resized_patch_size), mode='F')
         label_heatmap_array = mappable.to_rgba(resized_label_array).astype(np.float32)
         label_heatmap_tensor = torch.from_numpy(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
-        resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (72, 72), mode='F')
+        resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (resized_patch_size, resized_patch_size), mode='F')
         predicted_label_heatmap_array = mappable.to_rgba(resized_predicted_label_array).astype(np.float32)
         predicted_label_heatmap_tensor = torch.from_numpy(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         return label_heatmap_tensor, predicted_label_heatmap_tensor

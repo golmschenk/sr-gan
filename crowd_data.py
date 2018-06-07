@@ -10,6 +10,8 @@ import os
 import numpy as np
 from torch.utils.data import Dataset
 
+resized_patch_size = 128
+
 
 CrowdExampleWithPerspective = namedtuple('CrowdExample', ['image', 'label', 'roi', 'perspective'])
 CrowdExample = namedtuple('CrowdExample', ['image', 'label', 'roi'])
@@ -139,8 +141,8 @@ class PatchAndRescale:
     Select a patch based on a position and rescale it based on the perspective map.
     """
     def __init__(self):
-        self.image_scaled_size = [72, 72]
-        self.label_scaled_size = [18, 18]
+        self.image_scaled_size = [resized_patch_size, resized_patch_size]
+        self.label_scaled_size = [int(resized_patch_size / 4), int(resized_patch_size / 4)]
 
     def get_patch_for_position(self, example_with_perspective, y, x):
         """

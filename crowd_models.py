@@ -2,8 +2,11 @@
 Code for the model structures.
 """
 import torch
-from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d
+from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d
 from torch.nn.functional import leaky_relu, tanh
+
+from crowd_data import resized_patch_size
+from utility import seed_all
 
 
 class JointCNN(Module):
@@ -50,7 +53,7 @@ class JointCNN(Module):
         x = leaky_relu(self.conv5(x))
         self.feature_layer = x
         x_count = leaky_relu(self.count_conv(x)).view(-1)
-        x_density = leaky_relu(self.density_conv(x)).view(-1, 18, 18)
+        x_density = leaky_relu(self.density_conv(x)).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
         return x_density, x_count
 
 
@@ -90,3 +93,64 @@ class Generator(Module):
         :rtype: torch.autograd.Variable
         """
         return super().__call__(*args, **kwargs)
+
+
+batch_norm = False
+
+
+def transpose_convolution(c_in, c_out, k_size, stride=2, pad=1, bn=batch_norm):
+    layers = [ConvTranspose2d(c_in, c_out, k_size, stride, pad)]
+    if bn:
+        layers.append(BatchNorm2d(c_out))
+    return Sequential(*layers)
+
+
+def convolution(c_in, c_out, k_size, stride=2, pad=1, bn=batch_norm):
+    layers = [Conv2d(c_in, c_out, k_size, stride, pad)]
+    if bn:
+        layers.append(BatchNorm2d(c_out))
+    return Sequential(*layers)
+
+
+class DCGenerator(Module):
+    def __init__(self, z_dim=256, image_size=128, conv_dim=64):
+        seed_all(0)
+        super().__init__()
+        self.fc = transpose_convolution(z_dim, conv_dim * 8, int(image_size / 16), 1, 0, bn=False)
+        self.layer1 = transpose_convolution(conv_dim * 8, conv_dim * 4, 4)
+        self.layer2 = transpose_convolution(conv_dim * 4, conv_dim * 2, 4)
+        self.layer3 = transpose_convolution(conv_dim * 2, conv_dim, 4)
+        self.layer4 = transpose_convolution(conv_dim, 3, 4, bn=False)
+        self.input_size = z_dim
+
+    def forward(self, z):
+        z = z.view(z.size(0), z.size(1), 1, 1)
+        out = self.fc(z)                            # (?, 512, 4, 4)
+        out = leaky_relu(self.layer1(out), 0.05)    # (?, 256, 8, 8)
+        out = leaky_relu(self.layer2(out), 0.05)    # (?, 128, 16, 16)
+        out = leaky_relu(self.layer3(out), 0.05)    # (?, 64, 32, 32)
+        out = tanh(self.layer4(out))                # (?, 3, 64, 64)
+        return out
+
+
+class JointDCDiscriminator(Module):
+    def __init__(self, image_size=128, conv_dim=64):
+        seed_all(0)
+        super().__init__()
+        self.layer1 = convolution(3, conv_dim, 4, bn=False)
+        self.layer2 = convolution(conv_dim, conv_dim * 2, 4)
+        self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
+        self.layer4 = convolution(conv_dim * 4, conv_dim * 8, 4)
+        self.count_layer5 = convolution(conv_dim * 8, 1, int(image_size / 16), 1, 0, False)
+        self.density_layer5 = convolution(conv_dim * 8, int(resized_patch_size / 4) ** 2, int(image_size / 16), 1, 0, False)
+        self.feature_layer = None
+
+    def forward(self, x):
+        out = leaky_relu(self.layer1(x), 0.05)    # (?, 64, 32, 32)
+        out = leaky_relu(self.layer2(out), 0.05)  # (?, 128, 16, 16)
+        out = leaky_relu(self.layer3(out), 0.05)  # (?, 256, 8, 8)
+        out = leaky_relu(self.layer4(out), 0.05)  # (?, 512, 4, 4)
+        self.feature_layer = out.view(out.size(0), -1)
+        count = self.count_layer5(out).view(-1)
+        density = self.density_layer5(out).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
+        return density, count
