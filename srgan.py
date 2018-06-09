@@ -14,7 +14,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 from settings import Settings
-from utility import SummaryWriter, infinite_iter, gpu, make_directory_name_unique, MixtureModel
+from utility import SummaryWriter, infinite_iter, gpu, make_directory_name_unique, MixtureModel, seed_all
 
 
 class Experiment:
@@ -52,7 +52,7 @@ class Experiment:
         self.gan_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'GAN'))
         self.dnn_summary_writer.summary_period = self.settings.summary_step_period
         self.gan_summary_writer.summary_period = self.settings.summary_step_period
-
+        seed_all(0)
 
         dataset_setup = self.settings.application.dataset_setup
         model_setup = self.settings.application.model_setup

@@ -14,6 +14,7 @@ class JointCNN(Module):
     A CNN that produces a density map and a count.
     """
     def __init__(self):
+        seed_all(0)
         super().__init__()
         self.conv1 = Conv2d(3, 32, kernel_size=7, padding=3)
         self.max_pool1 = MaxPool2d(kernel_size=2, stride=2)
@@ -62,6 +63,7 @@ class Generator(Module):
     A generator for producing crowd images.
     """
     def __init__(self):
+        seed_all(0)
         super().__init__()
         self.input_size = 100
         self.conv_transpose1 = ConvTranspose2d(self.input_size, 64, kernel_size=18)
