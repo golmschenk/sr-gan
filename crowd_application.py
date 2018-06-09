@@ -96,10 +96,14 @@ class CrowdApplication(Application):
             if densities.size == 0:
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
-        density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
+        density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
         summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae)
+        count_mse = np.abs(predicted_counts - densities.sum(1).sum(1)).pow(2).mean()
+        summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse)
+        density_mse = np.abs(predicted_densities - densities).pow(2).sum(1).sum(1).mean()
+        summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse)
         if comparison_value is not None:
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
         return count_mae
