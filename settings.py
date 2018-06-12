@@ -43,6 +43,10 @@ class Settings:
         self.should_save_models = True
         self.skip_completed_experiment = True
 
+        # Crowd application only.
+        self.number_of_cameras = 5
+        self.number_of_images_per_camera = 5
+
     def local_setup(self):
         """Code to override some settings when debugging on the local (low power) machine."""
         if 'Carbon' in platform.node():

@@ -10,6 +10,8 @@ import os
 import numpy as np
 from torch.utils.data import Dataset
 
+from utility import seed_all
+
 resized_patch_size = 128
 
 
@@ -21,19 +23,37 @@ class CrowdDataset(Dataset):
     """
     A class for the crowd dataset.
     """
-    def __init__(self, dataset_directory, transform=None):
-        """
-        :param database_path: The path of the dataset directories.
-        :type database_path: str
-        :param data_type: The type of data to be loaded (e.g. train, test, etc).
-        :type data_type: str
-        :param transform: The transformations to be applied to the dataset.
-        :type transform: callable
-        """
-        self.images = np.load(os.path.join(dataset_directory, 'images.npy'), mmap_mode='r')
-        self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')
-        self.rois = np.load(os.path.join(dataset_directory, 'rois.npy'), mmap_mode='r')
-        self.perspectives = np.load(os.path.join(dataset_directory, 'perspectives.npy'), mmap_mode='r')
+    def __init__(self, dataset_directory, camera_names, number_of_cameras=None, number_of_images_per_camera=None,
+                 transform=None, seed=None, unlabeled=False):
+        seed_all(seed)
+        cameras_images = []
+        cameras_labels = []
+        cameras_rois = []
+        cameras_perspectives = []
+        if unlabeled:
+            number_of_cameras = len(camera_names)
+        for camera_name in random.shuffle(camera_names)[:number_of_cameras]:
+            camera_directory = os.path.join(dataset_directory, camera_name)
+            if unlabeled:
+                camera_images = np.load(os.path.join(camera_directory, 'unlabeled_images.npy'), mmap_mode='r')
+                camera_labels = np.zeros(*camera_images.shape[:3], dtype=np.float32)
+            else:
+                camera_images = np.load(os.path.join(camera_directory, 'images.npy'), mmap_mode='r')
+                camera_labels = np.load(os.path.join(camera_directory, 'labels.npy'), mmap_mode='r')
+            if number_of_images_per_camera is None:
+                number_of_images_per_camera = len(camera_images)
+            camera_roi = np.load(os.path.join(camera_directory, 'roi.npy'), mmap_mode='r')
+            camera_rois = np.repeat(camera_roi[np.newaxis, :, :], camera_images.shape[0], axis=0)
+            camera_perspective = np.load(os.path.join(camera_directory, 'perspective.npy'), mmap_mode='r')
+            camera_perspectives = np.repeat(camera_perspective[np.newaxis, :, :], camera_images.shape[0], axis=0)
+            cameras_images.append(np.random.permutation(camera_images)[:number_of_images_per_camera])
+            cameras_labels.append(np.random.permutation(camera_labels)[:number_of_images_per_camera])
+            cameras_rois.append(np.random.permutation(camera_rois)[:number_of_images_per_camera])
+            cameras_perspectives.append(np.random.permutation(camera_perspectives)[:number_of_images_per_camera])
+        self.images = np.concatenate(cameras_images, axis=0)
+        self.labels = np.concatenate(cameras_labels, axis=0)
+        self.rois = np.concatenate(cameras_rois, axis=0)
+        self.perspectives = np.concatenate(cameras_perspectives, axis=0)
         self.length = self.labels.shape[0]
         self.transform = transform
 

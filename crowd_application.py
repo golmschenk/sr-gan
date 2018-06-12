@@ -1,4 +1,4 @@
-
+import json
 import scipy.misc
 import matplotlib
 import numpy as np
@@ -17,7 +17,6 @@ from utility import seed_all, gpu, to_image_range, MixtureModel
 
 class CrowdApplication(Application):
     def dataset_setup(self, experiment):
-        datasets_path = '../World Expo/5 Camera 5 Images Target Unlabeled'
         train_transform = torchvision.transforms.Compose([crowd_data.RandomlySelectPatchAndRescale(),
                                                           crowd_data.RandomHorizontalFlip(),
                                                           crowd_data.NegativeOneToOneNormalizeImage(),
@@ -26,14 +25,16 @@ class CrowdApplication(Application):
                                                                crowd_data.NegativeOneToOneNormalizeImage(),
                                                                crowd_data.NumpyArraysToTorchTensors()])
         settings = experiment.settings
-        seed_all(settings.labeled_dataset_seed)  # Note, not seeding the dataset currently.
-        train_dataset = CrowdDataset(os.path.join(datasets_path, 'train'), train_transform)
+        dataset_path = '/media/root/Gold/crowd/data/World Expo/'
+        cameras_dict = json.load(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json'))
+        train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'], number_of_cameras=experiment.settings.number_of_cameras,
+                                     number_of_images_per_camera=experiment.settings.number_of_images_per_camera, transform=train_transform, seed=settings.labeled_dataset_seed)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
                                           num_workers=2)
-        unlabeled_dataset = CrowdDataset(os.path.join(datasets_path, 'unlabeled'), train_transform)
+        unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'], transform=train_transform, unlabeled=True)
         unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                               pin_memory=True, num_workers=2)
-        validation_dataset = CrowdDataset(os.path.join(datasets_path, 'validation'), validation_transform)
+        validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'], transform=validation_transform)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
     def model_setup(self):
