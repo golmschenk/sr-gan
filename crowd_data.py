@@ -41,8 +41,8 @@ class CrowdDataset(Dataset):
         """
         :param index: The index within the entire dataset.
         :type index: int
-        :return: An example from the crowd dataset.
-        :rtype: CrowdExample, CrowdExample
+        :return: An example and label from the crowd dataset.
+        :rtype: torch.Tensor, torch.Tensor
         """
         example = CrowdExampleWithPerspective(image=self.images[index], label=self.labels[index], roi=self.rois[index],
                                               perspective=self.perspectives[index])

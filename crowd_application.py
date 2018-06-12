@@ -29,10 +29,10 @@ class CrowdApplication(Application):
         seed_all(settings.labeled_dataset_seed)  # Note, not seeding the dataset currently.
         train_dataset = CrowdDataset(os.path.join(datasets_path, 'train'), train_transform)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
-                                          num_workers=0)
+                                          num_workers=2)
         unlabeled_dataset = CrowdDataset(os.path.join(datasets_path, 'unlabeled'), train_transform)
         unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                              pin_memory=True, num_workers=0)
+                                              pin_memory=True, num_workers=2)
         validation_dataset = CrowdDataset(os.path.join(datasets_path, 'validation'), validation_transform)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
