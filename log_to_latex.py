@@ -343,7 +343,6 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
             continue
         match_hyper_parameter = hyper_parameter_type(re.search(match_hyper_parameter_regex,
                                                                log.event_file_name).group(1))
-        match_hyper_parameter = 0.001 if match_hyper_parameter == 0 else match_hyper_parameter # TODO: figure out a better solution than this for showing 0 on the log plot.
         model_type = re.search(r'/(DNN|GAN)/', log.event_file_name).group(1)
         last_errors = log.scalars_data_frame.iloc[-3:]['1_Validation_Error/MAE'].tolist()
         error = np.nanmean(last_errors)
@@ -411,12 +410,12 @@ def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
 
 
 if __name__ == '__main__':
-    plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Documents/CVIU ALCV SR-GAN Results/coef mo le100 2',
+    plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Desktop/logs',
                                                      y_axis_label='MAE',
                                                      x_axis_label='Noise Mean Offset',
                                                      match_hyper_parameter_regex=r' mo(\d+e-?\d+) ',
                                                      hyper_parameter_type=float,
-                                                     exclude_filter=r' mo1e0 ',
+                                                     exclude_filter=None, #r' mo1e0 ',
                                                      experiment_name='coef-mo',
                                                      x_axis_scale='log')
     #plot_coefficient_dnn_vs_gan_error_over_training('/Users/golmschenk/Desktop/coef hunt ul1e-1 fl1e-1 le50 gp0e0 mo2e0 lr1e-4 nl0 gs1 ls0 u2f0.5g2 ue50000')
