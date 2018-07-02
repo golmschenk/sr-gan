@@ -8,11 +8,11 @@ from scipy.stats import norm
 import torchvision
 from torch.utils.data import DataLoader
 
-import crowd_data
-from crowd_data import CrowdDataset, resized_patch_size
+from crowd import crowd_data
+from crowd.crowd_data import CrowdDataset, resized_patch_size
 from application import Application
-from crowd_models import Generator, JointCNN, DCGenerator, JointDCDiscriminator
-from utility import seed_all, gpu, to_image_range, MixtureModel
+from crowd.crowd_models import DCGenerator, JointDCDiscriminator
+from utility import gpu, to_image_range, MixtureModel
 
 
 class CrowdApplication(Application):

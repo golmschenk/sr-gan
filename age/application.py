@@ -6,8 +6,8 @@ from scipy.stats import norm
 from torch.utils.data import DataLoader
 from torchvision.models import vgg16
 
-from age_data import AgeDataset
-from age_models import Generator, Discriminator
+from age.data import AgeDataset
+from age.models import Generator, Discriminator
 from application import Application
 from utility import seed_all, gpu, MixtureModel, to_image_range
 

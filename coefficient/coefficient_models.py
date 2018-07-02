@@ -2,7 +2,7 @@ import torch
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu
 
-from coefficient_data import irrelevant_data_multiplier
+from coefficient.coefficient_data import irrelevant_data_multiplier
 from utility import gpu, seed_all
 
 observation_count = 10

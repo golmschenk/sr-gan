@@ -5,7 +5,7 @@ import torch
 from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d
 from torch.nn.functional import leaky_relu, tanh
 
-from crowd_data import resized_patch_size
+from crowd.crowd_data import resized_patch_size
 from utility import seed_all
 
 

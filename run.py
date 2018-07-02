@@ -3,9 +3,7 @@ Runs a batch of experiments.
 """
 import torch
 
-from age_application import AgeApplication
-from coefficient_application import CoefficientApplication
-from crowd_application import CrowdApplication
+from age.application import AgeApplication
 from settings import Settings, convert_to_settings_list
 from srgan import Experiment
 from utility import seed_all, clean_scientific_notation

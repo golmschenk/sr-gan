@@ -6,7 +6,7 @@ import random
 from copy import deepcopy
 
 from application import Application
-from coefficient_application import CoefficientApplication
+from coefficient.coefficient_application import CoefficientApplication
 
 
 class Settings:
