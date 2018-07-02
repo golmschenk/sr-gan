@@ -26,7 +26,8 @@ class CrowdApplication(Application):
                                                                crowd_data.NumpyArraysToTorchTensors()])
         settings = experiment.settings
         dataset_path = '/media/root/Gold/crowd/data/World Expo/'
-        cameras_dict = json.load(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json'))
+        with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
+            cameras_dict = json.load(json_file)
         train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'], number_of_cameras=experiment.settings.number_of_cameras,
                                      number_of_images_per_camera=experiment.settings.number_of_images_per_camera, transform=train_transform, seed=settings.labeled_dataset_seed)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,

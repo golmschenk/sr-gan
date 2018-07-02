@@ -26,17 +26,18 @@ class CrowdDataset(Dataset):
     def __init__(self, dataset_directory, camera_names, number_of_cameras=None, number_of_images_per_camera=None,
                  transform=None, seed=None, unlabeled=False):
         seed_all(seed)
+        random.shuffle(camera_names)
         cameras_images = []
         cameras_labels = []
         cameras_rois = []
         cameras_perspectives = []
         if unlabeled:
             number_of_cameras = len(camera_names)
-        for camera_name in random.shuffle(camera_names)[:number_of_cameras]:
+        for camera_name in camera_names[:number_of_cameras]:
             camera_directory = os.path.join(dataset_directory, camera_name)
             if unlabeled:
                 camera_images = np.load(os.path.join(camera_directory, 'unlabeled_images.npy'), mmap_mode='r')
-                camera_labels = np.zeros(*camera_images.shape[:3], dtype=np.float32)
+                camera_labels = np.zeros(camera_images.shape[:3], dtype=np.float32)
             else:
                 camera_images = np.load(os.path.join(camera_directory, 'images.npy'), mmap_mode='r')
                 camera_labels = np.load(os.path.join(camera_directory, 'labels.npy'), mmap_mode='r')
