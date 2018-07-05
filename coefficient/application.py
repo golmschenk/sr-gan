@@ -4,8 +4,8 @@ from scipy.stats import norm, wasserstein_distance
 from torch.utils.data import DataLoader
 
 from application import Application
-from coefficient.coefficient_data import ToyDataset
-from coefficient.coefficient_models import Generator, MLP, observation_count
+from coefficient.data import ToyDataset
+from coefficient.models import Generator, MLP, observation_count
 from presentation import generate_display_frame
 from utility import gpu, MixtureModel
 

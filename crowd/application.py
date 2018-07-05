@@ -8,22 +8,22 @@ from scipy.stats import norm
 import torchvision
 from torch.utils.data import DataLoader
 
-from crowd import crowd_data
-from crowd.crowd_data import CrowdDataset, resized_patch_size
+from crowd import data
+from crowd.data import CrowdDataset, resized_patch_size
 from application import Application
-from crowd.crowd_models import DCGenerator, JointDCDiscriminator
+from crowd.models import DCGenerator, JointDCDiscriminator
 from utility import gpu, to_image_range, MixtureModel
 
 
 class CrowdApplication(Application):
     def dataset_setup(self, experiment):
-        train_transform = torchvision.transforms.Compose([crowd_data.RandomlySelectPatchAndRescale(),
-                                                          crowd_data.RandomHorizontalFlip(),
-                                                          crowd_data.NegativeOneToOneNormalizeImage(),
-                                                          crowd_data.NumpyArraysToTorchTensors()])
-        validation_transform = torchvision.transforms.Compose([crowd_data.RandomlySelectPatchAndRescale(),
-                                                               crowd_data.NegativeOneToOneNormalizeImage(),
-                                                               crowd_data.NumpyArraysToTorchTensors()])
+        train_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
+                                                          data.RandomHorizontalFlip(),
+                                                          data.NegativeOneToOneNormalizeImage(),
+                                                          data.NumpyArraysToTorchTensors()])
+        validation_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
+                                                               data.NegativeOneToOneNormalizeImage(),
+                                                               data.NumpyArraysToTorchTensors()])
         settings = experiment.settings
         dataset_path = '/media/root/Gold/crowd/data/World Expo/'
         with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
