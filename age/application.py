@@ -55,44 +55,18 @@ class AgeApplication(Application):
         train_dataset = experiment.train_dataset
         validation_dataset = experiment.validation_dataset
         # DNN training evaluation.
-        dnn_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
-        dnn_train_predicted_ages, dnn_train_ages = np.array([]), np.array([])
-        for images, ages in dnn_train_dataset_loader:
-            predicted_ages = DNN(images.to(gpu)).detach().to('cpu').numpy()
-            dnn_train_predicted_ages = np.concatenate([dnn_train_predicted_ages, predicted_ages])
-            dnn_train_ages = np.concatenate([dnn_train_ages, ages])
-        dnn_train_label_error = np.mean(np.abs(dnn_train_predicted_ages - dnn_train_ages))
-        dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_error)
+        self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error')
         # DNN validation evaluation.
-        dnn_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
-        dnn_validation_predicted_ages, dnn_validation_ages = np.array([]), np.array([])
-        for images, ages in dnn_validation_dataset_loader:
-            predicted_ages = DNN(images.to(gpu)).detach().to('cpu').numpy()
-            dnn_validation_predicted_ages = np.concatenate([dnn_validation_predicted_ages, predicted_ages])
-            dnn_validation_ages = np.concatenate([dnn_validation_ages, ages])
-        dnn_validation_label_error = np.mean(np.abs(dnn_validation_predicted_ages - dnn_validation_ages))
-        dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_error)
+        dnn_validation_mae = self.evaluation_epoch(settings, DNN, validation_dataset, dnn_summary_writer,
+                                                   '1 Validation Error')
         # GAN training evaluation.
-        gan_train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
-        gan_train_predicted_ages, gan_train_ages = np.array([]), np.array([])
-        for images, ages in gan_train_dataset_loader:
-            predicted_ages = D(images.to(gpu)).detach().to('cpu').numpy()
-            gan_train_predicted_ages = np.concatenate([gan_train_predicted_ages, predicted_ages])
-            gan_train_ages = np.concatenate([gan_train_ages, ages])
-        gan_train_label_error = np.mean(np.abs(gan_train_predicted_ages - gan_train_ages))
-        gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_error)
+        self.evaluation_epoch(settings, D, train_dataset, gan_summary_writer, '2 Train Error')
         # GAN validation evaluation.
-        gan_validation_dataset_loader = DataLoader(validation_dataset, batch_size=settings.batch_size)
-        gan_validation_predicted_ages, gan_validation_ages = np.array([]), np.array([])
-        for images, ages in gan_validation_dataset_loader:
-            predicted_ages = D(images.to(gpu)).detach().to('cpu').numpy()
-            gan_validation_predicted_ages = np.concatenate([gan_validation_predicted_ages, predicted_ages])
-            gan_validation_ages = np.concatenate([gan_validation_ages, ages])
-        gan_validation_label_error = np.mean(np.abs(gan_validation_predicted_ages - gan_validation_ages))
-        gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_error)
-        gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN', gan_validation_label_error / dnn_validation_label_error)
+        self.evaluation_epoch(settings, D, validation_dataset, gan_summary_writer, '1 Validation Error',
+                              comparison_value=dnn_validation_mae)
         # Real images.
-        train_iterator = iter(gan_train_dataset_loader)
+        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
+        train_iterator = iter(train_dataset_loader)
         examples, _ = next(train_iterator)
         images_image = torchvision.utils.make_grid(to_image_range(examples[:9]), nrow=3)
         gan_summary_writer.add_image('Real', images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
@@ -107,3 +81,20 @@ class AgeApplication(Application):
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
+
+
+    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+        dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
+        predicted_ages, ages = np.array([]), np.array([])
+        for images, labels in dataset_loader:
+            batch_predicted_ages = network(images.to(gpu))
+            batch_predicted_ages = batch_predicted_ages.detach().to('cpu').numpy()
+            ages = np.concatenate([ages, labels])
+            predicted_ages = np.concatenate([predicted_ages, batch_predicted_ages])
+        mae = np.abs(predicted_ages - ages).mean()
+        summary_writer.add_scalar('{}/MAE'.format(summary_name), mae)
+        mse = (np.abs(predicted_ages - ages) ** 2).mean()
+        summary_writer.add_scalar('{}/MSE'.format(summary_name), mse)
+        if comparison_value is not None:
+            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value)
+        return mae
