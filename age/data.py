@@ -57,6 +57,13 @@ class ImdbWikiDatabasePreparer():
     def __init__(self, preprocessed_image_size=128):
         self.preprocessed_image_size = preprocessed_image_size
 
+    def download_and_preprocess(self):
+        print('Preparing IMDB-WIKI database.')
+        print('Downloading...')
+        self.download()
+        print('Preprocessing...')
+        self.preprocess()
+
     def calculate_age(self, taken, date_of_birth):
         birth_datetime = datetime.fromordinal(max(int(date_of_birth) - 366, 1))
         # Assume the photo was taken in the middle of the year
@@ -82,12 +89,13 @@ class ImdbWikiDatabasePreparer():
         return image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages
 
 
-    def download_imdb_wiki_database(self):
+    def download(self):
         database_directory = '../imdb_wiki_data'
-        if os.path.exists(database_directory):
-            shutil.rmtree(database_directory)
-        os.makedirs(database_directory)
-        print('Downloading...')
+        os.makedirs(database_directory, exist_ok=True)
+        crop_database_directory = '../imdb_wiki_data/imdb_crop'
+        if os.path.exists(crop_database_directory):
+            shutil.rmtree(crop_database_directory)
+        os.makedirs(crop_database_directory)
         urlretrieve('https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/imdb_crop.tar',
                     os.path.join(database_directory, 'imdb_crop.tar'))
         with tarfile.open(os.path.join(database_directory, 'imdb_crop.tar')) as tar_file:
@@ -96,7 +104,7 @@ class ImdbWikiDatabasePreparer():
         print('Done.')
 
 
-    def preprocess_imdb_wiki_database(self):
+    def preprocess(self):
         preprocessed_directory = '../imdb_wiki_data/imdb_preprocessed_{}'.format(self.preprocessed_image_size)
         if os.path.exists(preprocessed_directory):
             shutil.rmtree(preprocessed_directory)
@@ -255,4 +263,4 @@ class LapDatabasePreparer():
 
 
 if __name__ == '__main__':
-    LapDatabasePreparer().download_and_preprocess()
+    ImdbWikiDatabasePreparer(preprocessed_image_size=224).download_and_preprocess()
