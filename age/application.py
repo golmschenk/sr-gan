@@ -4,20 +4,20 @@ import torch
 import torchvision as torchvision
 from scipy.stats import norm
 from torch.utils.data import DataLoader
-from torchvision.models import vgg16
 
 from age.data import AgeDataset
 from age.models import Generator, Discriminator
+from age.vgg import vgg16
 from application import Application
 from utility import seed_all, gpu, MixtureModel, to_image_range
 
-model_architecture = 'dcgan'  # dcgan or vgg
+model_architecture = 'vgg'  # dcgan or vgg
 
 
 class AgeApplication(Application):
     def dataset_setup(self, experiment):
         if model_architecture == 'vgg':
-            dataset_path = '../imdb_wiki_data/imdb_preprocessed_256'
+            dataset_path = '../imdb_wiki_data/imdb_preprocessed_224'
         else:
             dataset_path = '../imdb_wiki_data/imdb_preprocessed_128'
         settings = experiment.settings
@@ -35,7 +35,7 @@ class AgeApplication(Application):
 
     def model_setup(self):
         if model_architecture == 'vgg':
-            G_model = Generator(image_size=256)
+            G_model = Generator(image_size=224)
             D_model = vgg16(num_classes=1)
             DNN_model = vgg16(num_classes=1)
         else:
@@ -88,7 +88,7 @@ class AgeApplication(Application):
         predicted_ages, ages = np.array([]), np.array([])
         for images, labels in dataset_loader:
             batch_predicted_ages = network(images.to(gpu))
-            batch_predicted_ages = batch_predicted_ages.detach().to('cpu').numpy()
+            batch_predicted_ages = batch_predicted_ages.detach().to('cpu').numpy().squeeze()
             ages = np.concatenate([ages, labels])
             predicted_ages = np.concatenate([predicted_ages, batch_predicted_ages])
         mae = np.abs(predicted_ages - ages).mean()

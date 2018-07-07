@@ -5,6 +5,7 @@ Because they had a fairly well written, simple version available.
 """
 import torch.nn as nn
 from torch.nn.functional import leaky_relu, tanh
+from torchvision.models import VGG as TorchVGG
 
 from utility import seed_all
 
