@@ -65,5 +65,5 @@ class Discriminator(nn.Module):
         out = leaky_relu(self.layer3(out), 0.05)  # (?, 256, 8, 8)
         out = leaky_relu(self.layer4(out), 0.05)  # (?, 512, 4, 4)
         self.feature_layer = out.view(out.size(0), -1)
-        out = self.layer5(out).squeeze()
+        out = self.layer5(out).view(-1)
         return out

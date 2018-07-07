@@ -88,7 +88,7 @@ class AgeApplication(Application):
         predicted_ages, ages = np.array([]), np.array([])
         for images, labels in dataset_loader:
             batch_predicted_ages = network(images.to(gpu))
-            batch_predicted_ages = batch_predicted_ages.detach().to('cpu').numpy().squeeze()
+            batch_predicted_ages = batch_predicted_ages.detach().to('cpu').view(-1).numpy()
             ages = np.concatenate([ages, labels])
             predicted_ages = np.concatenate([predicted_ages, batch_predicted_ages])
         mae = np.abs(predicted_ages - ages).mean()
