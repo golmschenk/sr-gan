@@ -11,7 +11,7 @@ from age.vgg import vgg16
 from application import Application
 from utility import seed_all, gpu, MixtureModel, to_image_range
 
-model_architecture = 'vgg'  # dcgan or vgg
+model_architecture = 'dcgan'  # dcgan or vgg
 
 
 class AgeApplication(Application):
@@ -36,8 +36,8 @@ class AgeApplication(Application):
     def model_setup(self):
         if model_architecture == 'vgg':
             G_model = Generator(image_size=224)
-            D_model = vgg16(num_classes=1)
-            DNN_model = vgg16(num_classes=1)
+            D_model = vgg16(pretrained=True, num_classes=1)
+            DNN_model = vgg16(pretrained=True, num_classes=1)
         else:
             G_model = Generator()
             D_model = Discriminator()
@@ -65,7 +65,7 @@ class AgeApplication(Application):
         self.evaluation_epoch(settings, D, validation_dataset, gan_summary_writer, '1 Validation Error',
                               comparison_value=dnn_validation_mae)
         # Real images.
-        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size)
+        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
         train_iterator = iter(train_dataset_loader)
         examples, _ = next(train_iterator)
         images_image = torchvision.utils.make_grid(to_image_range(examples[:9]), nrow=3)

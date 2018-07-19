@@ -33,10 +33,10 @@ class VGG(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
-            nn.Dropout(),
+            #nn.Dropout(),
             nn.Linear(4096, 4096),
             nn.ReLU(True),
-            nn.Dropout()
+            #nn.Dropout()
         )
         self.final_layer = nn.Linear(4096, num_classes)
         self.feature_layer = None
@@ -156,7 +156,7 @@ def vgg16(pretrained=False, **kwargs):
         kwargs['init_weights'] = False
     model = VGG(make_layers(cfg['D']), **kwargs)
     if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['vgg16']))
+        model.load_state_dict(model_zoo.load_url(model_urls['vgg16']), strict=False)
     return model
 
 
