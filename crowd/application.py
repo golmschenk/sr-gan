@@ -71,6 +71,10 @@ class CrowdApplication(Application):
         real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
                                                                          predicted_densities.to('cpu'))
         gan_summary_writer.add_image('Real', real_comparison_image)
+        dnn_predicted_densities, _ = DNN(examples.to(gpu))
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
+                                                                         dnn_predicted_densities.to('cpu'))
+        dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
