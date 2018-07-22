@@ -1,4 +1,4 @@
-
+"""Code for the age estimation application."""
 import numpy as np
 import torch
 import torchvision as torchvision
@@ -15,7 +15,9 @@ model_architecture = 'dcgan'  # dcgan or vgg
 
 
 class AgeApplication(Application):
+    """The age estimation application."""
     def dataset_setup(self, experiment):
+        """Sets up the datasets for the application."""
         if model_architecture == 'vgg':
             dataset_path = '../imdb_wiki_data/imdb_preprocessed_224'
         else:
@@ -23,17 +25,19 @@ class AgeApplication(Application):
         settings = experiment.settings
         seed_all(settings.labeled_dataset_seed)
         train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size)
-        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=2)
+        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
+                                          num_workers=2)
         unlabeled_dataset = AgeDataset(dataset_path, start=train_dataset.length,
                                        end=train_dataset.length + settings.unlabeled_dataset_size)
-        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True, num_workers=2)
+        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                              pin_memory=True, num_workers=2)
         train_and_unlabeled_dataset_size = train_dataset.length + unlabeled_dataset.length
         validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
                                         end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
-
     def model_setup(self):
+        """Prepares all the model architectures required for the application."""
         if model_architecture == 'vgg':
             G_model = Generator(image_size=224)
             D_model = vgg16(pretrained=True, num_classes=1)
@@ -44,8 +48,8 @@ class AgeApplication(Application):
             DNN_model = Discriminator()
         return DNN_model, D_model, G_model
 
-
     def validation_summaries(self, experiment, step):
+        """Prepares the summaries that should be run for the given application."""
         settings = experiment.settings
         dnn_summary_writer = experiment.dnn_summary_writer
         gan_summary_writer = experiment.gan_summary_writer
@@ -75,15 +79,15 @@ class AgeApplication(Application):
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
-        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
-                                           norm(settings.mean_offset, 1)]
-                                          ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
+        z = torch.as_tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
+                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
 
-
-    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+    @staticmethod
+    def evaluation_epoch(settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+        """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
         predicted_ages, ages = np.array([]), np.array([])
         for images, labels in dataset_loader:

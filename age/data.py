@@ -20,6 +20,7 @@ from utility import to_normalized_range
 
 
 class AgeDataset(Dataset):
+    """The dataset class for the age estimation application."""
     def __init__(self, dataset_path, start=None, end=None, gender_filter=None):
         if gender_filter is not None:
             raise NotImplementedError()
@@ -49,22 +50,26 @@ class AgeDataset(Dataset):
         image = torch.tensor(image.astype(np.float32))
         image = to_normalized_range(image)
         age = self.ages[idx]
-        age = torch.tensor(age, dtype=torch.float)
+        age = torch.tensor(age, dtype=torch.float32)
         return image, age
 
 
-class ImdbWikiDatabasePreparer():
+class ImdbWikiDatabasePreparer:
+    """A class for preparing the IMDB-WIKI database."""
     def __init__(self, preprocessed_image_size=128):
         self.preprocessed_image_size = preprocessed_image_size
 
     def download_and_preprocess(self):
+        """Downloads and preprocesses the database."""
         print('Preparing IMDB-WIKI database.')
         print('Downloading...')
         self.download()
         print('Preprocessing...')
         self.preprocess()
 
-    def calculate_age(self, taken, date_of_birth):
+    @staticmethod
+    def calculate_age(taken, date_of_birth):
+        """Calculates the age of example from the data of birth and photo time stamp."""
         birth_datetime = datetime.fromordinal(max(int(date_of_birth) - 366, 1))
         # Assume the photo was taken in the middle of the year
         if birth_datetime.month < 7:
@@ -72,8 +77,8 @@ class ImdbWikiDatabasePreparer():
         else:
             return taken - birth_datetime.year - 1
 
-
     def get_database_meta(self, mat_path, database_name='imdb', shuffle=True):
+        """Gets the meta information of the database."""
         meta = loadmat(mat_path)
         image_paths = np.array(meta[database_name][0, 0]["full_path"][0].tolist())[:, 0]
         dobs = meta[database_name][0, 0]["dob"][0]
@@ -84,12 +89,13 @@ class ImdbWikiDatabasePreparer():
         ages = np.array([self.calculate_age(time_stamps[i], dobs[i]) for i in range(len(dobs))])
         if shuffle:
             p = np.random.permutation(len(ages))
-            image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages = (image_paths[p], dobs[p],
-                genders[p], time_stamps[p], face_scores[p], second_face_scores[p], ages[p])
+            (image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages
+             ) = image_paths[p], dobs[p], genders[p], time_stamps[p], face_scores[p], second_face_scores[p], ages[p]
         return image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages
 
-
-    def download(self):
+    @staticmethod
+    def download():
+        """Downloads the database."""
         database_directory = '../imdb_wiki_data'
         os.makedirs(database_directory, exist_ok=True)
         crop_database_directory = '../imdb_wiki_data/imdb_crop'
@@ -103,8 +109,8 @@ class ImdbWikiDatabasePreparer():
             os.remove(os.path.join(database_directory, 'imdb_crop.tar'))
         print('Done.')
 
-
     def preprocess(self):
+        """Preprocesses the database to the format needed by the network."""
         preprocessed_directory = '../imdb_wiki_data/imdb_preprocessed_{}'.format(self.preprocessed_image_size)
         if os.path.exists(preprocessed_directory):
             shutil.rmtree(preprocessed_directory)
@@ -112,7 +118,8 @@ class ImdbWikiDatabasePreparer():
         mat_path = '../imdb_wiki_data/imdb_crop/imdb.mat'
         dataset_base = '../imdb_wiki_data/imdb_crop/'
         # Get viable examples.
-        image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages = self.get_database_meta(mat_path)
+        (image_paths, dobs, genders, time_stamps, face_scores, second_face_scores, ages
+         ) = self.get_database_meta(mat_path)
         indexes = []
         for index, image_path in enumerate(image_paths):
             if face_scores[index] < 1.0:
@@ -137,7 +144,8 @@ class ImdbWikiDatabasePreparer():
         json_list = []
         for image_path, age, gender in zip(image_paths, ages, genders):
             image = imageio.imread(os.path.join(dataset_base, image_path))
-            image = transform.resize(image, (self.preprocessed_image_size, self.preprocessed_image_size), preserve_range=True)
+            image = transform.resize(image, (self.preprocessed_image_size, self.preprocessed_image_size),
+                                     preserve_range=True)
             if len(image.shape) == 2:
                 image = color.gray2rgb(image)
             image_name = os.path.basename(image_path)
@@ -149,13 +157,15 @@ class ImdbWikiDatabasePreparer():
 
 
 def download_and_extract_file(directory, download_link, file_name, password=None):
+    """Downloads and extracts a file from a URL."""
     urlretrieve(download_link, os.path.join(directory, file_name))
     with zipfile.ZipFile(os.path.join(directory, file_name), 'r') as zip_file:
         zip_file.extractall(directory, pwd=password)
     os.remove(os.path.join(directory, file_name))
 
 
-class LapDatabasePreparer():
+class LapDatabasePreparer:
+    """A class to prepare the LAP V2 Apparent Age database."""
     def __init__(self, preprocessed_image_size=128):
         from mtcnn.mtcnn import MTCNN
         self.database_directory = '../LAP Apparent Age V2'
@@ -163,6 +173,7 @@ class LapDatabasePreparer():
         self.preprocessed_image_size = preprocessed_image_size
 
     def download_and_preprocess(self):
+        """Downloads and preprocesses the database."""
         print('Preparing LAP Apparent Age V2 database.')
         print('Downloading...')
         self.download()
@@ -170,6 +181,7 @@ class LapDatabasePreparer():
         self.preprocess()
 
     def download(self):
+        """Downloads the database."""
         if os.path.exists(self.database_directory):
             shutil.rmtree(self.database_directory)
         os.makedirs(self.database_directory)
@@ -184,6 +196,7 @@ class LapDatabasePreparer():
                                   'http://158.109.8.102/ApparentAgeV2/train_gt.zip', 'train_gt.zip')
         download_and_extract_file(os.path.join(self.database_directory, 'validation'),
                                   'http://158.109.8.102/ApparentAgeV2/valid.zip', 'valid.zip')
+        # noinspection SpellCheckingInspection
         download_and_extract_file(os.path.join(self.database_directory, 'validation'),
                                   'http://158.109.8.102/ApparentAgeV2/valid_gt.zip', 'valid_gt.zip',
                                   password=b'Aj9WUCc5LJagn4')
@@ -198,7 +211,9 @@ class LapDatabasePreparer():
                                   password=b'0PWW7nh@5wTuAS')
 
     def preprocess(self):
-        preprocessed_directory = os.path.join(self.database_directory, 'preprocessed_{}'.format(self.preprocessed_image_size))
+        """Preprocesses the database to the format needed by the network."""
+        preprocessed_directory = os.path.join(self.database_directory,
+                                              'preprocessed_{}'.format(self.preprocessed_image_size))
         if os.path.exists(preprocessed_directory):
             shutil.rmtree(preprocessed_directory)
         os.makedirs(preprocessed_directory)
@@ -231,6 +246,7 @@ class LapDatabasePreparer():
                         json.dump(json_list, json_file)
 
     def crop_image_to_face(self, directory, image_name, output_directory):
+        """Crops an image to the detected face."""
         image_path = os.path.join(directory, image_name)
         image = imageio.imread(image_path, pilmode='RGB')
         detected_faces = self.face_detector.detect_faces(image)
@@ -258,9 +274,10 @@ class LapDatabasePreparer():
             if unchecked_crop_box != crop_box:
                 print('Bad crop for {}. Cropped image is stretched.'.format(image_path))
             cropped_image = image[crop_y_start:crop_y_end, crop_x_start:crop_x_end]
-        cropped_image = transform.resize(cropped_image, (self.preprocessed_image_size, self.preprocessed_image_size), preserve_range=True)
+        cropped_image = transform.resize(cropped_image, (self.preprocessed_image_size, self.preprocessed_image_size),
+                                         preserve_range=True)
         imageio.imwrite(os.path.join(output_directory, image_name), cropped_image.astype(np.uint8))
 
 
 if __name__ == '__main__':
-    ImdbWikiDatabasePreparer(preprocessed_image_size=224).download_and_preprocess()
+    ImdbWikiDatabasePreparer(preprocessed_image_size=128).download_and_preprocess()

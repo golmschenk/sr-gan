@@ -22,6 +22,7 @@ sns.set()
 dnn_color = sns.color_palette()[3]
 gan_color = sns.color_palette()[2]
 
+
 class Display:
     """
     A class for creating the display elements in latex
@@ -109,105 +110,6 @@ class Display:
         delete_file_lines_starting_with(latex_file_name, 'legend entries=')
         file_string_replace(latex_file_name, 'dashed', 'dash pattern=on 5pt off 2pt')
 
-    def create_table_for_logs(self, get_column_parameter_function, get_row_parameter_function,
-                              row_is_numeric_parameter=False):
-        """
-        Generate a table for the logs.
-        """
-        x_value_set = set()
-        y_value_set = set()
-        for log in self.logs:
-            x_value_set.add(get_column_parameter_function(log))
-            y_value_set.add(get_row_parameter_function(log))
-        x_values = sorted(list(x_value_set))
-        y_values = sorted(list(y_value_set))
-        data_frame = pd.DataFrame(index=y_values, columns=x_values, dtype=np.float32)
-        for log in self.logs:
-            index = get_row_parameter_function(log)
-            column = get_column_parameter_function(log)
-            data_frame[column][index] = log.experiment.test_error * 100
-        self.generate_latex_table_from_data_frame(data_frame, row_is_numeric_parameter=row_is_numeric_parameter)
-
-    def create_table_including_lowest_validation_for_logs(self, get_column_parameter_function,
-                                                          get_row_parameter_function=None):
-        """
-        Generate a table for the logs.
-        """
-        x_value_set = set()
-        y_value_set = set()
-        for log in self.logs:
-            x_value_set.add(get_column_parameter_function(log))
-            if get_row_parameter_function:
-                y_value_set.add(get_row_parameter_function(log))
-        x_values = sorted(list(x_value_set))
-        if y_value_set:
-            y_values = [str(row_parameter) + ' ' + error_name for row_parameter in sorted(list(y_value_set))
-                        for error_name in ['test error', 'lowest validation error']]
-        else:
-            y_values = ['Test error', 'Lowest validation error']
-        data_frame = pd.DataFrame(index=y_values, columns=x_values, dtype=np.float32)
-        for log in self.logs:
-            column = get_column_parameter_function(log)
-            if get_row_parameter_function:
-                index = str(get_row_parameter_function(log)) + ' test error'
-            else:
-                index = 'Test error'
-            data_frame[column][index] = log.experiment.test_error * 100
-            if get_row_parameter_function:
-                index = str(get_row_parameter_function(log)) + ' lowest validation error'
-            else:
-                index = 'Lowest validation error'
-            data_frame[column][index] = log.scalars_data_frame['Error'].min() * 100
-        self.generate_latex_table_from_data_frame(data_frame)
-
-    def generate_latex_table_from_data_frame(self, data_frame, row_is_numeric_parameter=False):
-        """
-        Generates a latex table file from a data frame.
-
-        :param data_frame: The data frame to generate the table from.
-        :type data_frame: pd.DataFrame
-        """
-        if self.power_of_ten_format_on:
-            data_frame.columns = map(power_of_ten_latex_format, data_frame.columns)
-        data_frame = data_frame.applymap(lambda x: '%.2f' % x)
-        # noinspection PyTypeChecker
-        column_format = 'l' + ('S' * len(data_frame.columns))
-        if self.table_index_rename_dictionary:
-            # noinspection PyUnresolvedReferences
-            data_frame.rename(index=self.table_index_rename_dictionary, inplace=True)
-        elif data_frame.shape[0] == 1:
-            data_frame.index = ['Test Error']
-        if row_is_numeric_parameter:
-            data_frame.index = map(power_of_ten_latex_format, data_frame.index)
-        else:
-            data_frame.index = map(lambda string: '{' + string + '}', data_frame.index)
-        data_frame.columns.names = ['{' + self.table_columns_name + '}']
-        latex_tabular = self.data_frame_to_pgfplotstable_tex(data_frame)
-        with open(os.path.join(self.latex_document_directory, 'Tables', self.latex_name + '.tex'), 'w') as latex_file:
-            latex_file.write(latex_tabular)
-
-    def data_frame_to_pgfplotstable_tex(self, data_frame):
-        """
-        Creates the tex code for the pgfplotstable for the data frame.
-
-        :param data_frame: The data frame to generate the pgfplotstable for.
-        :type data_frame: pandas.DataFrame
-        :return: The string of the pgfplotstable code.
-        :rtype: str
-        """
-        csv_latex_relative_name = 'Tables/' + self.latex_name + '.csv'
-        csv_file_name = os.path.join(self.latex_document_directory, 'Tables', self.latex_name + '.csv')
-        data_frame.to_csv(path_or_buf=csv_file_name, index_label=data_frame.columns.names[0])
-        contents = ('\pgfplotstabletypeset[\n' +
-                    'color cells={{min=1,max=100}},\n' +
-                    #'color cells={{min={},max={}}},\n'.format(data_frame.values.astype(np.float).min(),
-                    #                                          data_frame.values.astype(np.float).max()) +
-                    'col sep=comma\n' +
-                    ']{' +
-                    csv_latex_relative_name +
-                    '}\n')
-        return contents
-
 
 class Log:
     """
@@ -231,11 +133,6 @@ class Log:
     def create_all_in_directory(cls, directory, exclude_if_no_final_model_exists=False):
         """
         Generate all logs in directory.
-
-        :param directory: The directory to recursively search for log files in.
-        :type directory: str
-        :return: The list of logs.
-        :rtype: list[Log]
         """
         glob_string = os.path.join(directory, '**', 'events.out.tfevents*')
         event_file_names = glob.glob(glob_string, recursive=True)
@@ -327,9 +224,10 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
                                                      exclude_filter=None,
                                                      include_full_scatter=True,
                                                      match_hyper_parameter_regex=r' le(\d+) ',
-                                                     hyper_parameter_type=int,
+                                                     hyper_parameter_type='int',
                                                      experiment_name='age', linthreshx=0.1,
                                                      x_axis_scale='symlog'):
+    """Plots DNN vs GAN errors based on a hyperparameter."""
     alpha = 0.2
     logs = Log.create_all_in_directory(logs_directory, exclude_if_no_final_model_exists=True)
     dnn_results = collections.defaultdict(list)
@@ -341,8 +239,11 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
             continue
         if exclude_filter is not None and re.search(exclude_filter, log.event_file_name):
             continue
-        match_hyper_parameter = hyper_parameter_type(re.search(match_hyper_parameter_regex,
-                                                               log.event_file_name).group(1))
+        match_hyper_parameter = re.search(match_hyper_parameter_regex, log.event_file_name).group(1)
+        if hyper_parameter_type == 'int':
+            match_hyper_parameter = int(match_hyper_parameter)
+        elif hyper_parameter_type == 'float':
+            match_hyper_parameter = float(match_hyper_parameter)
         model_type = re.search(r'/(DNN|GAN)/', log.event_file_name).group(1)
         last_errors = log.scalars_data_frame.iloc[-3:]['1_Validation_Error/MAE'].tolist()
         error = np.nanmean(last_errors)
@@ -385,7 +286,8 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
     axes.set_xlabel(x_axis_label)
     axes.set_ylabel('GAN to DNN Relative Error')
     if include_full_scatter:
-        relative_points = [(dnn_point[0], gan_point[1]/dnn_point[1]) for dnn_point, gan_point in zip(dnn_points, gan_points)]
+        relative_points = [(dnn_point[0], gan_point[1]/dnn_point[1])
+                           for dnn_point, gan_point in zip(dnn_points, gan_points)]
         axes.scatter(*np.array(relative_points).transpose(), color=gan_color, alpha=alpha)
     axes.plot(gan_plot_x, gan_plot_y / dnn_plot_y, color=gan_color)
     matplotlib2tikz.save(os.path.join('latex', '{}-gan-to-dnn-relative-error.tex'.format(experiment_name)))
@@ -394,6 +296,7 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
 
 
 def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
+    """Plots error over training comparing DNN to GAN."""
     logs = Log.create_all_in_directory(single_log_directory)
     if re.search(r'/GAN/', logs[0].event_file_name):
         gan_log, dnn_log = logs[0], logs[1]
@@ -410,12 +313,11 @@ def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
 
 
 if __name__ == '__main__':
-    plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Desktop/logs',
-                                                     y_axis_label='MAE',
-                                                     x_axis_label='Noise Mean Offset',
-                                                     match_hyper_parameter_regex=r' mo(\d+e-?\d+) ',
-                                                     hyper_parameter_type=float,
-                                                     exclude_filter=None, #r' mo1e0 ',
-                                                     experiment_name='coef-mo',
+    plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Desktop/le2ue',
+                                                     y_axis_label='MAE (years)',
+                                                     x_axis_label='Labeled Dataset Size',
+                                                     match_hyper_parameter_regex=r' le(\d+) ',
+                                                     hyper_parameter_type='float',
+                                                     exclude_filter=None,  # r' mo1e0 ',
+                                                     experiment_name='age-le2ue',
                                                      x_axis_scale='log')
-    #plot_coefficient_dnn_vs_gan_error_over_training('/Users/golmschenk/Desktop/coef hunt ul1e-1 fl1e-1 le50 gp0e0 mo2e0 lr1e-4 nl0 gs1 ls0 u2f0.5g2 ue50000')

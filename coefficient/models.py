@@ -1,3 +1,4 @@
+"""Model architectures code."""
 import torch
 from torch.nn import Module, Linear
 from torch.nn.functional import leaky_relu

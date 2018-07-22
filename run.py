@@ -14,20 +14,22 @@ from utility import seed_all, clean_scientific_notation
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-trial_type = 'crowd'
+application_name = 'crowd'
 
 settings_ = Settings()
-if trial_type == 'age':
-    settings_.application = AgeApplication
-if trial_type == 'coef':
-    settings_.application = CoefficientApplication
-if trial_type == 'crowd':
-    settings_.application = CrowdApplication
-    settings_.number_of_cameras = [3, 5, 10, 20]
-    settings_.number_of_images_per_camera = [3, 5, 10, 20]
+if application_name == 'age':
+    settings_.application = AgeApplication()
+elif application_name == 'coef':
+    settings_.application = CoefficientApplication()
+elif application_name == 'crowd':
+    settings_.application = CrowdApplication()
+    settings_.number_of_cameras = [5]
+    settings_.number_of_images_per_camera = [5]
+else:
+    raise ValueError('{} is not an available application.'.format(application_name))
 settings_.unlabeled_dataset_size = [50000]
 settings_.labeled_dataset_size = [10000]
-settings_.batch_size = 10
+settings_.batch_size = 100
 settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
 settings_.unlabeled_loss_multiplier = [1e0]
@@ -39,14 +41,14 @@ settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = [0.5]
 settings_.generator_loss_order = [2]
-#settings_.load_model_path = 'logs/dcgan_load'
+# settings_.load_model_path = 'logs/dcgan_load'
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
     trial_name = 'long converge'
-    trial_name += ' {}'.format(trial_type)
-    if trial_type == 'crowd':
+    trial_name += ' {}'.format(application_name)
+    if application_name == 'crowd':
         trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
     else:
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)

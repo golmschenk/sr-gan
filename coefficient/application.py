@@ -1,3 +1,6 @@
+"""
+Code for the coefficient application.
+"""
 import numpy as np
 import torch
 from scipy.stats import norm, wasserstein_distance
@@ -11,26 +14,31 @@ from utility import gpu, MixtureModel
 
 
 class CoefficientApplication(Application):
+    """The coefficient application."""
     def dataset_setup(self, experiment):
+        """Sets up the datasets for the application."""
         settings = experiment.settings
         train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
                                    settings=settings, seed=settings.labeled_dataset_seed)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
-        unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size, observation_count=observation_count,
-                                       settings=settings, seed=100)
-        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
-        validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101, settings=settings)
+        unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size,
+                                       observation_count=observation_count, settings=settings, seed=100)
+        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                              pin_memory=True)
+        validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101,
+                                        settings=settings)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
     def model_setup(self):
+        """Prepares all the model architectures required for the application."""
         G_model = Generator()
         D_model = MLP()
         DNN_model = MLP()
         return DNN_model, D_model, G_model
 
     def validation_summaries(self, experiment, step):
+        """Prepares the summaries that should be run for the given application."""
         settings = experiment.settings
-        trial_directory = experiment.trial_directory
         dnn_summary_writer = experiment.dnn_summary_writer
         gan_summary_writer = experiment.gan_summary_writer
         DNN = experiment.DNN
@@ -75,8 +83,7 @@ class CoefficientApplication(Application):
             train_predictions_array = predicted_train_labels
             dnn_validation_predictions_array = dnn_predicted_validation_labels
             dnn_train_predictions_array = dnn_predicted_train_labels
-            distribution_image = generate_display_frame(trial_directory, fake_examples_array,
-                                                        unlabeled_predictions_array, validation_predictions_array,
-                                                        dnn_validation_predictions_array, train_predictions_array,
-                                                        dnn_train_predictions_array, step)
+            distribution_image = generate_display_frame(fake_examples_array, unlabeled_predictions_array,
+                                                        validation_predictions_array, dnn_validation_predictions_array,
+                                                        train_predictions_array, dnn_train_predictions_array, step)
             gan_summary_writer.add_image('Distributions', distribution_image)

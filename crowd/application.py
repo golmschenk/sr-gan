@@ -1,3 +1,6 @@
+"""
+Code for the crowd application.
+"""
 import json
 import scipy.misc
 import matplotlib
@@ -16,7 +19,9 @@ from utility import gpu, to_image_range, MixtureModel
 
 
 class CrowdApplication(Application):
+    """The crowd application."""
     def dataset_setup(self, experiment):
+        """Sets up the datasets for the application."""
         train_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
                                                           data.RandomHorizontalFlip(),
                                                           data.NegativeOneToOneNormalizeImage(),
@@ -25,26 +30,32 @@ class CrowdApplication(Application):
                                                                data.NegativeOneToOneNormalizeImage(),
                                                                data.NumpyArraysToTorchTensors()])
         settings = experiment.settings
-        dataset_path = '/media/root/Gold/crowd/data/World Expo/'
+        dataset_path = '../World Expo/'
         with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
             cameras_dict = json.load(json_file)
-        train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'], number_of_cameras=experiment.settings.number_of_cameras,
-                                     number_of_images_per_camera=experiment.settings.number_of_images_per_camera, transform=train_transform, seed=settings.labeled_dataset_seed)
+        train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
+                                     number_of_cameras=experiment.settings.number_of_cameras,
+                                     number_of_images_per_camera=experiment.settings.number_of_images_per_camera,
+                                     transform=train_transform, seed=settings.labeled_dataset_seed)
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
                                           num_workers=2)
-        unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'], transform=train_transform, unlabeled=True)
+        unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+                                         transform=train_transform, unlabeled=True)
         unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                               pin_memory=True, num_workers=2)
-        validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'], transform=validation_transform)
+        validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+                                          transform=validation_transform)
         return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
 
     def model_setup(self):
+        """Prepares all the model architectures required for the application."""
         G_model = DCGenerator()
         D_model = JointDCDiscriminator()
         DNN_model = JointDCDiscriminator()
         return DNN_model, D_model, G_model
 
     def validation_summaries(self, experiment, step):
+        """Prepares the summaries that should be run for the given application."""
         settings = experiment.settings
         dnn_summary_writer = experiment.dnn_summary_writer
         gan_summary_writer = experiment.gan_summary_writer
@@ -73,21 +84,22 @@ class CrowdApplication(Application):
         gan_summary_writer.add_image('Real', real_comparison_image)
         dnn_predicted_densities, _ = DNN(examples.to(gpu))
         dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
-                                                                         dnn_predicted_densities.to('cpu'))
+                                                                             dnn_predicted_densities.to('cpu'))
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
-        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1),
-                                           norm(settings.mean_offset, 1)]
-                                          ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
+        z = torch.as_tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
+                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
 
-    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+    @staticmethod
+    def evaluation_epoch(settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+        """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
         predicted_counts, densities, predicted_densities = np.array([]), np.array(
             []), np.array([])
@@ -114,7 +126,8 @@ class CrowdApplication(Application):
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
         return count_mae
 
-    def convert_density_maps_to_heatmaps(self, label, predicted_label):
+    @staticmethod
+    def convert_density_maps_to_heatmaps(label, predicted_label):
         """
         Converts a label and predicted label density map into their respective heatmap images.
 
@@ -132,10 +145,11 @@ class CrowdApplication(Application):
                           vmax=max(label_array.max(), predicted_label_array.max()))
         resized_label_array = scipy.misc.imresize(label_array, (resized_patch_size, resized_patch_size), mode='F')
         label_heatmap_array = mappable.to_rgba(resized_label_array).astype(np.float32)
-        label_heatmap_tensor = torch.from_numpy(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
-        resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (resized_patch_size, resized_patch_size), mode='F')
+        label_heatmap_tensor = torch.as_tensor(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
+        resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (resized_patch_size,
+                                                                                    resized_patch_size), mode='F')
         predicted_label_heatmap_array = mappable.to_rgba(resized_predicted_label_array).astype(np.float32)
-        predicted_label_heatmap_tensor = torch.from_numpy(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
+        predicted_label_heatmap_tensor = torch.as_tensor(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         return label_heatmap_tensor, predicted_label_heatmap_tensor
 
     def create_crowd_images_comparison_grid(self, images, labels, predicted_labels, number_of_images=3):
@@ -163,6 +177,7 @@ class CrowdApplication(Application):
         return torchvision.utils.make_grid(grid_image_list, nrow=number_of_images)
 
     def labeled_loss_function(self, predicted_labels, labels, order=2):
+        """The loss function for the crowd application."""
         density_labels = labels
         predicted_density_labels, predicted_count_labels = predicted_labels
         density_loss = torch.abs(predicted_density_labels - density_labels).pow(2).sum(1).sum(1).mean()

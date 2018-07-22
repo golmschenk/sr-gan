@@ -18,6 +18,7 @@ from utility import SummaryWriter, infinite_iter, gpu, make_directory_name_uniqu
 
 
 class Experiment:
+    """A class to manage an experimental trial."""
     def __init__(self, settings: Settings):
         self.settings = settings
         self.trial_directory: str = None
@@ -42,7 +43,8 @@ class Experiment:
         Run the SRGAN training for the experiment.
         """
         self.trial_directory = os.path.join(self.settings.logs_directory, self.settings.trial_name)
-        if self.settings.skip_completed_experiment and os.path.exists(self.trial_directory) and '/check' not in self.trial_directory:
+        if (self.settings.skip_completed_experiment and os.path.exists(self.trial_directory) and
+                '/check' not in self.trial_directory):
             print('{} experiment already exists. Skipping...'.format(self.trial_directory))
             return
         self.trial_directory = make_directory_name_unique(self.trial_directory)
@@ -59,7 +61,8 @@ class Experiment:
         validation_summaries = self.settings.application.validation_summaries
         self.labeled_loss_function = self.settings.application.labeled_loss_function
 
-        self.train_dataset, self.train_dataset_loader, self.unlabeled_dataset, self.unlabeled_dataset_loader, self.validation_dataset = dataset_setup(self)
+        (self.train_dataset, self.train_dataset_loader, self.unlabeled_dataset, self.unlabeled_dataset_loader,
+            self.validation_dataset) = dataset_setup(self)
         DNN_model, D_model, G_model = model_setup()
 
         if self.settings.load_model_path:
@@ -67,16 +70,19 @@ class Experiment:
                 map_location = 'cpu'
             else:
                 map_location = None
-            DNN_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'), map_location))
-            D_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'), map_location))
-            G_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'), map_location))
+            DNN_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'),
+                                                 map_location))
+            D_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'),
+                                               map_location))
+            G_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'),
+                                               map_location))
         self.G = G_model.to(gpu)
         self.D = D_model.to(gpu)
         self.DNN = DNN_model.to(gpu)
         d_lr = self.settings.learning_rate
         g_lr = d_lr
 
-        betas = (0.9, 0.999)
+        # betas = (0.9, 0.999)
         weight_decay = 1e-2
         self.D_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
         self.G_optimizer = Adam(self.G.parameters(), lr=g_lr)
@@ -110,9 +116,12 @@ class Experiment:
                 while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                     line = sys.stdin.readline()
                     if 'save' in line:
-                        torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model_{}.pth'.format(step)))
-                        torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model_{}.pth'.format(step)))
-                        torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model_{}.pth'.format(step)))
+                        torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory,
+                                                                       'DNN_model_{}.pth'.format(step)))
+                        torch.save(self.D.state_dict(), os.path.join(self.trial_directory,
+                                                                     'D_model_{}.pth'.format(step)))
+                        torch.save(self.G.state_dict(), os.path.join(self.trial_directory,
+                                                                     'G_model_{}.pth'.format(step)))
                         print('\rSaved model for step {}...'.format(step))
                     if 'quit' in line:
                         self.signal_quit = True
@@ -125,6 +134,7 @@ class Experiment:
             torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model.pth'))
 
     def dnn_training_step(self, examples, labels, step):
+        """Runs an individual round of DNN training."""
         self.dnn_summary_writer.step = step
         self.DNN_optimizer.zero_grad()
         dnn_predicted_labels = self.DNN(examples)
@@ -135,10 +145,10 @@ class Experiment:
         # Summaries.
         if self.dnn_summary_writer.is_summary_step():
             self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
-            self.dnn_summary_writer.add_scalar('Feature Norm/Labeled',
-                                          dnn_feature_layer.norm(dim=1).mean().item())
+            self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', dnn_feature_layer.norm(dim=1).mean().item())
 
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
+        """Runs an individual round of GAN training."""
         # Labeled.
         self.gan_summary_writer.step = step
         self.D_optimizer.zero_grad()
@@ -149,16 +159,19 @@ class Experiment:
         _ = self.D(unlabeled_examples)
         unlabeled_feature_layer = self.D.feature_layer
         unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
-                                               order=self.settings.unlabeled_loss_order) * self.settings.unlabeled_loss_multiplier
+                                               order=self.settings.unlabeled_loss_order
+                                               ) * self.settings.unlabeled_loss_multiplier
         # Fake.
         z = torch.tensor(MixtureModel([norm(-self.settings.mean_offset, 1),
                                        norm(self.settings.mean_offset, 1)]
-                                      ).rvs(size=[unlabeled_examples.size(0), self.G.input_size]).astype(np.float32)).to(gpu)
+                                      ).rvs(size=[unlabeled_examples.size(0),
+                                                  self.G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = self.G(z)
         _ = self.D(fake_examples.detach())
         fake_feature_layer = self.D.feature_layer
-        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer, scale=self.settings.normalize_fake_loss,
-                                          order=self.settings.fake_loss_order).neg() * self.settings.fake_loss_multiplier
+        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer,
+                                          scale=self.settings.normalize_fake_loss, order=self.settings.fake_loss_order
+                                          ).neg() * self.settings.fake_loss_multiplier
         # Feature norm loss.
         feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2) * self.settings.norm_loss_multiplier
         # Gradient penalty.
@@ -168,12 +181,15 @@ class Experiment:
                         alpha[1] * fake_examples.detach().requires_grad_())
         _ = self.D(interpolates)
         interpolates_feature_layer = self.D.feature_layer
-        interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer, scale=self.settings.normalize_fake_loss,
-                                                  order=self.settings.fake_loss_order).neg() * self.settings.fake_loss_multiplier
+        interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer,
+                                                  scale=self.settings.normalize_fake_loss,
+                                                  order=self.settings.fake_loss_order
+                                                  ).neg() * self.settings.fake_loss_multiplier
         gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
                                         grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
                                         create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2).mean() * self.settings.gradient_penalty_multiplier
+        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2
+                            ).mean() * self.settings.gradient_penalty_multiplier
         # Discriminator update.
         loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
         loss.backward()
@@ -197,9 +213,9 @@ class Experiment:
         if self.gan_summary_writer.is_summary_step():
             self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
             self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                          labeled_feature_layer.mean(0).norm().item())
+                                               labeled_feature_layer.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                          unlabeled_feature_layer.mean(0).norm().item())
+                                               unlabeled_feature_layer.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
 

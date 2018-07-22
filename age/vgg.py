@@ -26,17 +26,17 @@ model_urls = {
 
 
 class VGG(nn.Module):
-
+    """The VGG module generating class."""
     def __init__(self, features, num_classes=1000, init_weights=True):
         super(VGG, self).__init__()
         self.features = features
         self.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
-            #nn.Dropout(),
+            # nn.Dropout(),
             nn.Linear(4096, 4096),
             nn.ReLU(True),
-            #nn.Dropout()
+            # nn.Dropout()
         )
         self.final_layer = nn.Linear(4096, num_classes)
         self.feature_layer = None
@@ -44,6 +44,7 @@ class VGG(nn.Module):
             self._initialize_weights()
 
     def forward(self, x):
+        """The forward pass of the network."""
         x = self.features(x)
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
@@ -66,10 +67,11 @@ class VGG(nn.Module):
                 m.bias.data.zero_()
 
 
-def make_layers(cfg, batch_norm=False):
+def make_layers(cfg_, batch_norm=False):
+    """Makes the layers of the VGG network."""
     layers = []
     in_channels = 3
-    for v in cfg:
+    for v in cfg_:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:

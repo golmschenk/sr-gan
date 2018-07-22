@@ -1,0 +1,1 @@
+"""The coefficient estimation module."""

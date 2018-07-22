@@ -1,3 +1,6 @@
+"""
+Utility code to be used in miscellaneous cases.
+"""
 import os
 import random
 import re
@@ -9,6 +12,7 @@ from scipy.stats import rv_continuous
 from tensorboardX import SummaryWriter as SummaryWriter_
 
 gpu = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 
 class SummaryWriter(SummaryWriter_):
     """A custom version of the Tensorboard summary writer class."""
@@ -39,6 +43,7 @@ class SummaryWriter(SummaryWriter_):
             super().add_image(tag, img_tensor, global_step)
 
     def is_summary_step(self):
+        """Returns whether or not the current step is a summary step."""
         return self.step % self.summary_period == 0
 
 
@@ -93,6 +98,7 @@ class MixtureModel(rv_continuous):
         return pdf
 
     def rvs(self, size):
+        """Random variates of the mixture model."""
         submodel_choices = np.random.randint(len(self.submodels), size=size)
         submodel_samples = [submodel.rvs(size=size) for submodel in self.submodels]
         rvs = np.choose(submodel_choices, submodel_samples)
@@ -109,6 +115,7 @@ def seed_all(seed=None):
 
 
 def make_directory_name_unique(trial_directory):
+    """If the desired directory name already exists, make a new directory name based of the desired name."""
     if os.path.exists(trial_directory):
         run_number = 1
         while os.path.exists(trial_directory + ' r{}'.format(run_number)):
@@ -118,8 +125,12 @@ def make_directory_name_unique(trial_directory):
 
 
 def to_normalized_range(tensor_: torch.Tensor) -> torch.Tensor:
+    """Convert from 0-255 range to -1 to 1 range."""
+    # noinspection PyTypeChecker
     return (tensor_ / 127.5) - 1
 
 
 def to_image_range(tensor_: torch.Tensor) -> torch.Tensor:
+    """Convert from -1 to 1 range to 0-255."""
+    # noinspection PyTypeChecker
     return (tensor_ + 1) * 127.5
