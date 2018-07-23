@@ -42,7 +42,7 @@ class MLP(Module):
         self.features = None
         self.gradient_sum = torch.tensor(0, device=gpu)
 
-    def forward(self, x, add_noise=False):
+    def forward(self, x):
         """The forward pass of the module."""
         x = leaky_relu(self.linear1(x))
         x = leaky_relu(self.linear2(x))
@@ -50,18 +50,3 @@ class MLP(Module):
         self.features = x
         x = self.linear4(x)
         return x.squeeze()
-
-    def register_gradient_sum_hooks(self):
-        """A hook to remember the sum gradients of a backwards call."""
-
-        def gradient_sum_hook(grad):
-            """The hook callback."""
-            nonlocal self
-            self.gradient_sum += grad.abs().sum()
-            return grad
-
-        [parameter.register_hook(gradient_sum_hook) for parameter in self.parameters()]
-
-    def zero_gradient_sum(self):
-        """Zeros the sum gradients to allow for a new summing for logging."""
-        self.gradient_sum = torch.tensor(0, device=gpu)
