@@ -139,13 +139,13 @@ class Experiment:
         self.DNN_optimizer.zero_grad()
         dnn_predicted_labels = self.DNN(examples)
         dnn_loss = self.labeled_loss_function(dnn_predicted_labels, labels) * self.settings.labeled_loss_multiplier
-        dnn_feature_layer = self.DNN.feature_layer
+        dnn_features = self.DNN.features
         dnn_loss.backward()
         self.DNN_optimizer.step()
         # Summaries.
         if self.dnn_summary_writer.is_summary_step():
             self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
-            self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', dnn_feature_layer.norm(dim=1).mean().item())
+            self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', dnn_features.norm(dim=1).mean().item())
 
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
@@ -153,12 +153,12 @@ class Experiment:
         self.gan_summary_writer.step = step
         self.D_optimizer.zero_grad()
         predicted_labels = self.D(labeled_examples)
-        labeled_feature_layer = self.D.feature_layer
+        labeled_features = self.D.features
         labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
         # Unlabeled.
         _ = self.D(unlabeled_examples)
-        unlabeled_feature_layer = self.D.feature_layer
-        unlabeled_loss = feature_distance_loss(unlabeled_feature_layer, labeled_feature_layer,
+        unlabeled_features = self.D.features
+        unlabeled_loss = feature_distance_loss(unlabeled_features, labeled_features,
                                                order=self.settings.unlabeled_loss_order
                                                ) * self.settings.unlabeled_loss_multiplier
         # Fake.
@@ -168,8 +168,8 @@ class Experiment:
                                                   self.G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = self.G(z)
         _ = self.D(fake_examples.detach())
-        fake_feature_layer = self.D.feature_layer
-        fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer,
+        fake_features = self.D.features
+        fake_loss = feature_distance_loss(unlabeled_features, fake_features,
                                           scale=self.settings.normalize_fake_loss, order=self.settings.fake_loss_order
                                           ).neg() * self.settings.fake_loss_multiplier
         # Gradient penalty.
@@ -178,8 +178,8 @@ class Experiment:
         interpolates = (alpha[0] * unlabeled_examples.detach().requires_grad_() +
                         alpha[1] * fake_examples.detach().requires_grad_())
         _ = self.D(interpolates)
-        interpolates_feature_layer = self.D.feature_layer
-        interpolates_loss = feature_distance_loss(unlabeled_feature_layer, interpolates_feature_layer,
+        interpolates_features = self.D.features
+        interpolates_loss = feature_distance_loss(unlabeled_features, interpolates_features,
                                                   scale=self.settings.normalize_fake_loss,
                                                   order=self.settings.fake_loss_order
                                                   ).neg() * self.settings.fake_loss_multiplier
@@ -196,12 +196,12 @@ class Experiment:
         if step % self.settings.generator_training_step_period == 0:
             self.G_optimizer.zero_grad()
             _ = self.D(unlabeled_examples)
-            detached_unlabeled_feature_layer = self.D.feature_layer.detach()
+            detached_unlabeled_features = self.D.features.detach()
             z = torch.randn(unlabeled_examples.size(0), self.G.input_size).to(gpu)
             fake_examples = self.G(z)
             _ = self.D(fake_examples)
-            fake_feature_layer = self.D.feature_layer
-            generator_loss = feature_distance_loss(detached_unlabeled_feature_layer, fake_feature_layer,
+            fake_features = self.D.features
+            generator_loss = feature_distance_loss(detached_unlabeled_features, fake_features,
                                                    order=self.settings.generator_loss_order)
             generator_loss.backward()
             self.G_optimizer.step()
@@ -211,9 +211,9 @@ class Experiment:
         if self.gan_summary_writer.is_summary_step():
             self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
             self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                               labeled_feature_layer.mean(0).norm().item())
+                                               labeled_features.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                               unlabeled_feature_layer.mean(0).norm().item())
+                                               unlabeled_features.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
 

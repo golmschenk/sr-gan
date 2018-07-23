@@ -39,7 +39,7 @@ class MLP(Module):
         self.linear2 = Linear(100, 100)
         self.linear3 = Linear(100, 100)
         self.linear4 = Linear(100, 1)
-        self.feature_layer = None
+        self.features = None
         self.gradient_sum = torch.tensor(0, device=gpu)
 
     def forward(self, x, add_noise=False):
@@ -47,7 +47,7 @@ class MLP(Module):
         x = leaky_relu(self.linear1(x))
         x = leaky_relu(self.linear2(x))
         x = leaky_relu(self.linear3(x))
-        self.feature_layer = x
+        self.features = x
         x = self.linear4(x)
         return x.squeeze()
 
