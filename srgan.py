@@ -172,8 +172,6 @@ class Experiment:
         fake_loss = feature_distance_loss(unlabeled_feature_layer, fake_feature_layer,
                                           scale=self.settings.normalize_fake_loss, order=self.settings.fake_loss_order
                                           ).neg() * self.settings.fake_loss_multiplier
-        # Feature norm loss.
-        feature_norm_loss = (unlabeled_feature_layer.norm(dim=1).mean() - 1).pow(2) * self.settings.norm_loss_multiplier
         # Gradient penalty.
         alpha = torch.rand(2, device=gpu)
         alpha = alpha / alpha.sum(0)
@@ -191,7 +189,7 @@ class Experiment:
         gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2
                             ).mean() * self.settings.gradient_penalty_multiplier
         # Discriminator update.
-        loss = labeled_loss + unlabeled_loss + fake_loss + feature_norm_loss + gradient_penalty
+        loss = labeled_loss + unlabeled_loss + fake_loss + gradient_penalty
         loss.backward()
         self.D_optimizer.step()
         # Generator.
