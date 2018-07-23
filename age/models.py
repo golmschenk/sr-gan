@@ -61,7 +61,7 @@ class Discriminator(nn.Module):
         self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
         self.layer4 = convolution(conv_dim * 4, conv_dim * 8, 4)
         self.layer5 = convolution(conv_dim * 8, 1, int(image_size / 16), 1, 0, False)
-        self.feature_layer = None
+        self.features = None
 
     def forward(self, x):
         """The forward pass of the network."""
@@ -69,6 +69,6 @@ class Discriminator(nn.Module):
         out = leaky_relu(self.layer2(out), 0.05)  # (?, 128, 16, 16)
         out = leaky_relu(self.layer3(out), 0.05)  # (?, 256, 8, 8)
         out = leaky_relu(self.layer4(out), 0.05)  # (?, 512, 4, 4)
-        self.feature_layer = out.view(out.size(0), -1)
+        self.features = out.view(out.size(0), -1)
         out = self.layer5(out).view(-1)
         return out

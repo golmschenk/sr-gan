@@ -27,9 +27,9 @@ model_urls = {
 
 class VGG(nn.Module):
     """The VGG module generating class."""
-    def __init__(self, features, num_classes=1000, init_weights=True):
+    def __init__(self, feature_layers, num_classes=1000, init_weights=True):
         super(VGG, self).__init__()
-        self.features = features
+        self.feature_layers = feature_layers
         self.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
@@ -39,16 +39,16 @@ class VGG(nn.Module):
             # nn.Dropout()
         )
         self.final_layer = nn.Linear(4096, num_classes)
-        self.feature_layer = None
+        self.features = None
         if init_weights:
             self._initialize_weights()
 
     def forward(self, x):
         """The forward pass of the network."""
-        x = self.features(x)
+        x = self.feature_layers(x)
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
-        self.feature_layer = x
+        self.features = x
         x = self.final_layer(x)
         return x
 

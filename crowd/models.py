@@ -25,7 +25,7 @@ class JointCNN(Module):
         self.conv5 = Conv2d(self.conv4.out_channels, 400, kernel_size=1)
         self.count_conv = Conv2d(self.conv5.out_channels, 1, kernel_size=1)
         self.density_conv = Conv2d(self.conv5.out_channels, 324, kernel_size=1)
-        self.feature_layer = None
+        self.features = None
 
     def __call__(self, *args, **kwargs):
         """
@@ -52,7 +52,7 @@ class JointCNN(Module):
         x = leaky_relu(self.conv3(x))
         x = leaky_relu(self.conv4(x))
         x = leaky_relu(self.conv5(x))
-        self.feature_layer = x
+        self.features = x
         x_count = leaky_relu(self.count_conv(x)).view(-1)
         x_density = leaky_relu(self.density_conv(x)).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
         return x_density, x_count
@@ -151,7 +151,7 @@ class JointDCDiscriminator(Module):
         self.count_layer5 = convolution(conv_dim * 8, 1, int(image_size / 16), 1, 0, False)
         self.density_layer5 = convolution(conv_dim * 8, int(resized_patch_size / 4) ** 2, int(image_size / 16), 1, 0,
                                           False)
-        self.feature_layer = None
+        self.features = None
 
     def forward(self, x):
         """The forward pass of the network."""
@@ -159,7 +159,7 @@ class JointDCDiscriminator(Module):
         out = leaky_relu(self.layer2(out), 0.05)  # (?, 128, 16, 16)
         out = leaky_relu(self.layer3(out), 0.05)  # (?, 256, 8, 8)
         out = leaky_relu(self.layer4(out), 0.05)  # (?, 512, 4, 4)
-        self.feature_layer = out.view(out.size(0), -1)
+        self.features = out.view(out.size(0), -1)
         count = self.count_layer5(out).view(-1)
         density = self.density_layer5(out).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
         return density, count
