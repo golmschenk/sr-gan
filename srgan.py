@@ -38,6 +38,11 @@ class Experiment:
         self.signal_quit = False
         self.labeled_loss_function = None
 
+        self.labeled_features = None
+        self.unlabeled_features = None
+        self.fake_features = None
+        self.interpolates_features = None
+
     def train(self):
         """
         Run the SRGAN training for the experiment.
@@ -152,37 +157,22 @@ class Experiment:
         # Labeled.
         self.gan_summary_writer.step = step
         self.D_optimizer.zero_grad()
-        predicted_labels = self.D(labeled_examples)
-        labeled_features = self.D.features
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         # Unlabeled.
-        _ = self.D(unlabeled_examples)
-        unlabeled_features = self.D.features
-        unlabeled_loss = feature_distance_loss(unlabeled_features, labeled_features,
-                                               order=self.settings.unlabeled_loss_order
-                                               ) * self.settings.unlabeled_loss_multiplier
+        unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
         # Fake.
         z = torch.tensor(MixtureModel([norm(-self.settings.mean_offset, 1),
                                        norm(self.settings.mean_offset, 1)]
                                       ).rvs(size=[unlabeled_examples.size(0),
                                                   self.G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = self.G(z)
-        _ = self.D(fake_examples.detach())
-        fake_features = self.D.features
-        fake_loss = feature_distance_loss(unlabeled_features, fake_features,
-                                          scale=self.settings.normalize_fake_loss, order=self.settings.fake_loss_order
-                                          ).neg() * self.settings.fake_loss_multiplier
+        fake_loss = self.fake_loss_calculation(fake_examples)
         # Gradient penalty.
         alpha = torch.rand(2, device=gpu)
         alpha = alpha / alpha.sum(0)
         interpolates = (alpha[0] * unlabeled_examples.detach().requires_grad_() +
                         alpha[1] * fake_examples.detach().requires_grad_())
-        _ = self.D(interpolates)
-        interpolates_features = self.D.features
-        interpolates_loss = feature_distance_loss(unlabeled_features, interpolates_features,
-                                                  scale=self.settings.normalize_fake_loss,
-                                                  order=self.settings.fake_loss_order
-                                                  ).neg() * self.settings.fake_loss_multiplier
+        interpolates_loss = self.interpolate_loss_calculation(interpolates)
         gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
                                         grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
                                         create_graph=True, only_inputs=True)[0]
@@ -200,8 +190,8 @@ class Experiment:
             z = torch.randn(unlabeled_examples.size(0), self.G.input_size).to(gpu)
             fake_examples = self.G(z)
             _ = self.D(fake_examples)
-            fake_features = self.D.features
-            generator_loss = feature_distance_loss(detached_unlabeled_features, fake_features,
+            self.fake_features = self.D.features
+            generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features,
                                                    order=self.settings.generator_loss_order)
             generator_loss.backward()
             self.G_optimizer.step()
@@ -211,11 +201,46 @@ class Experiment:
         if self.gan_summary_writer.is_summary_step():
             self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
             self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                               labeled_features.mean(0).norm().item())
+                                               self.labeled_features.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                               unlabeled_features.mean(0).norm().item())
+                                               self.unlabeled_features.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
+
+    def labeled_loss_calculation(self, labeled_examples, labels):
+        """Calculates the labeled loss."""
+        predicted_labels = self.D(labeled_examples)
+        self.labeled_features = self.D.features
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        return labeled_loss
+
+    def unlabeled_loss_calculation(self, unlabeled_examples):
+        """Calculates the unlabeled loss."""
+        _ = self.D(unlabeled_examples)
+        self.unlabeled_features = self.D.features
+        unlabeled_loss = feature_distance_loss(self.unlabeled_features, self.labeled_features,
+                                               order=self.settings.unlabeled_loss_order
+                                               ) * self.settings.unlabeled_loss_multiplier
+        return unlabeled_loss
+
+    def fake_loss_calculation(self, fake_examples):
+        """Calculates the fake loss."""
+        _ = self.D(fake_examples.detach())
+        self.fake_features = self.D.features
+        fake_loss = feature_distance_loss(self.unlabeled_features, self.fake_features,
+                                          scale=self.settings.normalize_fake_loss, order=self.settings.fake_loss_order
+                                          ).neg() * self.settings.fake_loss_multiplier
+        return fake_loss
+
+    def interpolate_loss_calculation(self, interpolates):
+        """Calculates the interpolate loss for use in the gradient penalty."""
+        _ = self.D(interpolates)
+        self.interpolates_features = self.D.features
+        interpolates_loss = feature_distance_loss(self.unlabeled_features, self.interpolates_features,
+                                                  scale=self.settings.normalize_fake_loss,
+                                                  order=self.settings.fake_loss_order
+                                                  ).neg() * self.settings.fake_loss_multiplier
+        return interpolates_loss
 
 
 def unit_vector(vector):
