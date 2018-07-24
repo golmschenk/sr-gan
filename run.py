@@ -14,7 +14,7 @@ from utility import seed_all, clean_scientific_notation
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = 'crowd'
+application_name = 'coef'
 
 settings_ = Settings()
 if application_name == 'age':
@@ -34,7 +34,7 @@ settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
 settings_.unlabeled_loss_multiplier = [1e0]
 settings_.fake_loss_multiplier = [1e0]
-settings_.steps_to_run = 10000000
+settings_.steps_to_run = 1000000
 settings_.learning_rate = [1e-4]
 settings_.gradient_penalty_multiplier = [0]
 settings_.mean_offset = [0]
