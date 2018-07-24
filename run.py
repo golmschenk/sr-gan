@@ -14,7 +14,7 @@ from utility import seed_all, clean_scientific_notation
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = 'coef'
+application_name = 'crowd'
 
 settings_ = Settings()
 if application_name == 'age':
@@ -48,7 +48,7 @@ seed_all(0)
 for settings_ in settings_list:
     trial_name = 'base'
     trial_name += ' {}'.format(application_name)
-    if application_name == 'coef':
+    if application_name == 'crowd':
         trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
     else:
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
@@ -58,7 +58,6 @@ for settings_ in settings_list:
     trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
     trial_name += ' mo{:e}'.format(settings_.mean_offset)
     trial_name += ' lr{:e}'.format(settings_.learning_rate)
-    trial_name += ' nl{}'.format(settings_.norm_loss_multiplier)
     trial_name += ' gs{}'.format(settings_.generator_training_step_period)
     trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
     trial_name += ' u{}f{}g{}'.format(settings_.unlabeled_loss_order,
