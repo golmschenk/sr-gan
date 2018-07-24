@@ -46,9 +46,9 @@ settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'long converge'
+    trial_name = 'base'
     trial_name += ' {}'.format(application_name)
-    if application_name == 'crowd':
+    if application_name == 'coef':
         trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
     else:
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)
