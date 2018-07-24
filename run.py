@@ -14,7 +14,7 @@ from utility import seed_all, clean_scientific_notation
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = 'crowd'
+application_name = 'coef'
 
 settings_ = Settings()
 if application_name == 'age':
