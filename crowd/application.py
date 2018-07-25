@@ -91,7 +91,7 @@ class CrowdApplication(Application):
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
-        z = torch.as_tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
+        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                          ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
@@ -145,11 +145,11 @@ class CrowdApplication(Application):
                           vmax=max(label_array.max(), predicted_label_array.max()))
         resized_label_array = scipy.misc.imresize(label_array, (resized_patch_size, resized_patch_size), mode='F')
         label_heatmap_array = mappable.to_rgba(resized_label_array).astype(np.float32)
-        label_heatmap_tensor = torch.as_tensor(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
+        label_heatmap_tensor = torch.from_numpy(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (resized_patch_size,
                                                                                     resized_patch_size), mode='F')
         predicted_label_heatmap_array = mappable.to_rgba(resized_predicted_label_array).astype(np.float32)
-        predicted_label_heatmap_tensor = torch.as_tensor(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
+        predicted_label_heatmap_tensor = torch.from_numpy(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         return label_heatmap_tensor, predicted_label_heatmap_tensor
 
     def create_crowd_images_comparison_grid(self, images, labels, predicted_labels, number_of_images=3):
