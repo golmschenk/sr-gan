@@ -29,7 +29,6 @@ class Settings:
         self.fake_loss_multiplier = 1e0
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
-        self.noise_scale = 5e-1
         self.mean_offset = 1e0
         self.fake_loss_order = 2
         self.unlabeled_loss_order = 2
@@ -45,6 +44,9 @@ class Settings:
         # Crowd application only.
         self.number_of_cameras = 5
         self.number_of_images_per_camera = 5
+
+        # SGAN models only.
+        self.number_of_bins = 10
 
     def local_setup(self):
         """Code to override some settings when debugging on the local (low power) machine."""

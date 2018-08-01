@@ -50,7 +50,7 @@ class Experiment:
         self.trial_directory = os.path.join(self.settings.logs_directory, self.settings.trial_name)
         if (self.settings.skip_completed_experiment and os.path.exists(self.trial_directory) and
                 '/check' not in self.trial_directory):
-            print('{} experiment already exists. Skipping...'.format(self.trial_directory))
+            print('`{}` experiment already exists. Skipping...'.format(self.trial_directory))
             return
         self.trial_directory = make_directory_name_unique(self.trial_directory)
         print(self.trial_directory)
@@ -185,14 +185,9 @@ class Experiment:
         # Generator.
         if step % self.settings.generator_training_step_period == 0:
             self.G_optimizer.zero_grad()
-            _ = self.D(unlabeled_examples)
-            detached_unlabeled_features = self.D.features.detach()
             z = torch.randn(unlabeled_examples.size(0), self.G.input_size).to(gpu)
             fake_examples = self.G(z)
-            _ = self.D(fake_examples)
-            self.fake_features = self.D.features
-            generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features,
-                                                   order=self.settings.generator_loss_order)
+            generator_loss = self.generator_loss_calculation(fake_examples, unlabeled_examples)
             generator_loss.backward()
             self.G_optimizer.step()
             if self.gan_summary_writer.is_summary_step():
@@ -241,6 +236,16 @@ class Experiment:
                                                   order=self.settings.fake_loss_order
                                                   ).neg() * self.settings.fake_loss_multiplier
         return interpolates_loss
+
+    def generator_loss_calculation(self, fake_examples, unlabeled_examples):
+        """Calculates the generator's loss."""
+        _ = self.D(fake_examples)
+        self.fake_features = self.D.features
+        _ = self.D(unlabeled_examples)
+        detached_unlabeled_features = self.D.features.detach()
+        generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features,
+                                               order=self.settings.generator_loss_order)
+        return generator_loss
 
 
 def unit_vector(vector):
