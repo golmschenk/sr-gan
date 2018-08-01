@@ -134,3 +134,33 @@ def to_image_range(tensor_: torch.Tensor) -> torch.Tensor:
     """Convert from -1 to 1 range to 0-255."""
     # noinspection PyTypeChecker
     return (tensor_ + 1) * 127.5
+
+
+def real_numbers_to_bin_indexes(real_numbers: torch.Tensor, bins: torch.Tensor):
+    """Converts a batch of real numbers to a batch of indexes for the bins the real numbers fall in."""
+    _, indexes = (real_numbers.view(-1, 1) - bins.view(1, -1)).abs().min(dim=1)
+    return indexes
+
+
+def logsumexp(inputs, dim=None, keepdim=False):
+    """Numerically stable logsumexp.
+
+    Args:
+        inputs: A Variable with any shape.
+        dim: An integer.
+        keepdim: A boolean.
+
+    Returns:
+        Equivalent of log(sum(exp(inputs), dim=dim, keepdim=keepdim)).
+    """
+    # For a 1-D array x (any array along a single dimension),
+    # log sum exp(x) = s + log sum exp(x - s)
+    # with s = max(x) being a common choice.
+    if dim is None:
+        inputs = inputs.view(-1)
+        dim = 0
+    s, _ = torch.max(inputs, dim=dim, keepdim=True)
+    outputs = s + (inputs - s).exp().sum(dim=dim, keepdim=True).log()
+    if not keepdim:
+        outputs = outputs.squeeze(dim)
+    return outputs

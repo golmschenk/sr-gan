@@ -50,3 +50,25 @@ class MLP(Module):
         self.features = x
         x = self.linear4(x)
         return x.squeeze()
+
+
+class SganMLP(Module):
+    """The DNN MLP model for the SGAN."""
+
+    def __init__(self, number_of_bins=10):
+        super().__init__()
+        seed_all(0)
+        self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 100)
+        self.linear2 = Linear(100, 100)
+        self.linear3 = Linear(100, 100)
+        self.linear4 = Linear(100, number_of_bins + 1)
+        self.features = None
+        self.gradient_sum = torch.tensor(0, device=gpu)
+
+    def forward(self, x):
+        """The forward pass of the module."""
+        x = leaky_relu(self.linear1(x))
+        x = leaky_relu(self.linear2(x))
+        x = leaky_relu(self.linear3(x))
+        x = self.linear4(x)
+        return x.squeeze()
