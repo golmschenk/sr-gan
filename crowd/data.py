@@ -31,7 +31,7 @@ class CrowdDataset(Dataset):
         cameras_labels = []
         cameras_rois = []
         cameras_perspectives = []
-        if unlabeled:
+        if number_of_cameras is None:
             number_of_cameras = len(camera_names)
         for camera_name in camera_names[:number_of_cameras]:
             camera_directory = os.path.join(dataset_directory, camera_name)
