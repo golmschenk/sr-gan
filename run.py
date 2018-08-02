@@ -3,6 +3,7 @@ Runs a batch of experiments.
 """
 import torch
 
+from age.sgan import AgeSganExperiment
 from age.srgan import AgeExperiment
 from coefficient.sgan import CoefficientSganExperiment
 from coefficient.srgan import CoefficientExperiment
@@ -19,7 +20,7 @@ method_name = 'srgan'
 
 settings_ = Settings()
 if application_name == 'age':
-    Experiment = AgeExperiment
+    Experiment = AgeSganExperiment if method_name == 'sgan' else AgeExperiment
 elif application_name == 'coef':
     Experiment = CoefficientSganExperiment if method_name == 'sgan' else CoefficientExperiment
 elif application_name == 'crowd':

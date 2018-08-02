@@ -53,14 +53,15 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
     """A DCGAN-like discriminator architecture."""
-    def __init__(self, image_size=128, conv_dim=64):
+    def __init__(self, image_size=128, conv_dim=64, number_of_outputs=1):
         seed_all(0)
         super().__init__()
+        self.number_of_outputs = number_of_outputs
         self.layer1 = convolution(3, conv_dim, 4, bn=False)
         self.layer2 = convolution(conv_dim, conv_dim * 2, 4)
         self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
         self.layer4 = convolution(conv_dim * 4, conv_dim * 8, 4)
-        self.layer5 = convolution(conv_dim * 8, 1, int(image_size / 16), 1, 0, False)
+        self.layer5 = convolution(conv_dim * 8, self.number_of_outputs, int(image_size / 16), 1, 0, False)
         self.features = None
 
     def forward(self, x):
@@ -70,5 +71,9 @@ class Discriminator(nn.Module):
         out = leaky_relu(self.layer3(out), 0.05)  # (?, 256, 8, 8)
         out = leaky_relu(self.layer4(out), 0.05)  # (?, 512, 4, 4)
         self.features = out.view(out.size(0), -1)
-        out = self.layer5(out).view(-1)
+        out = self.layer5(out)
+        if self.number_of_outputs == 1:
+            out = out.view(-1)
+        else:
+            out = out.view(-1, self.number_of_outputs)
         return out

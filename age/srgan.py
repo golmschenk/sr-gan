@@ -83,13 +83,12 @@ class AgeExperiment(Experiment):
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
 
-    @staticmethod
-    def evaluation_epoch(settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
         predicted_ages, ages = np.array([]), np.array([])
         for images, labels in dataset_loader:
-            batch_predicted_ages = network(images.to(gpu))
+            batch_predicted_ages = self.images_to_predicted_ages(network, images.to(gpu))
             batch_predicted_ages = batch_predicted_ages.detach().to('cpu').view(-1).numpy()
             ages = np.concatenate([ages, labels])
             predicted_ages = np.concatenate([predicted_ages, batch_predicted_ages])
@@ -100,3 +99,8 @@ class AgeExperiment(Experiment):
         if comparison_value is not None:
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value)
         return mae
+
+    def images_to_predicted_ages(self, network, images):
+        """Runs the code to go from images to a predicted age. Useful for overriding in subclasses."""
+        predicted_ages = network(images)
+        return predicted_ages
