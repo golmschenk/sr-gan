@@ -31,8 +31,6 @@ class CrowdDataset(Dataset):
         cameras_labels = []
         cameras_rois = []
         cameras_perspectives = []
-        if unlabeled:
-            number_of_cameras = len(camera_names)
         for camera_name in camera_names[:number_of_cameras]:
             camera_directory = os.path.join(dataset_directory, camera_name)
             if unlabeled:
@@ -41,8 +39,6 @@ class CrowdDataset(Dataset):
             else:
                 camera_images = np.load(os.path.join(camera_directory, 'images.npy'), mmap_mode='r')
                 camera_labels = np.load(os.path.join(camera_directory, 'labels.npy'), mmap_mode='r')
-            if number_of_images_per_camera is None:
-                number_of_images_per_camera = len(camera_images)
             camera_roi = np.load(os.path.join(camera_directory, 'roi.npy'), mmap_mode='r')
             camera_rois = np.repeat(camera_roi[np.newaxis, :, :], camera_images.shape[0], axis=0)
             camera_perspective = np.load(os.path.join(camera_directory, 'perspective.npy'), mmap_mode='r')
