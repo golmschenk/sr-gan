@@ -13,14 +13,14 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import CrowdDataset, resized_patch_size
-from application import Application
 from crowd.models import DCGenerator, JointDCDiscriminator
+from srgan import Experiment
 from utility import gpu, to_image_range, MixtureModel
 
 
-class CrowdApplication(Application):
+class CrowdExperiment(Experiment):
     """The crowd application."""
-    def dataset_setup(self, experiment):
+    def dataset_setup(self):
         """Sets up the datasets for the application."""
         train_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
                                                           data.RandomHorizontalFlip(),
@@ -29,41 +29,39 @@ class CrowdApplication(Application):
         validation_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
                                                                data.NegativeOneToOneNormalizeImage(),
                                                                data.NumpyArraysToTorchTensors()])
-        settings = experiment.settings
+        settings = self.settings
         dataset_path = '../World Expo/'
         with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
             cameras_dict = json.load(json_file)
-        train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
-                                     number_of_cameras=experiment.settings.number_of_cameras,
-                                     number_of_images_per_camera=experiment.settings.number_of_images_per_camera,
-                                     transform=train_transform, seed=settings.labeled_dataset_seed)
-        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
-                                          num_workers=2)
-        unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                         transform=train_transform, unlabeled=True)
-        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                              pin_memory=True, num_workers=2)
-        validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                          transform=validation_transform)
-        return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
+        self.train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
+                                          number_of_cameras=settings.number_of_cameras,
+                                          number_of_images_per_camera=settings.number_of_images_per_camera,
+                                          transform=train_transform, seed=settings.labeled_dataset_seed)
+        self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+                                               pin_memory=True, num_workers=2)
+        self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+                                              transform=train_transform, unlabeled=True)
+        self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                                   pin_memory=True, num_workers=2)
+        self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+                                               transform=validation_transform)
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        G_model = DCGenerator()
-        D_model = JointDCDiscriminator()
-        DNN_model = JointDCDiscriminator()
-        return DNN_model, D_model, G_model
+        self.G = DCGenerator()
+        self.D = JointDCDiscriminator()
+        self.DNN = JointDCDiscriminator()
 
-    def validation_summaries(self, experiment, step):
+    def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
-        settings = experiment.settings
-        dnn_summary_writer = experiment.dnn_summary_writer
-        gan_summary_writer = experiment.gan_summary_writer
-        DNN = experiment.DNN
-        D = experiment.D
-        G = experiment.G
-        train_dataset = experiment.train_dataset
-        validation_dataset = experiment.validation_dataset
+        settings = self.settings
+        dnn_summary_writer = self.dnn_summary_writer
+        gan_summary_writer = self.gan_summary_writer
+        DNN = self.DNN
+        D = self.D
+        G = self.G
+        train_dataset = self.train_dataset
+        validation_dataset = self.validation_dataset
 
         # DNN training evaluation.
         self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error')

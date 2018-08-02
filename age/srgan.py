@@ -8,56 +8,54 @@ from torch.utils.data import DataLoader
 from age.data import AgeDataset
 from age.models import Generator, Discriminator
 from age.vgg import vgg16
-from application import Application
+from srgan import Experiment
 from utility import seed_all, gpu, MixtureModel, to_image_range
 
 model_architecture = 'dcgan'  # dcgan or vgg
 
 
-class AgeApplication(Application):
+class AgeExperiment(Experiment):
     """The age estimation application."""
-    def dataset_setup(self, experiment):
+    def dataset_setup(self):
         """Sets up the datasets for the application."""
         if model_architecture == 'vgg':
             dataset_path = '../imdb_wiki_data/imdb_preprocessed_224'
         else:
             dataset_path = '../imdb_wiki_data/imdb_preprocessed_128'
-        settings = experiment.settings
+        settings = self.settings
         seed_all(settings.labeled_dataset_seed)
-        train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size)
-        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True,
-                                          num_workers=2)
-        unlabeled_dataset = AgeDataset(dataset_path, start=train_dataset.length,
-                                       end=train_dataset.length + settings.unlabeled_dataset_size)
-        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                              pin_memory=True, num_workers=2)
-        train_and_unlabeled_dataset_size = train_dataset.length + unlabeled_dataset.length
-        validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
-                                        end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
-        return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
+        self.train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size)
+        self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+                                               pin_memory=True, num_workers=2)
+        self.unlabeled_dataset = AgeDataset(dataset_path, start=self.train_dataset.length,
+                                       end=self.train_dataset.length + settings.unlabeled_dataset_size)
+        self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                                   pin_memory=True, num_workers=2)
+        train_and_unlabeled_dataset_size = self.train_dataset.length + self.unlabeled_dataset.length
+        self.validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
+                                             end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         if model_architecture == 'vgg':
-            G_model = Generator(image_size=224)
-            D_model = vgg16(pretrained=True, num_classes=1)
-            DNN_model = vgg16(pretrained=True, num_classes=1)
+            self.G = Generator(image_size=224)
+            self.D = vgg16(pretrained=True, num_classes=1)
+            self.DNN = vgg16(pretrained=True, num_classes=1)
         else:
-            G_model = Generator()
-            D_model = Discriminator()
-            DNN_model = Discriminator()
-        return DNN_model, D_model, G_model
+            self.G = Generator()
+            self.D = Discriminator()
+            self.DNN = Discriminator()
 
-    def validation_summaries(self, experiment, step):
+    def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
-        settings = experiment.settings
-        dnn_summary_writer = experiment.dnn_summary_writer
-        gan_summary_writer = experiment.gan_summary_writer
-        DNN = experiment.DNN
-        D = experiment.D
-        G = experiment.G
-        train_dataset = experiment.train_dataset
-        validation_dataset = experiment.validation_dataset
+        settings = self.settings
+        dnn_summary_writer = self.dnn_summary_writer
+        gan_summary_writer = self.gan_summary_writer
+        DNN = self.DNN
+        D = self.D
+        G = self.G
+        train_dataset = self.train_dataset
+        validation_dataset = self.validation_dataset
         # DNN training evaluation.
         self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error')
         # DNN validation evaluation.

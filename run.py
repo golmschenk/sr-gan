@@ -3,9 +3,9 @@ Runs a batch of experiments.
 """
 import torch
 
-#from age.application import AgeApplication
+from age.srgan import AgeExperiment
 from coefficient.srgan import CoefficientExperiment
-#from crowd.application import CrowdApplication
+from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
 from utility import seed_all, clean_scientific_notation
 
@@ -17,11 +17,11 @@ application_name = 'coef'
 
 settings_ = Settings()
 if application_name == 'age':
-    settings_.application = AgeApplication()
+    Experiment = AgeExperiment
 elif application_name == 'coef':
     Experiment = CoefficientExperiment
 elif application_name == 'crowd':
-    settings_.application = CrowdApplication()
+    Experiment = CrowdExperiment
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
 else:
