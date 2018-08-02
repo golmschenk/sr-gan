@@ -6,47 +6,46 @@ import torch
 from scipy.stats import norm, wasserstein_distance
 from torch.utils.data import DataLoader
 
-from application import Application
+from srgan import Experiment
 from coefficient.data import ToyDataset
 from coefficient.models import Generator, MLP, observation_count
 from presentation import generate_display_frame
 from utility import gpu, MixtureModel
 
 
-class CoefficientApplication(Application):
+class CoefficientExperiment(Experiment):
     """The coefficient application."""
-    def dataset_setup(self, experiment):
+    def dataset_setup(self):
         """Sets up the datasets for the application."""
-        settings = experiment.settings
-        train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
-                                   settings=settings, seed=settings.labeled_dataset_seed)
-        train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True, pin_memory=True)
-        unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size,
-                                       observation_count=observation_count, settings=settings, seed=100)
-        unlabeled_dataset_loader = DataLoader(unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                              pin_memory=True)
-        validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101,
-                                        settings=settings)
-        return train_dataset, train_dataset_loader, unlabeled_dataset, unlabeled_dataset_loader, validation_dataset
+        settings = self.settings
+        self.train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
+                                        settings=settings, seed=settings.labeled_dataset_seed)
+        self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+                                               pin_memory=True)
+        self.unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size,
+                                            observation_count=observation_count, settings=settings, seed=100)
+        self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                                   pin_memory=True)
+        self.validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101,
+                                             settings=settings)
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        G_model = Generator()
-        D_model = MLP()
-        DNN_model = MLP()
-        return DNN_model, D_model, G_model
+        self.DNN = MLP()
+        self.D = MLP()
+        self.G = Generator()
 
-    def validation_summaries(self, experiment, step):
+    def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
-        settings = experiment.settings
-        dnn_summary_writer = experiment.dnn_summary_writer
-        gan_summary_writer = experiment.gan_summary_writer
-        DNN = experiment.DNN
-        D = experiment.D
-        G = experiment.G
-        train_dataset = experiment.train_dataset
-        validation_dataset = experiment.validation_dataset
-        unlabeled_dataset = experiment.unlabeled_dataset
+        settings = self.settings
+        dnn_summary_writer = self.dnn_summary_writer
+        gan_summary_writer = self.gan_summary_writer
+        DNN = self.DNN
+        D = self.D
+        G = self.G
+        train_dataset = self.train_dataset
+        validation_dataset = self.validation_dataset
+        unlabeled_dataset = self.unlabeled_dataset
         dnn_predicted_train_labels = DNN(torch.tensor(
             train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
         dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels))

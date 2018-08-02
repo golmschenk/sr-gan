@@ -5,6 +5,8 @@ import datetime
 import os
 import select
 import sys
+from abc import ABC, abstractmethod
+from typing import Tuple
 
 import numpy as np
 from scipy.stats import norm
@@ -17,7 +19,7 @@ from settings import Settings
 from utility import SummaryWriter, infinite_iter, gpu, make_directory_name_unique, MixtureModel, seed_all
 
 
-class Experiment:
+class Experiment(ABC):
     """A class to manage an experimental trial."""
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -30,13 +32,12 @@ class Experiment:
         self.unlabeled_dataset_loader: DataLoader = None
         self.validation_dataset: Dataset = None
         self.DNN: Module = None
-        self.DNN_optimizer: Optimizer = None
+        self.dnn_optimizer: Optimizer = None
         self.D: Module = None
-        self.D_optimizer: Optimizer = None
+        self.d_optimizer: Optimizer = None
         self.G: Module = None
-        self.G_optimizer: Optimizer = None
+        self.g_optimizer: Optimizer = None
         self.signal_quit = False
-        self.labeled_loss_function = None
 
         self.labeled_features = None
         self.unlabeled_features = None
@@ -61,37 +62,31 @@ class Experiment:
         self.gan_summary_writer.summary_period = self.settings.summary_step_period
         seed_all(0)
 
-        dataset_setup = self.settings.application.dataset_setup
-        model_setup = self.settings.application.model_setup
-        validation_summaries = self.settings.application.validation_summaries
-        self.labeled_loss_function = self.settings.application.labeled_loss_function
-
-        (self.train_dataset, self.train_dataset_loader, self.unlabeled_dataset, self.unlabeled_dataset_loader,
-            self.validation_dataset) = dataset_setup(self)
-        DNN_model, D_model, G_model = model_setup()
+        self.dataset_setup()
+        self.model_setup()
 
         if self.settings.load_model_path:
             if not torch.cuda.is_available():
                 map_location = 'cpu'
             else:
                 map_location = None
-            DNN_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'),
-                                                 map_location))
-            D_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'),
-                                               map_location))
-            G_model.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'),
-                                               map_location))
-        self.G = G_model.to(gpu)
-        self.D = D_model.to(gpu)
-        self.DNN = DNN_model.to(gpu)
+            self.DNN.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'),
+                                                map_location))
+            self.D.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'),
+                                              map_location))
+            self.G.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'),
+                                              map_location))
+        self.G = self.G.to(gpu)
+        self.D = self.D.to(gpu)
+        self.DNN = self.DNN.to(gpu)
+
         d_lr = self.settings.learning_rate
         g_lr = d_lr
-
         # betas = (0.9, 0.999)
         weight_decay = 1e-2
-        self.D_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
-        self.G_optimizer = Adam(self.G.parameters(), lr=g_lr)
-        self.DNN_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.d_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.g_optimizer = Adam(self.G.parameters(), lr=g_lr)
+        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
 
         step_time_start = datetime.datetime.now()
         train_dataset_generator = infinite_iter(self.train_dataset_loader)
@@ -114,7 +109,7 @@ class Experiment:
                 self.D.eval()
                 self.DNN.eval()
                 self.G.eval()
-                validation_summaries(self, step)
+                self.validation_summaries(step)
                 self.D.train()
                 self.DNN.train()
                 self.G.train()
@@ -141,12 +136,12 @@ class Experiment:
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
         self.dnn_summary_writer.step = step
-        self.DNN_optimizer.zero_grad()
+        self.dnn_optimizer.zero_grad()
         dnn_predicted_labels = self.DNN(examples)
         dnn_loss = self.labeled_loss_function(dnn_predicted_labels, labels) * self.settings.labeled_loss_multiplier
         dnn_features = self.DNN.features
         dnn_loss.backward()
-        self.DNN_optimizer.step()
+        self.dnn_optimizer.step()
         # Summaries.
         if self.dnn_summary_writer.is_summary_step():
             self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
@@ -156,7 +151,7 @@ class Experiment:
         """Runs an individual round of GAN training."""
         # Labeled.
         self.gan_summary_writer.step = step
-        self.D_optimizer.zero_grad()
+        self.d_optimizer.zero_grad()
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         # Unlabeled.
         unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
@@ -181,15 +176,15 @@ class Experiment:
         # Discriminator update.
         loss = labeled_loss + unlabeled_loss + fake_loss + gradient_penalty
         loss.backward()
-        self.D_optimizer.step()
+        self.d_optimizer.step()
         # Generator.
         if step % self.settings.generator_training_step_period == 0:
-            self.G_optimizer.zero_grad()
+            self.g_optimizer.zero_grad()
             z = torch.randn(unlabeled_examples.size(0), self.G.input_size).to(gpu)
             fake_examples = self.G(z)
             generator_loss = self.generator_loss_calculation(fake_examples, unlabeled_examples)
             generator_loss.backward()
-            self.G_optimizer.step()
+            self.g_optimizer.step()
             if self.gan_summary_writer.is_summary_step():
                 self.gan_summary_writer.add_scalar('Generator/Loss', generator_loss.item())
         # Summaries.
@@ -246,6 +241,32 @@ class Experiment:
         generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features,
                                                order=self.settings.generator_loss_order)
         return generator_loss
+
+    @abstractmethod
+    def dataset_setup(self):
+        """Prepares all the datasets and loaders required for the application."""
+        self.train_dataset = Dataset()
+        self.unlabeled_dataset = Dataset()
+        self.validation_dataset = Dataset()
+        self.train_dataset_loader = DataLoader(self.train_dataset)
+        self.unlabeled_dataset_loader = DataLoader(self.validation_dataset)
+
+    @abstractmethod
+    def model_setup(self):
+        """Prepares all the model architectures required for the application."""
+        self.DNN = Module()
+        self.D = Module()
+        self.G = Module()
+
+    @abstractmethod
+    def validation_summaries(self, step: int):
+        """Prepares the summaries that should be run for the given application."""
+        pass
+
+    @staticmethod
+    def labeled_loss_function(predicted_labels, labels, order=2):
+        """Calculate the loss from the label difference prediction."""
+        return (predicted_labels - labels).abs().pow(order).mean()
 
 
 def unit_vector(vector):
