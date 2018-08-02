@@ -137,15 +137,14 @@ class Experiment(ABC):
         """Runs an individual round of DNN training."""
         self.dnn_summary_writer.step = step
         self.dnn_optimizer.zero_grad()
-        dnn_predicted_labels = self.DNN(examples)
-        dnn_loss = self.labeled_loss_function(dnn_predicted_labels, labels) * self.settings.labeled_loss_multiplier
-        dnn_features = self.DNN.features
+        dnn_loss = self.dnn_loss_calculation(examples, labels)
         dnn_loss.backward()
         self.dnn_optimizer.step()
         # Summaries.
         if self.dnn_summary_writer.is_summary_step():
             self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
-            self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', dnn_features.norm(dim=1).mean().item())
+            if self.DNN.features is not None:
+                self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', self.DNN.features.norm(dim=1).mean().item())
 
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
@@ -190,12 +189,19 @@ class Experiment(ABC):
         # Summaries.
         if self.gan_summary_writer.is_summary_step():
             self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
-            self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                               self.labeled_features.mean(0).norm().item())
-            self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                               self.unlabeled_features.mean(0).norm().item())
             self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
+            if self.labeled_features is not None:
+                self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
+                                                   self.labeled_features.mean(0).norm().item())
+                self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
+                                                   self.unlabeled_features.mean(0).norm().item())
+
+    def dnn_loss_calculation(self, labeled_examples, labels):
+        """Calculates the DNN loss."""
+        predicted_labels = self.DNN(labeled_examples)
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        return labeled_loss
 
     def labeled_loss_calculation(self, labeled_examples, labels):
         """Calculates the labeled loss."""

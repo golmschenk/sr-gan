@@ -13,7 +13,15 @@ class SganExperiment(Experiment):
         super().__init__(settings)
         self.labeled_criterion = nn.CrossEntropyLoss()
         self.gan_criterion = nn.BCEWithLogitsLoss()
-        self.bins = torch.linspace(-3, 3, settings.number_of_bins)
+        self.bins: torch.Tensor = None
+
+    def dnn_loss_calculation(self, labeled_examples, labels):
+        """Calculates the labeled loss."""
+        bin_index_labels = real_numbers_to_bin_indexes(labels, self.bins)
+        predicted_logits = self.DNN(labeled_examples)
+        labeled_loss = self.labeled_criterion(predicted_logits, bin_index_labels)
+        labeled_loss *= self.settings.labeled_loss_multiplier
+        return labeled_loss
 
     def labeled_loss_calculation(self, labeled_examples, labels):
         """Calculates the labeled loss."""

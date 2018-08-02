@@ -11,7 +11,6 @@ observation_count = 10
 
 class Generator(Module):
     """The generator model."""
-
     def __init__(self):
         super().__init__()
         self.input_size = 10
@@ -31,7 +30,6 @@ class Generator(Module):
 
 class MLP(Module):
     """The DNN MLP model."""
-
     def __init__(self):
         super().__init__()
         seed_all(0)
@@ -54,14 +52,13 @@ class MLP(Module):
 
 class SganMLP(Module):
     """The DNN MLP model for the SGAN."""
-
     def __init__(self, number_of_bins=10):
         super().__init__()
         seed_all(0)
         self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 100)
         self.linear2 = Linear(100, 100)
         self.linear3 = Linear(100, 100)
-        self.linear4 = Linear(100, number_of_bins + 1)
+        self.linear4 = Linear(100, number_of_bins)
         self.features = None
         self.gradient_sum = torch.tensor(0, device=gpu)
 

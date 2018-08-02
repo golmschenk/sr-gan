@@ -142,6 +142,13 @@ def real_numbers_to_bin_indexes(real_numbers: torch.Tensor, bins: torch.Tensor):
     return indexes
 
 
+def logits_to_bin_values(logits: torch.Tensor, bins: torch.Tensor):
+    """Converts a batch of logits the bin values the highest logit corresponds to."""
+    _, indexes = logits.max(dim=1)
+    values = bins[indexes]
+    return values
+
+
 def logsumexp(inputs, dim=None, keepdim=False):
     """Numerically stable logsumexp.
 
