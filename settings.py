@@ -36,6 +36,7 @@ class Settings:
         self.load_model_path = None
         self.should_save_models = True
         self.skip_completed_experiment = True
+        self.number_of_data_workers = 2
 
         # Crowd application only.
         self.number_of_cameras = 5
@@ -54,6 +55,7 @@ class Settings:
             self.unlabeled_dataset_size = 10
             self.validation_dataset_size = 10
             self.skip_completed_experiment = False
+            self.number_of_data_workers = 0
 
 
 def convert_to_settings_list(settings, shuffle=True):

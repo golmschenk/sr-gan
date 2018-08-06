@@ -38,11 +38,11 @@ class CrowdExperiment(Experiment):
                                           number_of_images_per_camera=settings.number_of_images_per_camera,
                                           transform=train_transform, seed=settings.labeled_dataset_seed)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                               pin_memory=True, num_workers=2)
+                                               pin_memory=True, num_workers=settings.number_of_data_workers)
         self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
                                               transform=train_transform, unlabeled=True)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                   pin_memory=True, num_workers=2)
+                                                   pin_memory=True, num_workers=settings.number_of_data_workers)
         self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
                                                transform=validation_transform)
 
@@ -95,14 +95,13 @@ class CrowdExperiment(Experiment):
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
 
-    @staticmethod
-    def evaluation_epoch(settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
         predicted_counts, densities, predicted_densities = np.array([]), np.array(
             []), np.array([])
         for images, labels in dataset_loader:
-            batch_predicted_densities, batch_predicted_counts = network(images.to(gpu))
+            batch_predicted_densities, batch_predicted_counts = self.images_to_predicted_labels(network, images.to(gpu))
             batch_predicted_densities = batch_predicted_densities.detach().to('cpu').numpy()
             batch_predicted_counts = batch_predicted_counts.detach().to('cpu').numpy()
             predicted_counts = np.concatenate([predicted_counts, batch_predicted_counts])
@@ -181,3 +180,8 @@ class CrowdExperiment(Experiment):
         density_loss = torch.abs(predicted_density_labels - density_labels).pow(2).sum(1).sum(1).mean()
         count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(2).mean()
         return count_loss + (density_loss * 10)
+
+    def images_to_predicted_labels(self, network, images):
+        """Runs the code to go from images to a predicted labels. Useful for overriding."""
+        predicted_densities, predicted_counts = network(images)
+        return predicted_densities, predicted_counts

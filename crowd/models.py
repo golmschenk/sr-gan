@@ -141,14 +141,15 @@ class DCGenerator(Module):
 
 class JointDCDiscriminator(Module):
     """A DCGAN-like discriminator architecture."""
-    def __init__(self, image_size=128, conv_dim=64):
+    def __init__(self, image_size=128, conv_dim=64, number_of_outputs=1):
         seed_all(0)
         super().__init__()
+        self.number_of_outputs = number_of_outputs
         self.layer1 = convolution(3, conv_dim, 4, bn=False)
         self.layer2 = convolution(conv_dim, conv_dim * 2, 4)
         self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
         self.layer4 = convolution(conv_dim * 4, conv_dim * 8, 4)
-        self.count_layer5 = convolution(conv_dim * 8, 1, int(image_size / 16), 1, 0, False)
+        self.count_layer5 = convolution(conv_dim * 8, self.number_of_outputs, int(image_size / 16), 1, 0, False)
         self.density_layer5 = convolution(conv_dim * 8, int(resized_patch_size / 4) ** 2, int(image_size / 16), 1, 0,
                                           False)
         self.features = None
@@ -161,5 +162,9 @@ class JointDCDiscriminator(Module):
         out = leaky_relu(self.layer4(out), 0.05)  # (?, 512, 4, 4)
         self.features = out.view(out.size(0), -1)
         count = self.count_layer5(out).view(-1)
+        if self.number_of_outputs == 1:
+            count = count.view(-1)
+        else:
+            count = count.view(-1, self.number_of_outputs)
         density = self.density_layer5(out).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
         return density, count

@@ -7,6 +7,7 @@ from age.sgan import AgeSganExperiment
 from age.srgan import AgeExperiment
 from coefficient.sgan import CoefficientSganExperiment
 from coefficient.srgan import CoefficientExperiment
+from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
 from utility import seed_all, clean_scientific_notation
@@ -24,7 +25,7 @@ if application_name == 'age':
 elif application_name == 'coef':
     Experiment = CoefficientSganExperiment if method_name == 'sgan' else CoefficientExperiment
 elif application_name == 'crowd':
-    Experiment = CrowdExperiment
+    Experiment = CrowdSganExperiment if method_name == 'sgan' else CrowdExperiment
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
 else:

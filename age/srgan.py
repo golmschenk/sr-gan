@@ -26,11 +26,11 @@ class AgeExperiment(Experiment):
         seed_all(settings.labeled_dataset_seed)
         self.train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                               pin_memory=True, num_workers=2)
+                                               pin_memory=True, num_workers=settings.number_of_data_workers)
         self.unlabeled_dataset = AgeDataset(dataset_path, start=self.train_dataset.length,
                                        end=self.train_dataset.length + settings.unlabeled_dataset_size)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                   pin_memory=True, num_workers=2)
+                                                   pin_memory=True, num_workers=settings.number_of_data_workers)
         train_and_unlabeled_dataset_size = self.train_dataset.length + self.unlabeled_dataset.length
         self.validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
                                              end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
