@@ -22,28 +22,34 @@ method_name = 'srgan'
 settings_ = Settings()
 if application_name == 'age':
     Experiment = AgeSganExperiment if method_name == 'sgan' else AgeExperiment
+    settings_.unlabeled_loss_multiplier = [1e0]
+    settings_.fake_loss_multiplier = [1e0]
+    settings_.batch_size = 100
 elif application_name == 'coef':
     Experiment = CoefficientSganExperiment if method_name == 'sgan' else CoefficientExperiment
+    settings_.unlabeled_loss_multiplier = [1e-2]
+    settings_.fake_loss_multiplier = [1e-2]
+    settings_.batch_size = 1000
 elif application_name == 'crowd':
     Experiment = CrowdSganExperiment if method_name == 'sgan' else CrowdExperiment
+    settings_.unlabeled_loss_multiplier = [1e0]
+    settings_.fake_loss_multiplier = [1e0]
+    settings_.batch_size = 100
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.unlabeled_dataset_size = [50000]
 settings_.labeled_dataset_size = [1000]
-settings_.batch_size = 1000
 settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
-settings_.unlabeled_loss_multiplier = [1e0]
-settings_.fake_loss_multiplier = [1e0]
 settings_.steps_to_run = 1000000
 settings_.learning_rate = [1e-4]
 settings_.gradient_penalty_multiplier = [0]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
-settings_.fake_loss_order = [0.5]
-settings_.generator_loss_order = [2]
+settings_.fake_loss_order = 0.5
+settings_.generator_loss_order = 2
 # settings_.load_model_path = 'logs/dcgan_load'
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
