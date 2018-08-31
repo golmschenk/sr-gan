@@ -39,12 +39,17 @@ class CrowdExperiment(Experiment):
                                           transform=train_transform, seed=settings.labeled_dataset_seed)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                pin_memory=True, num_workers=settings.number_of_data_workers)
-        self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                              transform=train_transform, unlabeled=True)
+        # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+        #                                       transform=train_transform, unlabeled=True,
+        #                                       seed=100)
+        self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
+                                              number_of_cameras=settings.number_of_cameras,
+                                              transform=train_transform, unlabeled=True,
+                                              seed=settings.labeled_dataset_seed)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
         self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                               transform=validation_transform)
+                                               transform=validation_transform, seed=101)
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
@@ -84,6 +89,12 @@ class CrowdExperiment(Experiment):
         dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
                                                                              dnn_predicted_densities.to('cpu'))
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
+        validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
+        examples, densities = next(validation_iterator)
+        predicted_densities, _ = D(examples.to(gpu))
+        real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
+                                                                         predicted_densities.to('cpu'))
+        gan_summary_writer.add_image('Validation', real_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
