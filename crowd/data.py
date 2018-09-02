@@ -305,3 +305,8 @@ class RandomlySelectPatchAndRescale(PatchAndRescale):
         y = np.random.randint(example_with_perspective.label.shape[0])
         x = np.random.randint(example_with_perspective.label.shape[1])
         return y, x
+
+class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
+    @staticmethod
+    def get_patch_size_for_position(example_with_perspective, y, x):
+        return resized_patch_size

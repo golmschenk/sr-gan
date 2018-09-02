@@ -10,10 +10,11 @@ import torch
 from scipy.stats import norm
 import torchvision
 from torch.utils.data import DataLoader
+from torchvision.transforms import RandomCrop
 
 from crowd import data
 from crowd.data import CrowdDataset, resized_patch_size
-from crowd.models import DCGenerator, JointDCDiscriminator
+from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator
 from srgan import Experiment
 from utility import gpu, to_image_range, MixtureModel
 
@@ -22,11 +23,11 @@ class CrowdExperiment(Experiment):
     """The crowd application."""
     def dataset_setup(self):
         """Sets up the datasets for the application."""
-        train_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
+        train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
                                                           data.RandomHorizontalFlip(),
                                                           data.NegativeOneToOneNormalizeImage(),
                                                           data.NumpyArraysToTorchTensors()])
-        validation_transform = torchvision.transforms.Compose([data.RandomlySelectPatchAndRescale(),
+        validation_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
                                                                data.NegativeOneToOneNormalizeImage(),
                                                                data.NumpyArraysToTorchTensors()])
         settings = self.settings
@@ -54,8 +55,8 @@ class CrowdExperiment(Experiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = JointDCDiscriminator()
-        self.DNN = JointDCDiscriminator()
+        self.D = SpatialPyramidPoolingDiscriminator()
+        self.DNN = SpatialPyramidPoolingDiscriminator()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
