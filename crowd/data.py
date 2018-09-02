@@ -182,20 +182,20 @@ class PatchAndRescale:
         if y - half_patch_size < 0:
             example = self.pad_example(example, y_padding=(half_patch_size - y, 0))
             y += half_patch_size - y
-        if y + half_patch_size >= example.label.shape[0]:
-            example = self.pad_example(example, y_padding=(0, y + half_patch_size + 1 - example.label.shape[0]))
+        if y + half_patch_size > example.label.shape[0]:
+            example = self.pad_example(example, y_padding=(0, y + half_patch_size - example.label.shape[0]))
         if x - half_patch_size < 0:
             example = self.pad_example(example, x_padding=(half_patch_size - x, 0))
             x += half_patch_size - x
-        if x + half_patch_size >= example.label.shape[1]:
-            example = self.pad_example(example, x_padding=(0, x + half_patch_size + 1 - example.label.shape[1]))
-        image_patch = example.image[y - half_patch_size:y + half_patch_size + 1,
-                                    x - half_patch_size:x + half_patch_size + 1,
+        if x + half_patch_size > example.label.shape[1]:
+            example = self.pad_example(example, x_padding=(0, x + half_patch_size - example.label.shape[1]))
+        image_patch = example.image[y - half_patch_size:y + half_patch_size,
+                                    x - half_patch_size:x + half_patch_size,
                                     :]
-        label_patch = example.label[y - half_patch_size:y + half_patch_size + 1,
-                                    x - half_patch_size:x + half_patch_size + 1]
-        roi_patch = example.roi[y - half_patch_size:y + half_patch_size + 1,
-                                x - half_patch_size:x + half_patch_size + 1]
+        label_patch = example.label[y - half_patch_size:y + half_patch_size,
+                                    x - half_patch_size:x + half_patch_size]
+        roi_patch = example.roi[y - half_patch_size:y + half_patch_size,
+                                x - half_patch_size:x + half_patch_size]
         return CrowdExample(image=image_patch, label=label_patch, roi=roi_patch)
 
     @staticmethod
@@ -310,3 +310,18 @@ class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
     @staticmethod
     def get_patch_size_for_position(example_with_perspective, y, x):
         return resized_patch_size
+
+    def resize_patch(self, patch):
+        """
+        :param patch: The patch to resize.
+        :type patch: CrowdExample
+        :return: The crowd example that is the resized patch.
+        :rtype: CrowdExample
+        """
+        original_label_sum = np.sum(patch.label)
+        label = scipy.misc.imresize(patch.label, self.label_scaled_size, mode='F')
+        unnormalized_label_sum = np.sum(label)
+        if unnormalized_label_sum != 0:
+            label = (label / unnormalized_label_sum) * original_label_sum
+        roi = scipy.misc.imresize(patch.roi, self.label_scaled_size, mode='F') > 0.5
+        return CrowdExample(image=patch.image, label=label, roi=roi)
