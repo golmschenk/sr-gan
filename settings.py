@@ -39,6 +39,7 @@ class Settings:
         self.number_of_data_workers = 2
 
         # Crowd application only.
+        self.crowd_dataset = 'World Expo'
         self.number_of_cameras = 5
         self.number_of_images_per_camera = 5
 

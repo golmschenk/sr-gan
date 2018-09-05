@@ -15,6 +15,7 @@ from torchvision.transforms import RandomCrop
 from crowd import data
 from crowd.data import CrowdDataset, resized_patch_size
 from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator
+from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
 from utility import gpu, to_image_range, MixtureModel
 
@@ -31,26 +32,38 @@ class CrowdExperiment(Experiment):
                                                                data.NegativeOneToOneNormalizeImage(),
                                                                data.NumpyArraysToTorchTensors()])
         settings = self.settings
-        dataset_path = '../World Expo/'
-        with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
-            cameras_dict = json.load(json_file)
-        self.train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
-                                          number_of_cameras=settings.number_of_cameras,
-                                          number_of_images_per_camera=settings.number_of_images_per_camera,
-                                          transform=train_transform, seed=settings.labeled_dataset_seed)
-        self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                               pin_memory=True, num_workers=settings.number_of_data_workers)
-        # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-        #                                       transform=train_transform, unlabeled=True,
-        #                                       seed=100)
-        self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
+        if settings.crowd_dataset == 'World Expo':
+            dataset_path = '../World Expo/'
+            with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
+                cameras_dict = json.load(json_file)
+            self.train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
                                               number_of_cameras=settings.number_of_cameras,
-                                              transform=train_transform, unlabeled=True,
-                                              seed=settings.labeled_dataset_seed)
-        self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                              number_of_images_per_camera=settings.number_of_images_per_camera,
+                                              transform=train_transform, seed=settings.labeled_dataset_seed)
+            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
-        self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                               transform=validation_transform, seed=101)
+            # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+            #                                       transform=train_transform, unlabeled=True,
+            #                                       seed=100)
+            self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
+                                                  number_of_cameras=settings.number_of_cameras,
+                                                  transform=train_transform, unlabeled=True,
+                                                  seed=settings.labeled_dataset_seed)
+            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                                       pin_memory=True, num_workers=settings.number_of_data_workers)
+            self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+                                                   transform=validation_transform, seed=101)
+        elif settings.crowd_dataset == 'ShanghaiTech':
+            self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed)
+            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+                                                   pin_memory=True, num_workers=settings.number_of_data_workers)
+            self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
+                                                         unlabeled=True)
+            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
+                                                       pin_memory=True, num_workers=settings.number_of_data_workers)
+            self.validation_dataset = ShanghaiTechDataset(dataset='test', transform=validation_transform, seed=101)
+        else:
+            raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""

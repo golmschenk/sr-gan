@@ -9,14 +9,13 @@ import torch
 from urllib.request import urlretrieve
 import tarfile
 import numpy as np
-import zipfile
 import imageio
 from skimage import transform, color
 from torch.utils.data import Dataset
 from scipy.io import loadmat
 from datetime import datetime
 
-from utility import to_normalized_range
+from utility import to_normalized_range, download_and_extract_file
 
 
 class AgeDataset(Dataset):
@@ -154,14 +153,6 @@ class ImdbWikiDatabasePreparer:
             json_list.append([image_name, age, gender])
         with open(os.path.join(preprocessed_directory, 'meta.json'), 'w+') as json_file:
             json.dump(json_list, json_file)
-
-
-def download_and_extract_file(directory, download_link, file_name, password=None):
-    """Downloads and extracts a file from a URL."""
-    urlretrieve(download_link, os.path.join(directory, file_name))
-    with zipfile.ZipFile(os.path.join(directory, file_name), 'r') as zip_file:
-        zip_file.extractall(directory, pwd=password)
-    os.remove(os.path.join(directory, file_name))
 
 
 class LapDatabasePreparer:

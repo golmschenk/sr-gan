@@ -5,6 +5,8 @@ import os
 import random
 import re
 import time
+import zipfile
+from urllib.request import urlretrieve
 
 import numpy as np
 import torch
@@ -171,3 +173,11 @@ def logsumexp(inputs, dim=None, keepdim=False):
     if not keepdim:
         outputs = outputs.squeeze(dim)
     return outputs
+
+
+def download_and_extract_file(directory, download_link, file_name='temporary', password=None):
+    """Downloads and extracts a file from a URL."""
+    urlretrieve(download_link, os.path.join(directory, file_name))
+    with zipfile.ZipFile(os.path.join(directory, file_name), 'r') as zip_file:
+        zip_file.extractall(directory, pwd=password)
+    os.remove(os.path.join(directory, file_name))
