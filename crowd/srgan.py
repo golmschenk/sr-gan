@@ -283,26 +283,25 @@ class CrowdExperiment(Experiment):
         # For each example, sliding window crop it, pass it through the network, average the results into a single
         # density map, then sum those results.
 
-    def batches_of_patches_with_position(self, full_example):
+    def batches_of_patches_with_position(self, full_example, window_step_size=32):
         extract_patch_transform = ExtractPatchForPosition()
         test_transform = torchvision.transforms.Compose([data.NegativeOneToOneNormalizeImage(),
                                                          data.NumpyArraysToTorchTensors()])
         x = 0
         y = 0
-        half_patch_size = 0  # Don't move on the first patch.
         while True:
             batch = []
             for _ in range(self.settings.batch_size):
-                x += half_patch_size
-                if x >= full_example.label.shape[1]:
-                    x = 0
-                    y += half_patch_size
-                if y >= full_example.label.shape[0]:
-                    if batch:
-                        yield batch
-                    return
                 patch = extract_patch_transform(full_example, y, x)
                 example = test_transform(patch)
                 example_with_position = CrowdExampleWithPosition(example.image, example.label, x, y)
                 batch.append(example_with_position)
+                x += window_step_size
+                if x >= full_example.label.shape[1]:
+                    x = 0
+                    y += window_step_size
+                if y >= full_example.label.shape[0]:
+                    if batch:
+                        yield batch
+                    return
             yield batch
