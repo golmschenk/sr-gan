@@ -118,11 +118,17 @@ class Experiment(ABC):
         self.D.train()
         self.DNN.train()
         self.G.train()
+        self.D.to(gpu)
+        self.DNN.to(gpu)
+        self.D.to(gpu)
 
     def eval_mode(self):
         self.D.eval()
         self.DNN.eval()
         self.G.eval()
+        self.D.to('cpu')
+        self.DNN.to('cpu')
+        self.D.to('cpu')
 
     def load_models(self):
         if self.settings.load_model_path:

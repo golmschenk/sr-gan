@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import RandomCrop
 
 from crowd import data
-from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition
+from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
 from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
@@ -221,7 +221,9 @@ class CrowdExperiment(Experiment):
         total_count = 0
         total_count_error = 0
         total_density_error = 0
-        for full_example in test_dataset:
+        for full_example_index, (full_image, full_label) in enumerate(test_dataset):
+            print('Processing full example {}...'.format(full_example_index), end='\r')
+            full_example = CrowdExample(full_image, full_label)
             sum_density_label = np.zeros_like(full_example.label, dtype=np.float32)
             sum_count_label = np.zeros_like(full_example.label, dtype=np.float32)
             hit_predicted_label = np.zeros_like(full_example.label, dtype=np.int32)
@@ -230,13 +232,20 @@ class CrowdExperiment(Experiment):
                 network = self.DNN
                 predicted_labels, predicted_counts = network(images)
                 for example_index, example_with_position in enumerate(batch):
-                    predicted_label = predicted_labels[example_index]
-                    predicted_count = predicted_counts[example_index]
-                    predicted_count_array = np.full(predicted_label.shape, predicted_count / predicted_label.size)
+                    predicted_label = predicted_labels[example_index].detach().numpy()
+                    predicted_count = predicted_counts[example_index].detach().numpy()
                     x, y = example_with_position.x, example_with_position.y
                     predicted_label_sum = np.sum(predicted_label)
-                    y_start_offset = 0
+                    predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
+                    unnormalized_predicted_label_sum = np.sum(predicted_label)
+                    if unnormalized_predicted_label_sum != 0:
+                        predicted_label = predicted_label * predicted_label_sum / unnormalized_predicted_label_sum
+                        predicted_count_array = predicted_label * predicted_count / unnormalized_predicted_label_sum
+                    else:
+                        predicted_label = predicted_label
+                        predicted_count_array = np.full(predicted_label.shape, predicted_count / predicted_label.size)
                     half_patch_size = patch_size // 2
+                    y_start_offset = 0
                     if y - half_patch_size < 0:
                         y_start_offset = half_patch_size - y
                     y_end_offset = 0
@@ -249,16 +258,16 @@ class CrowdExperiment(Experiment):
                     if x + half_patch_size >= full_example.label.shape[1]:
                         x_end_offset = x + half_patch_size - full_example.label.shape[1]
                     sum_density_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
-                    x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                    ] += predicted_label[y_start_offset:predicted_label.shape[0] - y_end_offset,
-                         x_start_offset:predicted_label.shape[1] - x_end_offset]
+                                      x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
+                                      ] += predicted_label[y_start_offset:predicted_label.shape[0] - y_end_offset,
+                                                           x_start_offset:predicted_label.shape[1] - x_end_offset]
                     sum_count_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
-                    x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                    ] += predicted_count_array[y_start_offset:predicted_count_array.shape[0] - y_end_offset,
-                         x_start_offset:predicted_count_array.shape[1] - x_end_offset]
+                                    x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
+                                    ] += predicted_count_array[y_start_offset:predicted_count_array.shape[0] - y_end_offset,
+                                                               x_start_offset:predicted_count_array.shape[1] - x_end_offset]
                     hit_predicted_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
-                    x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                    ] += 1
+                                        x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
+                                        ] += 1
             hit_predicted_label[hit_predicted_label == 0] = 1
             full_predicted_label = sum_density_label / hit_predicted_label.astype(np.float32)
             full_predicted_count = np.sum(sum_count_label / hit_predicted_label.astype(np.float32))

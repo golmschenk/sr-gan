@@ -363,7 +363,9 @@ class ExtractPatchForPosition():
         self.label_scaled_size = [int(patch_size / 4), int(patch_size / 4)]
 
     def __call__(self, example, y, x):
-        pass
+        patch = self.get_patch_for_position(example, y, x)
+        example = self.resize_label(patch)
+        return example
 
     def get_patch_for_position(self, example, y, x):
         half_patch_size = int(self.image_patch_size // 2)
