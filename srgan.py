@@ -64,21 +64,7 @@ class Experiment(ABC):
 
         self.dataset_setup()
         self.model_setup()
-
-        if self.settings.load_model_path:
-            if not torch.cuda.is_available():
-                map_location = 'cpu'
-            else:
-                map_location = None
-            self.DNN.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'),
-                                                map_location))
-            self.D.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'),
-                                              map_location))
-            self.G.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'),
-                                              map_location))
-        self.G = self.G.to(gpu)
-        self.D = self.D.to(gpu)
-        self.DNN = self.DNN.to(gpu)
+        self.load_models()
 
         d_lr = self.settings.learning_rate
         g_lr = d_lr
@@ -105,14 +91,9 @@ class Experiment(ABC):
             if self.gan_summary_writer.is_summary_step():
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
                 step_time_start = datetime.datetime.now()
-
-                self.D.eval()
-                self.DNN.eval()
-                self.G.eval()
+                self.eval_mode()
                 self.validation_summaries(step)
-                self.D.train()
-                self.DNN.train()
-                self.G.train()
+                self.train_mode()
                 while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                     line = sys.stdin.readline()
                     if 'save' in line:
@@ -132,6 +113,32 @@ class Experiment(ABC):
             torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model.pth'))
             torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model.pth'))
             torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model.pth'))
+
+    def train_mode(self):
+        self.D.train()
+        self.DNN.train()
+        self.G.train()
+
+    def eval_mode(self):
+        self.D.eval()
+        self.DNN.eval()
+        self.G.eval()
+
+    def load_models(self):
+        if self.settings.load_model_path:
+            if not torch.cuda.is_available():
+                map_location = 'cpu'
+            else:
+                map_location = None
+            self.DNN.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'),
+                                                map_location))
+            self.D.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'),
+                                              map_location))
+            self.G.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'),
+                                              map_location))
+        self.G = self.G.to(gpu)
+        self.D = self.D.to(gpu)
+        self.DNN = self.DNN.to(gpu)
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
@@ -273,6 +280,12 @@ class Experiment(ABC):
     def labeled_loss_function(predicted_labels, labels, order=2):
         """Calculate the loss from the label difference prediction."""
         return (predicted_labels - labels).abs().pow(order).mean()
+
+    @abstractmethod
+    def evaluate(self):
+        self.model_setup()
+        self.load_models()
+        self.eval_mode()
 
 
 def unit_vector(vector):

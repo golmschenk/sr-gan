@@ -5,7 +5,7 @@ import torch
 from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear
 from torch.nn.functional import leaky_relu, tanh, max_pool2d
 
-from crowd.data import resized_patch_size
+from crowd.data import patch_size
 from utility import seed_all
 
 
@@ -54,7 +54,7 @@ class JointCNN(Module):
         x = leaky_relu(self.conv5(x))
         self.features = x
         x_count = leaky_relu(self.count_conv(x)).view(-1)
-        x_density = leaky_relu(self.density_conv(x)).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
+        x_density = leaky_relu(self.density_conv(x)).view(-1, int(patch_size / 4), int(patch_size / 4))
         return x_density, x_count
 
 
@@ -150,7 +150,7 @@ class JointDCDiscriminator(Module):
         self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
         self.layer4 = convolution(conv_dim * 4, conv_dim * 8, 4)
         self.count_layer5 = convolution(conv_dim * 8, self.number_of_outputs, int(image_size / 16), 1, 0, False)
-        self.density_layer5 = convolution(conv_dim * 8, int(resized_patch_size / 4) ** 2, int(image_size / 16), 1, 0,
+        self.density_layer5 = convolution(conv_dim * 8, int(patch_size / 4) ** 2, int(image_size / 16), 1, 0,
                                           False)
         self.features = None
 
@@ -166,7 +166,7 @@ class JointDCDiscriminator(Module):
             count = count.view(-1)
         else:
             count = count.view(-1, self.number_of_outputs)
-        density = self.density_layer5(out).view(-1, int(resized_patch_size / 4), int(resized_patch_size / 4))
+        density = self.density_layer5(out).view(-1, int(patch_size / 4), int(patch_size / 4))
         return density, count
 
 def spatial_pyramid_pooling(input, output_size):

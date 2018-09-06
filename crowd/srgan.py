@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import RandomCrop
 
 from crowd import data
-from crowd.data import CrowdDataset, resized_patch_size
+from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition
 from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
@@ -165,11 +165,11 @@ class CrowdExperiment(Experiment):
         predicted_label_array = predicted_label.numpy()
         mappable.set_clim(vmin=min(label_array.min(), predicted_label_array.min()),
                           vmax=max(label_array.max(), predicted_label_array.max()))
-        resized_label_array = scipy.misc.imresize(label_array, (resized_patch_size, resized_patch_size), mode='F')
+        resized_label_array = scipy.misc.imresize(label_array, (patch_size, patch_size), mode='F')
         label_heatmap_array = mappable.to_rgba(resized_label_array).astype(np.float32)
         label_heatmap_tensor = torch.from_numpy(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
-        resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (resized_patch_size,
-                                                                                    resized_patch_size), mode='F')
+        resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (patch_size,
+                                                                                    patch_size), mode='F')
         predicted_label_heatmap_array = mappable.to_rgba(resized_predicted_label_array).astype(np.float32)
         predicted_label_heatmap_tensor = torch.from_numpy(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         return label_heatmap_tensor, predicted_label_heatmap_tensor
@@ -210,3 +210,90 @@ class CrowdExperiment(Experiment):
         """Runs the code to go from images to a predicted labels. Useful for overriding."""
         predicted_densities, predicted_counts = network(images)
         return predicted_densities, predicted_counts
+
+    def evaluate(self, sliding_window_step=10):
+        super().evaluate()
+        settings = self.settings
+        if settings.crowd_dataset == 'ShanghaiTech':
+            test_dataset = ShanghaiTechDataset(dataset='test')
+        else:
+            raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
+        total_count = 0
+        total_count_error = 0
+        total_density_error = 0
+        for full_example in test_dataset:
+            sum_density_label = np.zeros_like(full_example.label, dtype=np.float32)
+            sum_count_label = np.zeros_like(full_example.label, dtype=np.float32)
+            hit_predicted_label = np.zeros_like(full_example.label, dtype=np.int32)
+            for batch in self.batches_of_patches_with_position(full_example):
+                images = torch.stack([example_with_position.image for example_with_position in batch])
+                network = self.DNN
+                predicted_labels, predicted_counts = network(images)
+                for example_index, example_with_position in enumerate(batch):
+                    predicted_label = predicted_labels[example_index]
+                    predicted_count = predicted_counts[example_index]
+                    predicted_count_array = np.full(predicted_label.shape, predicted_count / predicted_label.size)
+                    x, y = example_with_position.x, example_with_position.y
+                    predicted_label_sum = np.sum(predicted_label)
+                    y_start_offset = 0
+                    half_patch_size = patch_size // 2
+                    if y - half_patch_size < 0:
+                        y_start_offset = half_patch_size - y
+                    y_end_offset = 0
+                    if y + half_patch_size >= full_example.label.shape[0]:
+                        y_end_offset = y + half_patch_size + 1 - full_example.label.shape[0]
+                    x_start_offset = 0
+                    if x - half_patch_size < 0:
+                        x_start_offset = half_patch_size - x
+                    x_end_offset = 0
+                    if x + half_patch_size >= full_example.label.shape[1]:
+                        x_end_offset = x + half_patch_size + 1 - full_example.label.shape[1]
+                    sum_density_label[y - half_patch_size + y_start_offset:y + half_patch_size + 1 - y_end_offset,
+                    x - half_patch_size + x_start_offset:x + half_patch_size + 1 - x_end_offset
+                    ] += predicted_label[y_start_offset:predicted_label.shape[0] - y_end_offset,
+                         x_start_offset:predicted_label.shape[1] - x_end_offset]
+                    sum_count_label[y - half_patch_size + y_start_offset:y + half_patch_size + 1 - y_end_offset,
+                    x - half_patch_size + x_start_offset:x + half_patch_size + 1 - x_end_offset
+                    ] += predicted_count_array[y_start_offset:predicted_count_array.shape[0] - y_end_offset,
+                         x_start_offset:predicted_count_array.shape[1] - x_end_offset]
+                    hit_predicted_label[y - half_patch_size + y_start_offset:y + half_patch_size + 1 - y_end_offset,
+                    x - half_patch_size + x_start_offset:x + half_patch_size + 1 - x_end_offset
+                    ] += 1
+            hit_predicted_label[hit_predicted_label == 0] = 1
+            full_predicted_label = sum_density_label / hit_predicted_label.astype(np.float32)
+            full_predicted_count = np.sum(sum_count_label / hit_predicted_label.astype(np.float32))
+            density_loss = np.abs(full_predicted_label - full_example.label).sum()
+            count_loss = np.abs(full_predicted_count - full_example.label.sum())
+            total_count += full_example.label.sum()
+            total_count_error += count_loss
+            total_density_error += density_loss
+        print('Total count: {}.'.format(total_count))
+        print('Total count error: {}.'.format(total_count_error))
+        print('Total density error: {}.'.format(total_density_error))
+
+        # For each example, sliding window crop it, pass it through the network, average the results into a single
+        # density map, then sum those results.
+
+    def batches_of_patches_with_position(self, full_example):
+        extract_patch_transform = ExtractPatchForPosition()
+        test_transform = torchvision.transforms.Compose([data.NegativeOneToOneNormalizeImage(),
+                                                         data.NumpyArraysToTorchTensors()])
+        x = 0
+        y = 0
+        half_patch_size = 0  # Don't move on the first patch.
+        while True:
+            batch = []
+            for _ in range(self.settings.batch_size):
+                x += half_patch_size
+                if x >= full_example.label.shape[1]:
+                    x = 0
+                    y += half_patch_size
+                if y >= full_example.label.shape[0]:
+                    if batch:
+                        yield batch
+                    return
+                patch = extract_patch_transform(full_example, y, x)
+                example = test_transform(patch)
+                example_with_position = CrowdExampleWithPosition(example.image, example.label, x, y)
+                batch.append(example_with_position)
+            yield batch
