@@ -11,7 +11,7 @@ body_height_offset_meters = 0.875
 
 default_head_standard_deviation = 20
 
-head_count = 0
+dataset_head_count = 0
 
 
 def generate_density_label(head_positions, label_size, perspective=None, include_body=True, ignore_tiny=False,
@@ -26,7 +26,8 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     :return: The density labeling.
     :rtype: np.ndarray
     """
-    global head_count
+    global dataset_head_count
+    head_count = 0
     body_parts = 2 if include_body else 1
     label = np.zeros(shape=label_size, dtype=np.float32)
     for head_position in head_positions:
@@ -44,6 +45,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
             position_perspective = None
         head_gaussian = make_gaussian(head_standard_deviation)
         head_gaussian = head_gaussian / (body_parts * head_gaussian.sum())
+        dataset_head_count += 1
         head_count += 1
         person_label = np.zeros_like(label, dtype=np.float32)
         off_center_size = int((head_gaussian.shape[0] - 1) / 2)
@@ -92,7 +94,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
             raise ValueError('Person label should not be less than zero (though it\'s possible if the person was labeled outside the image).')
         label += person_label
     if force_full_image_count_normalize:
-        label = label / label.sum()
+        label = head_count * (label / label.sum())
     return label
 
 

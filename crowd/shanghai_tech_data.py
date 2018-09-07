@@ -140,7 +140,7 @@ class ShanghaiTechCheck:
 
 
 if __name__ == '__main__':
-    # ShanghaiTechCheck().display_statistics()
     preprocessor = ShanghaiTechPreprocessing()
     # preprocessor.download_and_preprocess()
     preprocessor.preprocess()
+    ShanghaiTechCheck().display_statistics()
