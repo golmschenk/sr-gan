@@ -95,28 +95,28 @@ class CrowdExperiment(Experiment):
         # Real images.
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         examples, densities = next(train_iterator)
-        predicted_densities, _ = D(examples.to(gpu))
-        real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
-                                                                         predicted_densities.to('cpu'))
+        predicted_densities, _ = D(examples)
+        real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+                                                                         predicted_densities)
         gan_summary_writer.add_image('Real', real_comparison_image)
-        dnn_predicted_densities, _ = DNN(examples.to(gpu))
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
-                                                                             dnn_predicted_densities.to('cpu'))
+        dnn_predicted_densities, _ = DNN(examples)
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+                                                                             dnn_predicted_densities)
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         examples, densities = next(validation_iterator)
-        predicted_densities, _ = D(examples.to(gpu))
-        real_comparison_image = self.create_crowd_images_comparison_grid(examples.to('cpu'), densities.to('cpu'),
-                                                                         predicted_densities.to('cpu'))
+        predicted_densities, _ = D(examples)
+        real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+                                                                         predicted_densities)
         gan_summary_writer.add_image('Validation', real_comparison_image)
         # Generated images.
-        z = torch.randn(settings.batch_size, G.input_size).to(gpu)
-        fake_examples = G(z).to('cpu')
+        z = torch.randn(settings.batch_size, G.input_size)
+        fake_examples = G(z)
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
-                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
-        fake_examples = G(z).to('cpu')
+                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
+        fake_examples = G(z)
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
 
@@ -126,9 +126,9 @@ class CrowdExperiment(Experiment):
         predicted_counts, densities, predicted_densities = np.array([]), np.array(
             []), np.array([])
         for images, labels in dataset_loader:
-            batch_predicted_densities, batch_predicted_counts = self.images_to_predicted_labels(network, images.to(gpu))
-            batch_predicted_densities = batch_predicted_densities.detach().to('cpu').numpy()
-            batch_predicted_counts = batch_predicted_counts.detach().to('cpu').numpy()
+            batch_predicted_densities, batch_predicted_counts = self.images_to_predicted_labels(network, images)
+            batch_predicted_densities = batch_predicted_densities.detach().numpy()
+            batch_predicted_counts = batch_predicted_counts.detach().numpy()
             predicted_counts = np.concatenate([predicted_counts, batch_predicted_counts])
             if predicted_densities.size == 0:
                 predicted_densities = predicted_densities.reshape([0, *batch_predicted_densities.shape[1:]])
@@ -218,9 +218,8 @@ class CrowdExperiment(Experiment):
             test_dataset = ShanghaiTechDataset(dataset='test')
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
-        total_count = 0
-        total_count_error = 0
-        total_density_error = 0
+        totals = {'count': 0, 'count_error': 0, 'density_error': 0, 'density_sum_error': 0, 'predicted_count': 0,
+                  'predicted_density_sum': 0}
         for full_example_index, (full_image, full_label) in enumerate(test_dataset):
             print('Processing full example {}...'.format(full_example_index), end='\r')
             full_example = CrowdExample(full_image, full_label)
@@ -271,17 +270,14 @@ class CrowdExperiment(Experiment):
             hit_predicted_label[hit_predicted_label == 0] = 1
             full_predicted_label = sum_density_label / hit_predicted_label.astype(np.float32)
             full_predicted_count = np.sum(sum_count_label / hit_predicted_label.astype(np.float32))
-            density_loss = np.abs(full_predicted_label - full_example.label).sum()
-            count_loss = np.abs(full_predicted_count - full_example.label.sum())
-            total_count += full_example.label.sum()
-            total_count_error += count_loss
-            total_density_error += density_loss
-        print('Total count: {}.'.format(total_count))
-        print('Total count error: {}.'.format(total_count_error))
-        print('Total density error: {}.'.format(total_density_error))
-
-        # For each example, sliding window crop it, pass it through the network, average the results into a single
-        # density map, then sum those results.
+            totals['count'] += full_example.label.sum()
+            totals['count_error'] += np.abs(full_predicted_count - full_example.label.sum())
+            totals['density_error'] += np.abs(full_predicted_label - full_example.label).sum()
+            totals['density_sum_error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
+            totals['predicted_count'] += full_predicted_count
+            totals['predicted_density_sum'] += full_predicted_label.sum()
+        for key, value in totals.items():
+            print('Total {}: {}'.format(key, value))
 
     def batches_of_patches_with_position(self, full_example, window_step_size=32):
         extract_patch_transform = ExtractPatchForPosition()

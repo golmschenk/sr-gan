@@ -120,7 +120,7 @@ class Experiment(ABC):
         self.G.train()
         self.D.to(gpu)
         self.DNN.to(gpu)
-        self.D.to(gpu)
+        self.G.to(gpu)
 
     def eval_mode(self):
         self.D.eval()
@@ -128,7 +128,7 @@ class Experiment(ABC):
         self.G.eval()
         self.D.to('cpu')
         self.DNN.to('cpu')
-        self.D.to('cpu')
+        self.G.to('cpu')
 
     def load_models(self):
         if self.settings.load_model_path:

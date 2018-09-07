@@ -9,7 +9,7 @@ body_width_standard_deviation_meters = 0.2
 body_height_standard_deviation_meters = 0.5
 body_height_offset_meters = 0.875
 
-default_head_standard_deviation = 20
+default_head_standard_deviation = 8
 
 dataset_head_count = 0
 

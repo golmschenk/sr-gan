@@ -112,7 +112,6 @@ class ShanghaiTechCheck:
     def display_statistics(self):
         print('=' * 50)
         print('part_B')
-        print('-' * 50)
         test_dataset_name = 'test'
         test_dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(test_dataset_name))
         test_images = np.load(os.path.join(test_dataset_directory, 'images.npy'))
