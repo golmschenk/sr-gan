@@ -287,21 +287,14 @@ class CrowdExperiment(Experiment):
         extract_patch_transform = ExtractPatchForPosition()
         test_transform = torchvision.transforms.Compose([data.NegativeOneToOneNormalizeImage(),
                                                          data.NumpyArraysToTorchTensors()])
-        x = 0
-        y = 0
-        while True:
-            batch = []
-            for _ in range(self.settings.batch_size):
+        batch = []
+        for y in range(0, full_example.label.shape[0], window_step_size):
+            for x in range(0, full_example.label.shape[1], window_step_size):
                 patch = extract_patch_transform(full_example, y, x)
                 example = test_transform(patch)
                 example_with_position = CrowdExampleWithPosition(example.image, example.label, x, y)
                 batch.append(example_with_position)
-                x += window_step_size
-                if x >= full_example.label.shape[1]:
-                    x = 0
-                    y += window_step_size
-                if y >= full_example.label.shape[0]:
-                    if batch:
-                        yield batch
-                    return
-            yield batch
+                if len(batch) == self.settings.batch_size:
+                    yield batch
+                    batch = []
+        yield batch
