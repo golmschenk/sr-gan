@@ -108,6 +108,39 @@ class ShanghaiTechPreprocessing:
                 np.save(os.path.join(database_directory, part, dataset, 'labels.npy'), labels)
 
 
+class ShanghaiTechCheck:
+    def display_statistics(self):
+        print('=' * 50)
+        print('part_B')
+        print('-' * 50)
+        test_dataset_name = 'test'
+        test_dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(test_dataset_name))
+        test_images = np.load(os.path.join(test_dataset_directory, 'images.npy'))
+        test_labels = np.load(os.path.join(test_dataset_directory, 'labels.npy'))
+        self.print_statistics(test_dataset_name, test_images, test_labels)
+        train_dataset_name = 'train'
+        train_dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(train_dataset_name))
+        train_images = np.load(os.path.join(train_dataset_directory, 'images.npy'))
+        train_labels = np.load(os.path.join(train_dataset_directory, 'labels.npy'))
+        self.print_statistics(train_dataset_name, train_images, train_labels)
+        total_dataset_name = 'total'
+        total_images = np.concatenate([test_images, train_images], axis=0)
+        total_labels = np.concatenate([test_labels, train_labels], axis=0)
+        self.print_statistics(total_dataset_name, total_images, total_labels)
+
+    def print_statistics(self, dataset, images, labels):
+        print('-' * 50)
+        print('Dataset: {}'.format(dataset))
+        print('Images shape: {}'.format(images.shape))
+        print('Labels shape: {}'.format(labels.shape))
+        print('Person count: {}'.format(labels.sum()))
+        print('Average count: {}'.format(labels.sum(axis=(1, 2)).mean(axis=0)))
+        print('Max single image count: {}'.format(labels.sum(axis=(1, 2)).max(axis=0)))
+        print('Min single image count: {}'.format(labels.sum(axis=(1, 2)).min(axis=0)))
+
+
 if __name__ == '__main__':
+    # ShanghaiTechCheck().display_statistics()
     preprocessor = ShanghaiTechPreprocessing()
-    preprocessor.download_and_preprocess()
+    # preprocessor.download_and_preprocess()
+    preprocessor.preprocess()
