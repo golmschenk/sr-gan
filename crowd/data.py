@@ -136,8 +136,11 @@ class RandomHorizontalFlip:
         if random.choice([True, False]):
             image = np.flip(example.image, axis=1).copy()
             label = np.flip(example.label, axis=1).copy()
-            roi = np.flip(example.roi, axis=1).copy()
-            return CrowdExampleWithRoi(image=image, label=label, roi=roi)
+            if isinstance(example, CrowdExampleWithRoi):
+                roi = np.flip(example.roi, axis=1).copy()
+                return CrowdExampleWithRoi(image=image, label=label, roi=roi)
+            else:
+                return CrowdExample(image=image, label=label)
         else:
             return example
 
@@ -357,15 +360,10 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
         return CrowdExampleWithRoi(image=patch.image, label=label, roi=roi)
 
 
-class ExtractPatchForPosition():
+class ExtractPatch():
     def __init__(self):
         self.image_patch_size = patch_size
         self.label_scaled_size = [int(patch_size / 4), int(patch_size / 4)]
-
-    def __call__(self, example, y, x):
-        patch = self.get_patch_for_position(example, y, x)
-        example = self.resize_label(patch)
-        return example
 
     def get_patch_for_position(self, example, y, x):
         half_patch_size = int(self.image_patch_size // 2)
@@ -400,3 +398,24 @@ class ExtractPatchForPosition():
         if unnormalized_label_sum != 0:
             label = (label / unnormalized_label_sum) * original_label_sum
         return CrowdExample(image=patch.image, label=label)
+
+
+class ExtractPatchForPosition(ExtractPatch):
+    def __call__(self, example, y, x):
+        patch = self.get_patch_for_position(example, y, x)
+        example = self.resize_label(patch)
+        return example
+
+
+class ExtractPatchForRandomPosition(ExtractPatch):
+    def __call__(self, example):
+        y, x = self.select_random_position(example)
+        patch = self.get_patch_for_position(example, y, x)
+        example = self.resize_label(patch)
+        return example
+
+    @staticmethod
+    def select_random_position(example):
+        y = np.random.randint(example.label.shape[0])
+        x = np.random.randint(example.label.shape[1])
+        return y, x

@@ -24,15 +24,15 @@ class CrowdExperiment(Experiment):
     """The crowd application."""
     def dataset_setup(self):
         """Sets up the datasets for the application."""
-        train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
-                                                          data.RandomHorizontalFlip(),
-                                                          data.NegativeOneToOneNormalizeImage(),
-                                                          data.NumpyArraysToTorchTensors()])
-        validation_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
-                                                               data.NegativeOneToOneNormalizeImage(),
-                                                               data.NumpyArraysToTorchTensors()])
         settings = self.settings
         if settings.crowd_dataset == 'World Expo':
+            train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
+                                                              data.RandomHorizontalFlip(),
+                                                              data.NegativeOneToOneNormalizeImage(),
+                                                              data.NumpyArraysToTorchTensors()])
+            validation_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
+                                                                   data.NegativeOneToOneNormalizeImage(),
+                                                                   data.NumpyArraysToTorchTensors()])
             dataset_path = '../World Expo/'
             with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
                 cameras_dict = json.load(json_file)
@@ -54,6 +54,13 @@ class CrowdExperiment(Experiment):
             self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
                                                    transform=validation_transform, seed=101)
         elif settings.crowd_dataset == 'ShanghaiTech':
+            train_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
+                                                              data.RandomHorizontalFlip(),
+                                                              data.NegativeOneToOneNormalizeImage(),
+                                                              data.NumpyArraysToTorchTensors()])
+            validation_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
+                                                                   data.NegativeOneToOneNormalizeImage(),
+                                                                   data.NumpyArraysToTorchTensors()])
             self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
@@ -202,8 +209,8 @@ class CrowdExperiment(Experiment):
         """The loss function for the crowd application."""
         density_labels = labels
         predicted_density_labels, predicted_count_labels = predicted_labels
-        density_loss = torch.abs(predicted_density_labels - density_labels).pow(2).sum(1).sum(1).mean()
-        count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(2).mean()
+        density_loss = torch.abs(predicted_density_labels - density_labels).pow(order).sum(1).sum(1).mean()
+        count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(order).mean()
         return count_loss + (density_loss * 10)
 
     def images_to_predicted_labels(self, network, images):

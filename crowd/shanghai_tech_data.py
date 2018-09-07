@@ -11,7 +11,7 @@ import numpy as np
 import scipy.io
 from torch.utils.data import Dataset
 
-from crowd.data import CrowdExampleWithPerspective
+from crowd.data import CrowdExampleWithPerspective, CrowdExample
 from crowd.label_generation import generate_density_label
 from utility import download_and_extract_file, seed_all
 
@@ -29,15 +29,14 @@ class ShanghaiTechDataset(Dataset):
         seed_all(seed)
         dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(dataset))
         if unlabeled:
-            self.images = np.load(os.path.join(dataset_directory, 'unlabeled_images.npy'))
+            self.images = np.load(os.path.join(dataset_directory, 'unlabeled_images.npy'), mmap_mode='r')
             self.labels = np.zeros(self.images.shape[:3], dtype=np.float32)
         else:
-            self.images = np.load(os.path.join(dataset_directory, 'images.npy'))
-            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))
-        self.perspectives = np.zeros_like(self.labels)
-        self.rois = np.ones_like(self.labels, dtype=np.bool)
+            self.images = np.load(os.path.join(dataset_directory, 'images.npy'), mmap_mode='r')
+            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')
         self.length = self.labels.shape[0]
         self.transform = transform
+        self.unlabeled = unlabeled
 
     def __getitem__(self, index):
         """
@@ -46,8 +45,12 @@ class ShanghaiTechDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        example = CrowdExampleWithPerspective(image=self.images[index], label=self.labels[index], roi=self.rois[index],
-                                              perspective=self.perspectives[index])
+        if self.unlabeled:
+            image = self.images[index]
+            label = np.zeros(self.images.shape[:2], dtype=np.float32)
+            example = CrowdExample(image=image, label=label)
+        else:
+            example = CrowdExample(image=self.images[index], label=self.labels[index])
         if self.transform:
             example = self.transform(example)
         return example.image, example.label
