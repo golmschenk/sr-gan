@@ -1,13 +1,13 @@
 """Code for a regular (non-regression) GAN."""
+from abc import ABC
 import torch
-
 from torch import nn
 
 from srgan import Experiment
 from utility import real_numbers_to_bin_indexes, logsumexp
 
 
-class SganExperiment(Experiment):
+class SganExperiment(Experiment, ABC):
     """A class for an experiment of a SGAN."""
     def __init__(self, settings):
         super().__init__(settings)

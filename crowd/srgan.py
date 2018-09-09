@@ -113,9 +113,13 @@ class CrowdExperiment(Experiment):
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         examples, densities = next(validation_iterator)
         predicted_densities, _ = D(examples)
-        real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
-                                                                         predicted_densities)
-        gan_summary_writer.add_image('Validation', real_comparison_image)
+        validation_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+                                                                               predicted_densities)
+        gan_summary_writer.add_image('Validation', validation_comparison_image)
+        dnn_predicted_densities, _ = DNN(examples)
+        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+                                                                                   dnn_predicted_densities)
+        dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
         fake_examples = G(z)

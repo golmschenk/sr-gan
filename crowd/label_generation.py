@@ -19,6 +19,14 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     """
     Generates a density label given the head positions and other meta data.
 
+    :param force_full_image_count_normalize: Whether to normalize the label sum value to the head count.
+    :type force_full_image_count_normalize: bool
+    :param ignore_tiny: Whether the label should exclude annotations for positions with very small perspective values.
+    :type ignore_tiny: bool
+    :param include_body: Whether the label should add a body annotation.
+    :type include_body: bool
+    :param label_size: The dimensions the generated label should have.
+    :type label_size: (int, int)
     :param head_positions: The head labeling positions.
     :type head_positions: np.ndarray
     :param perspective: The perspective map.

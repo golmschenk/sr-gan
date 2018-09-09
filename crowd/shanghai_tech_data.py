@@ -86,7 +86,8 @@ class ShanghaiTechPreprocessing:
 
         print('Done downloading.')
 
-    def preprocess(self):
+    @staticmethod
+    def preprocess():
         """Preprocesses the database to the format needed by the network."""
         for part in ['part_B']:
             for dataset in ['test_data', 'train_data']:
@@ -112,7 +113,11 @@ class ShanghaiTechPreprocessing:
 
 
 class ShanghaiTechCheck:
+    """A class for listing statistics about the ShanghaiTech dataset."""
     def display_statistics(self):
+        """
+        Displays the statistics of the database.
+        """
         print('=' * 50)
         print('part_B')
         test_dataset_name = 'test'
@@ -130,9 +135,20 @@ class ShanghaiTechCheck:
         total_labels = np.concatenate([test_labels, train_labels], axis=0)
         self.print_statistics(total_dataset_name, total_images, total_labels)
 
-    def print_statistics(self, dataset, images, labels):
+    @staticmethod
+    def print_statistics(dataset_name, images, labels):
+        """
+        Prints the statistics for the given images and labels.
+
+        :param dataset_name: The name of the data set being checked.
+        :type dataset_name: str
+        :param images: The images of the dataset.
+        :type images: np.ndarray
+        :param labels: The labels of the dataset.
+        :type labels: np.ndarray
+        """
         print('-' * 50)
-        print('Dataset: {}'.format(dataset))
+        print('Dataset: {}'.format(dataset_name))
         print('Images shape: {}'.format(images.shape))
         print('Labels shape: {}'.format(labels.shape))
         print('Person count: {}'.format(labels.sum()))

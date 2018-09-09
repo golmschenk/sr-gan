@@ -169,7 +169,18 @@ class JointDCDiscriminator(Module):
         density = self.density_layer5(out).view(-1, int(patch_size / 4), int(patch_size / 4))
         return density, count
 
+
 def spatial_pyramid_pooling(input, output_size):
+    """
+    Adds a spatial pyramid pooling layer.
+
+    :param input: The input to the layer.
+    :type input: torch.Tensor
+    :param output_size: The output size of the layer (number of pooling grid cells).
+    :type output_size: int
+    :return: The pooling layer.
+    :rtype: torch.nn.Module
+    """
     assert input.dim() == 4 and input.size(2) == input.size(3)
     kernel_size = input.size(2) // output_size
     padding = 0
@@ -177,6 +188,7 @@ def spatial_pyramid_pooling(input, output_size):
         kernel_size += 1
         padding = 1
     return max_pool2d(input, kernel_size=kernel_size, padding=padding)
+
 
 class SpatialPyramidPoolingDiscriminator(Module):
     """A discriminator that uses sptial pyramid pooling as a primary feature."""

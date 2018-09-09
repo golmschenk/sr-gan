@@ -115,6 +115,9 @@ class Experiment(ABC):
             torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model.pth'))
 
     def train_mode(self):
+        """
+        Converts the networks to train mode, including moving them to the GPU.
+        """
         self.D.train()
         self.DNN.train()
         self.G.train()
@@ -287,7 +290,6 @@ class Experiment(ABC):
         """Calculate the loss from the label difference prediction."""
         return (predicted_labels - labels).abs().pow(order).mean()
 
-    @abstractmethod
     def evaluate(self):
         self.model_setup()
         self.load_models()

@@ -317,12 +317,27 @@ class RandomlySelectPatchAndRescale(PatchAndRescale):
         return y, x
 
 class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
+    """A transformation to randomly select a patch."""
     @staticmethod
     def get_patch_size_for_position(example_with_perspective, y, x):
+        """
+        Always returns the patch size (overriding the super class)
+
+        :param example_with_perspective: The example to extract the patch from.
+        :type example_with_perspective: ExampleWithPerspective
+        :param y: The y position of the center of the patch.
+        :type y: int
+        :param x: The x position of the center of the patch.
+        :type x: int
+        :return: The size of the patch to be extracted.
+        :rtype: int
+        """
         return patch_size
 
     def resize_patch(self, patch):
         """
+        Resizes the label and roi of the patch.
+
         :param patch: The patch to resize.
         :type patch: CrowdExampleWithRoi
         :return: The crowd example that is the resized patch.
@@ -338,6 +353,7 @@ class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
 
 
 class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
+    """Extracts the patch for a position."""
     def __call__(self, example_with_perspective, y, x):
         original_patch_size = self.get_patch_size_for_position(example_with_perspective, y, x)
         patch = self.get_patch_for_position(example_with_perspective, y, x)
@@ -348,9 +364,29 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
 
     @staticmethod
     def get_patch_size_for_position(example_with_perspective, y, x):
+        """
+        Always returns the patch size (overriding the super class)
+
+        :param example_with_perspective: The example to extract the patch from.
+        :type example_with_perspective: ExampleWithPerspective
+        :param y: The y position of the center of the patch.
+        :type y: int
+        :param x: The x position of the center of the patch.
+        :type x: int
+        :return: The size of the patch to be extracted.
+        :rtype: int
+        """
         return patch_size
 
     def resize_patch(self, patch):
+        """
+        Resizes the label and roi of the patch.
+
+        :param patch: The patch to resize.
+        :type patch: CrowdExampleWithRoi
+        :return: The crowd example that is the resized patch.
+        :rtype: CrowdExampleWithRoi
+        """
         original_label_sum = np.sum(patch.label)
         label = scipy.misc.imresize(patch.label, self.label_scaled_size, mode='F')
         unnormalized_label_sum = np.sum(label)
@@ -361,11 +397,24 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
 
 
 class ExtractPatch():
+    """A transform to extract a patch from an example."""
     def __init__(self):
         self.image_patch_size = patch_size
         self.label_scaled_size = [int(patch_size / 4), int(patch_size / 4)]
 
     def get_patch_for_position(self, example, y, x):
+        """
+        Extracts a patch for a given position.
+
+        :param example: The example to extract the patch from.
+        :type example: CrowdExample
+        :param y: The y position of the center of the patch.
+        :type y: int
+        :param x: The x position of the center of the patch.
+        :type x: int
+        :return: The patch.
+        :rtype: CrowdExample
+        """
         half_patch_size = int(self.image_patch_size // 2)
         if y - half_patch_size < 0:
             example = self.pad_example(example, y_padding=(half_patch_size - y, 0))
@@ -386,12 +435,32 @@ class ExtractPatch():
 
     @staticmethod
     def pad_example(example, y_padding=(0, 0), x_padding=(0, 0)):
+        """
+        Pads the given example.
+
+        :param example: The example to pad.
+        :type example: CrowdExample
+        :param y_padding: The amount to pad the y axis by.
+        :type y_padding: (int, int)
+        :param x_padding: The amount to pad the x axis by.
+        :type x_padding: (int, int)
+        :return: The padded example.
+        :rtype: CrowdExample
+        """
         z_padding = (0, 0)
         image = np.pad(example.image, (y_padding, x_padding, z_padding), 'constant')
         label = np.pad(example.label, (y_padding, x_padding), 'constant')
         return CrowdExample(image=image, label=label)
 
     def resize_label(self, patch):
+        """
+        Resizes the label of a patch.
+
+        :param patch: The patch.
+        :type patch: CrowdExample
+        :return: The patch with the resized label.
+        :rtype: CrowdExample
+        """
         original_label_sum = np.sum(patch.label)
         label = scipy.misc.imresize(patch.label, self.label_scaled_size, mode='F')
         unnormalized_label_sum = np.sum(label)
@@ -401,6 +470,7 @@ class ExtractPatch():
 
 
 class ExtractPatchForPosition(ExtractPatch):
+    """A transform to extract a patch for a give position."""
     def __call__(self, example, y, x):
         patch = self.get_patch_for_position(example, y, x)
         example = self.resize_label(patch)
@@ -408,6 +478,7 @@ class ExtractPatchForPosition(ExtractPatch):
 
 
 class ExtractPatchForRandomPosition(ExtractPatch):
+    """A transform to extract a patch for a random position."""
     def __call__(self, example):
         y, x = self.select_random_position(example)
         patch = self.get_patch_for_position(example, y, x)
@@ -416,6 +487,14 @@ class ExtractPatchForRandomPosition(ExtractPatch):
 
     @staticmethod
     def select_random_position(example):
+        """
+        Selects a random position from the example.
+
+        :param example: The example.
+        :type example: CrowdExample
+        :return: The patch.
+        :rtype: CrowdExample
+        """
         y = np.random.randint(example.label.shape[0])
         x = np.random.randint(example.label.shape[1])
         return y, x
