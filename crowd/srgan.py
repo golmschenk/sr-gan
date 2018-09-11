@@ -147,6 +147,8 @@ class CrowdExperiment(Experiment):
             if densities.size == 0:
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
+        count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
+        summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
         density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
