@@ -3,6 +3,7 @@ Regression semi-supervised GAN code.
 """
 import datetime
 import os
+import re
 import select
 import sys
 from abc import ABC, abstractmethod
@@ -65,6 +66,7 @@ class Experiment(ABC):
         self.dataset_setup()
         self.model_setup()
         self.load_models()
+        self.train_mode()
 
         d_lr = self.settings.learning_rate
         g_lr = d_lr
@@ -133,21 +135,53 @@ class Experiment(ABC):
         self.DNN.to('cpu')
         self.G.to('cpu')
 
+    @staticmethod
+    def compare_model_path_for_latest(model_path1, model_path2):
+        if model_path1 is None:
+            return model_path2
+        elif model_path1.group(2) is None:
+            return model_path1
+        elif model_path2.group(2) is None:
+            return model_path2
+        elif int(model_path1.group(2)) > int(model_path2.group(2)):
+            return model_path1
+        else:
+            return model_path2
+
     def load_models(self):
         if self.settings.load_model_path:
+            latest_dnn_model = None
+            latest_d_model = None
+            latest_g_model = None
+            model_path_file_names = os.listdir(self.settings.load_model_path)
+            for file_name in model_path_file_names:
+                match = re.search(r'(DNN|D|G)_model_?(\d+)?\.pth', file_name)
+                if match:
+                    if match.group(1) == 'DNN':
+                        latest_dnn_model = self.compare_model_path_for_latest(latest_dnn_model, match)
+                    elif match.group(1) == 'D':
+                        latest_d_model = self.compare_model_path_for_latest(latest_d_model, match)
+                    elif match.group(1) == 'G':
+                        latest_g_model = self.compare_model_path_for_latest(latest_g_model, match)
+            latest_dnn_model = None if latest_dnn_model is None else latest_dnn_model.group(0)
+            latest_d_model = None if latest_d_model is None else latest_d_model.group(0)
+            latest_g_model = None if latest_g_model is None else latest_g_model.group(0)
             if not torch.cuda.is_available():
                 map_location = 'cpu'
             else:
                 map_location = None
-            self.DNN.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'DNN_model.pth'),
-                                                map_location))
-            self.D.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'D_model.pth'),
-                                              map_location))
-            self.G.load_state_dict(torch.load(os.path.join(self.settings.load_model_path, 'G_model.pth'),
-                                              map_location))
-        self.G = self.G.to(gpu)
-        self.D = self.D.to(gpu)
-        self.DNN = self.DNN.to(gpu)
+            if latest_dnn_model:
+                dnn_model_path = os.path.join(self.settings.load_model_path, latest_dnn_model)
+                print('DNN model loaded from {}.'.format(dnn_model_path))
+                self.DNN.load_state_dict(torch.load(dnn_model_path, map_location))
+            if latest_d_model:
+                d_model_path = os.path.join(self.settings.load_model_path, latest_d_model)
+                print('D model loaded from {}.'.format(d_model_path))
+                self.D.load_state_dict(torch.load(d_model_path, map_location))
+            if latest_g_model:
+                g_model_path = os.path.join(self.settings.load_model_path, latest_g_model)
+                print('G model loaded from {}.'.format(g_model_path))
+                self.G.load_state_dict(torch.load(g_model_path, map_location))
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
