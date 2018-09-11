@@ -123,13 +123,13 @@ class CrowdExperiment(Experiment):
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
         fake_examples = G(z)
-        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
-        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
+        fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], range=(-1, 1), nrow=3)
+        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
-                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
+                                          ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
         fake_examples = G(z)
-        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
-        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
+        fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], range=(-1, 1), nrow=3)
+        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""

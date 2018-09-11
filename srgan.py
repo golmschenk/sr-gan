@@ -172,15 +172,15 @@ class Experiment(ABC):
                 map_location = None
             if latest_dnn_model:
                 dnn_model_path = os.path.join(self.settings.load_model_path, latest_dnn_model)
-                print('DNN model loaded from {}.'.format(dnn_model_path))
+                print('DNN model loaded from `{}`.'.format(dnn_model_path))
                 self.DNN.load_state_dict(torch.load(dnn_model_path, map_location))
             if latest_d_model:
                 d_model_path = os.path.join(self.settings.load_model_path, latest_d_model)
-                print('D model loaded from {}.'.format(d_model_path))
+                print('D model loaded from `{}`.'.format(d_model_path))
                 self.D.load_state_dict(torch.load(d_model_path, map_location))
             if latest_g_model:
                 g_model_path = os.path.join(self.settings.load_model_path, latest_g_model)
-                print('G model loaded from {}.'.format(g_model_path))
+                print('G model loaded from `{}`.'.format(g_model_path))
                 self.G.load_state_dict(torch.load(g_model_path, map_location))
 
     def dnn_training_step(self, examples, labels, step):
