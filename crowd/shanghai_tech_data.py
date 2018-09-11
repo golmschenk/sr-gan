@@ -153,12 +153,13 @@ class ShanghaiTechCheck:
         print('Labels shape: {}'.format(labels.shape))
         print('Person count: {}'.format(labels.sum()))
         print('Average count: {}'.format(labels.sum(axis=(1, 2)).mean(axis=0)))
+        print('Median count: {}'.format(np.median(labels.sum(axis=(1, 2)), axis=0)))
         print('Max single image count: {}'.format(labels.sum(axis=(1, 2)).max(axis=0)))
         print('Min single image count: {}'.format(labels.sum(axis=(1, 2)).min(axis=0)))
 
 
 if __name__ == '__main__':
-    preprocessor = ShanghaiTechPreprocessing()
+    # preprocessor = ShanghaiTechPreprocessing()
     # preprocessor.download_and_preprocess()
-    preprocessor.preprocess()
+    # preprocessor.preprocess()
     ShanghaiTechCheck().display_statistics()

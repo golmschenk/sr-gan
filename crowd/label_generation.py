@@ -2,14 +2,13 @@
 Code for generating labels from head positions.
 """
 import numpy as np
+from sklearn.neighbors import NearestNeighbors
 
 
 head_standard_deviation_meters = 0.2
 body_width_standard_deviation_meters = 0.2
 body_height_standard_deviation_meters = 0.5
 body_height_offset_meters = 0.875
-
-default_head_standard_deviation = 8
 
 dataset_head_count = 0
 
@@ -37,8 +36,12 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     global dataset_head_count
     head_count = 0
     body_parts = 2 if include_body else 1
+    number_of_neighbors = min(11, len(head_positions))
+    nearest_neighbors = NearestNeighbors(n_neighbors=number_of_neighbors, algorithm='ball_tree').fit(head_positions)
+    neighbor_distances, _ = nearest_neighbors.kneighbors(head_positions)
+    average_neighbor_distances = neighbor_distances[0:].mean(axis=1)
     label = np.zeros(shape=label_size, dtype=np.float32)
-    for head_position in head_positions:
+    for head_index, head_position in enumerate(head_positions):
         x, y = head_position.astype(np.uint32)
         if perspective is not None:
             if 0 <= x < perspective.shape[1]:
@@ -49,7 +52,9 @@ def generate_density_label(head_positions, label_size, perspective=None, include
                 continue
             head_standard_deviation = position_perspective * head_standard_deviation_meters
         else:
-            head_standard_deviation = default_head_standard_deviation
+            # This is the method used in the MCNN paper (or at least a close approximation).
+            neighbor_deviation_beta = 0.3
+            head_standard_deviation = average_neighbor_distances[head_index] * neighbor_deviation_beta
             position_perspective = None
         head_gaussian = make_gaussian(head_standard_deviation)
         head_gaussian = head_gaussian / (body_parts * head_gaussian.sum())
