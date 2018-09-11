@@ -26,6 +26,7 @@ class Settings:
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
         self.mean_offset = 1e0
+        self.labeled_loss_order = 2
         self.fake_loss_order = 2
         self.unlabeled_loss_order = 2
         self.generator_loss_order = 2

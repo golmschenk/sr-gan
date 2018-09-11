@@ -216,14 +216,14 @@ class Experiment(ABC):
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
         predicted_labels = self.DNN(labeled_examples)
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order) * self.settings.labeled_loss_multiplier
         return labeled_loss
 
     def labeled_loss_calculation(self, labeled_examples, labels):
         """Calculates the labeled loss."""
         predicted_labels = self.D(labeled_examples)
         self.labeled_features = self.D.features
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels) * self.settings.labeled_loss_multiplier
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order) * self.settings.labeled_loss_multiplier
         return labeled_loss
 
     def unlabeled_loss_calculation(self, unlabeled_examples):
