@@ -14,7 +14,7 @@ dataset_head_count = 0
 
 
 def generate_density_label(head_positions, label_size, perspective=None, include_body=True, ignore_tiny=False,
-                           force_full_image_count_normalize=True):
+                           force_full_image_count_normalize=True, perspective_resizing=True):
     """
     Generates a density label given the head positions and other meta data.
 
@@ -43,18 +43,22 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     label = np.zeros(shape=label_size, dtype=np.float32)
     for head_index, head_position in enumerate(head_positions):
         x, y = head_position.astype(np.uint32)
-        if perspective is not None:
-            if 0 <= x < perspective.shape[1]:
-                position_perspective = perspective[y, x]
+        if perspective_resizing:
+            if perspective is not None:
+                if 0 <= x < perspective.shape[1]:
+                    position_perspective = perspective[y, x]
+                else:
+                    position_perspective = perspective[y, 0]
+                if ignore_tiny and position_perspective < 3.1:
+                    continue
+                head_standard_deviation = position_perspective * head_standard_deviation_meters
             else:
-                position_perspective = perspective[y, 0]
-            if ignore_tiny and position_perspective < 3.1:
-                continue
-            head_standard_deviation = position_perspective * head_standard_deviation_meters
+                # This is the method used in the MCNN paper (or at least a close approximation).
+                neighbor_deviation_beta = 0.3
+                head_standard_deviation = average_neighbor_distances[head_index] * neighbor_deviation_beta
+                position_perspective = None
         else:
-            # This is the method used in the MCNN paper (or at least a close approximation).
-            neighbor_deviation_beta = 0.3
-            head_standard_deviation = average_neighbor_distances[head_index] * neighbor_deviation_beta
+            head_standard_deviation = 8
             position_perspective = None
         head_gaussian = make_gaussian(head_standard_deviation)
         head_gaussian = head_gaussian / (body_parts * head_gaussian.sum())
