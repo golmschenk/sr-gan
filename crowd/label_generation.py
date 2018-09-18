@@ -14,10 +14,12 @@ dataset_head_count = 0
 
 
 def generate_density_label(head_positions, label_size, perspective=None, include_body=True, ignore_tiny=False,
-                           force_full_image_count_normalize=True, perspective_resizing=True):
+                           force_full_image_count_normalize=True, perspective_resizing=False):
     """
     Generates a density label given the head positions and other meta data.
 
+    :param perspective_resizing: Marks whether any form of perspective head sizing should be used.
+    :type perspective_resizing: bool
     :param force_full_image_count_normalize: Whether to normalize the label sum value to the head count.
     :type force_full_image_count_normalize: bool
     :param ignore_tiny: Whether the label should exclude annotations for positions with very small perspective values.
@@ -54,7 +56,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
                 head_standard_deviation = position_perspective * head_standard_deviation_meters
             else:
                 # This is the method used in the MCNN paper (or at least a close approximation).
-                neighbor_deviation_beta = 0.3
+                neighbor_deviation_beta = 0.15
                 head_standard_deviation = average_neighbor_distances[head_index] * neighbor_deviation_beta
                 position_perspective = None
         else:

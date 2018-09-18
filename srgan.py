@@ -128,6 +128,9 @@ class Experiment(ABC):
         self.G.to(gpu)
 
     def eval_mode(self):
+        """
+        Changes the network to evaluation mode, including using the CPU.
+        """
         self.D.eval()
         self.DNN.eval()
         self.G.eval()
@@ -137,6 +140,17 @@ class Experiment(ABC):
 
     @staticmethod
     def compare_model_path_for_latest(model_path1, model_path2):
+        """
+        Compares two version of the model path to see which one has trained longer. A model without any step number
+        is considered to have trained the longest.
+
+        :param model_path1: The first model path.
+        :type model_path1: re.Match
+        :param model_path2: The second model path.
+        :type model_path2: re.Match
+        :return: The model path which was newer.
+        :rtype: re.Match
+        """
         if model_path1 is None:
             return model_path2
         elif model_path1.group(2) is None:
