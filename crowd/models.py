@@ -204,7 +204,7 @@ class SpatialPyramidPoolingDiscriminator(Module):
         self.conv4 = Conv2d(self.conv3.out_channels, 32, kernel_size=3)
         self.conv5 = Conv2d(self.conv4.out_channels, 16, kernel_size=3)
         self.conv6 = Conv2d(self.conv5.out_channels, 16, kernel_size=3, dilation=2)
-        self.conv7 = Conv2d(self.conv5.out_channels, 16, kernel_size=3, dilation=2)
+        self.conv7 = Conv2d(self.conv6.out_channels, 16, kernel_size=3, dilation=2)
         # Feature 5 regression
         self.f5_fc1 = Linear(912, 1000)
         self.f5_density = Linear(1000, self.density_label_size ** 2)
