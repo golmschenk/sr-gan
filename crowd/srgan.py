@@ -50,8 +50,9 @@ class CrowdExperiment(Experiment):
                                                   number_of_cameras=settings.number_of_cameras,
                                                   transform=train_transform, unlabeled=True,
                                                   seed=settings.labeled_dataset_seed)
-            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                       pin_memory=True, num_workers=settings.number_of_data_workers)
+            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
+                                                       shuffle=True, pin_memory=True,
+                                                       num_workers=settings.number_of_data_workers)
             self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
                                                    transform=validation_transform, seed=101)
         elif settings.crowd_dataset == 'ShanghaiTech':
@@ -67,8 +68,9 @@ class CrowdExperiment(Experiment):
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
             self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
                                                          part='part_A')
-            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                       pin_memory=True, num_workers=settings.number_of_data_workers)
+            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
+                                                       shuffle=True, pin_memory=True,
+                                                       num_workers=settings.number_of_data_workers)
             self.validation_dataset = ShanghaiTechDataset(dataset='test', transform=validation_transform, seed=101)
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
@@ -226,6 +228,7 @@ class CrowdExperiment(Experiment):
         return predicted_densities, predicted_counts
 
     def evaluate(self, sliding_window_step=10):
+        """Evaluates the model on test data."""
         super().evaluate()
         settings = self.settings
         if settings.crowd_dataset == 'ShanghaiTech':
@@ -297,6 +300,16 @@ class CrowdExperiment(Experiment):
         print('MAE Density: {}'.format(totals['density_sum_error'] / len(test_dataset)))
 
     def batches_of_patches_with_position(self, full_example, window_step_size=32):
+        """
+        A generator for extracting patches from an image in batches.
+
+        :param full_example: The full example to be patched.
+        :type full_example: CrowdExample
+        :param window_step_size: The sliding window size.
+        :type window_step_size: int
+        :return: A batch of patches.
+        :rtype: list[CrowdExample]
+        """
         extract_patch_transform = ExtractPatchForPosition()
         test_transform = torchvision.transforms.Compose([data.NegativeOneToOneNormalizeImage(),
                                                          data.NumpyArraysToTorchTensors()])

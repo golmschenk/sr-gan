@@ -69,7 +69,8 @@ class ShanghaiTechPreprocessing:
         if os.path.exists(database_directory):
             shutil.rmtree(database_directory)
         os.makedirs(database_directory)
-        urlretrieve('https://www.dropbox.com/s/fipgjqxl7uj8hd5/ShanghaiTech.zip?dl=1', os.path.join(database_directory, 'temporary'))
+        urlretrieve('https://www.dropbox.com/s/fipgjqxl7uj8hd5/ShanghaiTech.zip?dl=1',
+                    os.path.join(database_directory, 'temporary'))
         with zipfile.ZipFile(os.path.join(database_directory, 'temporary'), 'r') as zip_file:
             zip_file.extractall(database_directory)
         files = os.listdir(os.path.join(database_directory, 'ShanghaiTech'))

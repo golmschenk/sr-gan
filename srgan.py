@@ -163,6 +163,7 @@ class Experiment(ABC):
             return model_path2
 
     def load_models(self):
+        """Loads existing models if they exist at `self.settings.load_model_path`."""
         if self.settings.load_model_path:
             latest_dnn_model = None
             latest_d_model = None
@@ -264,14 +265,16 @@ class Experiment(ABC):
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
         predicted_labels = self.DNN(labeled_examples)
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order) * self.settings.labeled_loss_multiplier
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order)
+        labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
     def labeled_loss_calculation(self, labeled_examples, labels):
         """Calculates the labeled loss."""
         predicted_labels = self.D(labeled_examples)
         self.labeled_features = self.D.features
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order) * self.settings.labeled_loss_multiplier
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order)
+        labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
     def unlabeled_loss_calculation(self, unlabeled_examples):
@@ -339,6 +342,7 @@ class Experiment(ABC):
         return (predicted_labels - labels).abs().pow(order).mean()
 
     def evaluate(self):
+        """Evaluates the model on the test dataset (needs to be overridden by subclass."""
         self.model_setup()
         self.load_models()
         self.eval_mode()

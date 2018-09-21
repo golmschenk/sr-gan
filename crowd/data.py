@@ -316,6 +316,7 @@ class RandomlySelectPatchAndRescale(PatchAndRescale):
         x = np.random.randint(example_with_perspective.label.shape[1])
         return y, x
 
+
 class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
     """A transformation to randomly select a patch."""
     @staticmethod

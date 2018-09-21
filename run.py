@@ -52,7 +52,7 @@ settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-# settings_.load_model_path = '/home/golmschenk/srgan/logs/spp shanghai smaller label crowd c5i5 ul1e0 fl1e0 gp0e0 mo0e0 lr1e-4 gs1 ls0 u2f0.5g2 bs100 l'
+# settings_.load_model_path = 'logs/log path'
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
@@ -80,6 +80,6 @@ for settings_ in settings_list:
     trial_name += ' l' if settings_.load_model_path else ''
     settings_.trial_name = clean_scientific_notation(trial_name)
     experiment = Experiment(settings_)
-    experiment.train()
+    experiment.evaluate()
     if experiment.signal_quit:
         break
