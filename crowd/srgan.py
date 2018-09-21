@@ -2,6 +2,8 @@
 Code for the crowd application.
 """
 import json
+from collections import defaultdict
+
 import scipy.misc
 import matplotlib
 import numpy as np
@@ -233,8 +235,7 @@ class CrowdExperiment(Experiment):
             test_dataset = ShanghaiTechDataset(dataset='test')
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
-        totals = {'count': 0, 'count_error': 0, 'density_error': 0, 'density_sum_error': 0, 'predicted_count': 0,
-                  'predicted_density_sum': 0}
+        totals = defaultdict(lambda: 0)
         for full_example_index, (full_image, full_label) in enumerate(test_dataset):
             print('Processing full example {}...'.format(full_example_index), end='\r')
             full_example = CrowdExample(full_image, full_label)
@@ -288,16 +289,20 @@ class CrowdExperiment(Experiment):
             hit_predicted_label[hit_predicted_label == 0] = 1
             full_predicted_label = sum_density_label / hit_predicted_label.astype(np.float32)
             full_predicted_count = np.sum(sum_count_label / hit_predicted_label.astype(np.float32))
-            totals['count'] += full_example.label.sum()
-            totals['count_error'] += np.abs(full_predicted_count - full_example.label.sum())
-            totals['density_error'] += np.abs(full_predicted_label - full_example.label).sum()
-            totals['density_sum_error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
-            totals['predicted_count'] += full_predicted_count
-            totals['predicted_density_sum'] += full_predicted_label.sum()
+            totals['Count'] += full_example.label.sum()
+            totals['Density error'] += np.abs(full_predicted_label - full_example.label).sum()
+            totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
+            totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
+            totals['Predicted count'] += full_predicted_count
+            totals['Predicted density sum'] += full_predicted_label.sum()
+            totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
+            totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
+        print('MAE count: {}'.format(totals['Count error'] / len(test_dataset)))
+        print('MAE density: {}'.format(totals['Density sum error'] / len(test_dataset)))
+        print('MSE count: {}'.format(totals['SE count'] / len(test_dataset)))
+        print('MSE density: {}'.format(totals['SE density'] / len(test_dataset)))
         for key, value in totals.items():
             print('Total {}: {}'.format(key, value))
-        print('MAE Count: {}'.format(totals['count_error']/len(test_dataset)))
-        print('MAE Density: {}'.format(totals['density_sum_error'] / len(test_dataset)))
 
     def batches_of_patches_with_position(self, full_example, window_step_size=32):
         """
