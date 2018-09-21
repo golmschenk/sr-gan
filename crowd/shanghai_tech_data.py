@@ -25,18 +25,17 @@ class ShanghaiTechDataset(Dataset):
     """
     A class for the UCSD crowd dataset.
     """
-    def __init__(self, dataset='train', transform=None, seed=None, unlabeled=False):
+    def __init__(self, dataset='train', transform=None, seed=None, part='part_B'):
         seed_all(seed)
-        dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(dataset))
-        if unlabeled:
-            self.images = np.load(os.path.join(dataset_directory, 'unlabeled_images.npy'), mmap_mode='r')
-            self.labels = np.zeros(self.images.shape[:3], dtype=np.float32)
-        else:
+        dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
+        try:
             self.images = np.load(os.path.join(dataset_directory, 'images.npy'), mmap_mode='r')
             self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')
+        except ValueError:
+            self.images = np.load(os.path.join(dataset_directory, 'images.npy'))
+            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))
         self.length = self.labels.shape[0]
         self.transform = transform
-        self.unlabeled = unlabeled
 
     def __getitem__(self, index):
         """
@@ -45,12 +44,7 @@ class ShanghaiTechDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        if self.unlabeled:
-            image = self.images[index]
-            label = np.zeros(self.images.shape[:2], dtype=np.float32)
-            example = CrowdExample(image=image, label=label)
-        else:
-            example = CrowdExample(image=self.images[index], label=self.labels[index])
+        example = CrowdExample(image=self.images[index], label=self.labels[index])
         if self.transform:
             example = self.transform(example)
         return example.image, example.label
@@ -89,7 +83,7 @@ class ShanghaiTechPreprocessing:
     @staticmethod
     def preprocess():
         """Preprocesses the database to the format needed by the network."""
-        for part in ['part_B']:
+        for part in ['part_A', 'part_B']:
             for dataset in ['test_data', 'train_data']:
                 image_list = []
                 label_list = []
@@ -100,14 +94,20 @@ class ShanghaiTechPreprocessing:
                     mat_path = os.path.join(ground_truth_directory, mat_filename)
                     image_path = os.path.join(image_directory, image_filename + 'jpg')
                     image = imageio.imread(image_path)
+                    if len(image.shape) == 2:
+                        image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
                     label_size = image.shape[:2]
                     mat = scipy.io.loadmat(mat_path)
                     head_positions = mat['image_info'][0, 0][0][0][0]
                     label = generate_density_label(head_positions, label_size)
                     image_list.append(image)
                     label_list.append(label)
-                images = np.stack(image_list)
-                labels = np.stack(label_list)
+                try:
+                    images = np.stack(image_list)
+                    labels = np.stack(label_list)
+                except ValueError:
+                    images = np.array(image_list)
+                    labels = np.array(label_list)
                 np.save(os.path.join(database_directory, part, dataset, 'images.npy'), images)
                 np.save(os.path.join(database_directory, part, dataset, 'labels.npy'), labels)
 
@@ -160,6 +160,6 @@ class ShanghaiTechCheck:
 
 if __name__ == '__main__':
     preprocessor = ShanghaiTechPreprocessing()
-    # preprocessor.download_and_preprocess()
-    preprocessor.preprocess()
+    preprocessor.download_and_preprocess()
+    # preprocessor.preprocess()
     ShanghaiTechCheck().display_statistics()
