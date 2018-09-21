@@ -42,7 +42,7 @@ class CoefficientSganExperiment(SganExperiment, CoefficientExperiment):
         predicted_labels = logits_to_bin_values(logits, self.bins)
         predicted_labels = predicted_labels.to('cpu').detach().numpy()
         mae = np.mean(np.abs(predicted_labels - dataset.labels))
-        summary_writer.add_scalar('{}/MAE'.format(summary_name), mae)
+        summary_writer.add_scalar('{}/MAE'.format(summary_name), mae, )
         if comparison_value is not None:
-            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value)
+            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value, )
         return mae

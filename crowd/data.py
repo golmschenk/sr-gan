@@ -397,7 +397,7 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
         return CrowdExampleWithRoi(image=patch.image, label=label, roi=roi)
 
 
-class ExtractPatch():
+class ExtractPatch:
     """A transform to extract a patch from an example."""
     def __init__(self):
         self.image_patch_size = patch_size

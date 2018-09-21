@@ -10,15 +10,13 @@ import torch
 from scipy.stats import norm
 import torchvision
 from torch.utils.data import DataLoader
-from torchvision.transforms import RandomCrop
 
 from crowd import data
 from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
-from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator, \
-    FullSpatialPyramidPoolingDiscriminator
+from crowd.models import DCGenerator, FullSpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
-from utility import gpu, to_image_range, MixtureModel
+from utility import MixtureModel
 
 
 class CrowdExperiment(Experiment):
@@ -108,31 +106,31 @@ class CrowdExperiment(Experiment):
         predicted_densities, _ = D(examples)
         real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
                                                                          predicted_densities)
-        gan_summary_writer.add_image('Real', real_comparison_image)
+        gan_summary_writer.add_image('Real', real_comparison_image, )
         dnn_predicted_densities, _ = DNN(examples)
         dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
                                                                              dnn_predicted_densities)
-        dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
+        dnn_summary_writer.add_image('Real', dnn_real_comparison_image, )
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         examples, densities = next(validation_iterator)
         predicted_densities, _ = D(examples)
         validation_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
                                                                                predicted_densities)
-        gan_summary_writer.add_image('Validation', validation_comparison_image)
+        gan_summary_writer.add_image('Validation', validation_comparison_image, )
         dnn_predicted_densities, _ = DNN(examples)
         dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
                                                                                    dnn_predicted_densities)
-        dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
+        dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image, )
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
         fake_examples = G(z)
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], range=(-1, 1), nrow=3)
-        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
+        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy(), )
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
         fake_examples = G(z)
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], range=(-1, 1), nrow=3)
-        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
+        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy(), )
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
@@ -151,17 +149,17 @@ class CrowdExperiment(Experiment):
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
         count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
-        summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
+        summary_writer.add_scalar('{}/ME'.format(summary_name), count_me, )
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
-        summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
+        summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae, )
         density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
-        summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae)
+        summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae, )
         count_mse = (np.abs(predicted_counts - densities.sum(1).sum(1)) ** 2).mean()
-        summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse)
+        summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse, )
         density_mse = (np.abs(predicted_densities - densities) ** 2).sum(1).sum(1).mean()
-        summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse)
+        summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse, )
         if comparison_value is not None:
-            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
+            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value, )
         return count_mae
 
     @staticmethod
@@ -280,8 +278,10 @@ class CrowdExperiment(Experiment):
                                                            x_start_offset:predicted_label.shape[1] - x_end_offset]
                     sum_count_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
                                     x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                                    ] += predicted_count_array[y_start_offset:predicted_count_array.shape[0] - y_end_offset,
-                                                               x_start_offset:predicted_count_array.shape[1] - x_end_offset]
+                                    ] += predicted_count_array[y_start_offset:
+                                                               predicted_count_array.shape[0] - y_end_offset,
+                                                               x_start_offset:
+                                                               predicted_count_array.shape[1] - x_end_offset]
                     hit_predicted_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
                                         x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
                                         ] += 1

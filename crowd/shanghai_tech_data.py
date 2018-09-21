@@ -11,9 +11,9 @@ import numpy as np
 import scipy.io
 from torch.utils.data import Dataset
 
-from crowd.data import CrowdExampleWithPerspective, CrowdExample
+from crowd.data import CrowdExample
 from crowd.label_generation import generate_density_label
-from utility import download_and_extract_file, seed_all
+from utility import seed_all
 
 if os.path.basename(os.path.normpath(os.path.abspath('..'))) == 'srgan':
     database_directory = '../../ShanghaiTech Dataset'

@@ -7,7 +7,6 @@ import re
 import select
 import sys
 from abc import ABC, abstractmethod
-from typing import Tuple
 
 import numpy as np
 from scipy.stats import norm
@@ -207,9 +206,10 @@ class Experiment(ABC):
         self.dnn_optimizer.step()
         # Summaries.
         if self.dnn_summary_writer.is_summary_step():
-            self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
+            self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item(), )
             if self.DNN.features is not None:
-                self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', self.DNN.features.norm(dim=1).mean().item())
+                self.dnn_summary_writer.add_scalar('Feature Norm/Labeled',
+                                                   self.DNN.features.norm(dim=1).mean().item(), )
 
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
@@ -250,17 +250,17 @@ class Experiment(ABC):
             generator_loss.backward()
             self.g_optimizer.step()
             if self.gan_summary_writer.is_summary_step():
-                self.gan_summary_writer.add_scalar('Generator/Loss', generator_loss.item())
+                self.gan_summary_writer.add_scalar('Generator/Loss', generator_loss.item(), )
         # Summaries.
         if self.gan_summary_writer.is_summary_step():
-            self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
-            self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
-            self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
+            self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item(), )
+            self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item(), )
+            self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item(), )
             if self.labeled_features is not None:
                 self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                                   self.labeled_features.mean(0).norm().item())
+                                                   self.labeled_features.mean(0).norm().item(), )
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                                   self.unlabeled_features.mean(0).norm().item())
+                                                   self.unlabeled_features.mean(0).norm().item(), )
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
@@ -381,7 +381,7 @@ def feature_angle_loss(base_features, other_features, target=0, summary_writer=N
     """Calculate the loss based on the angle between feature vectors."""
     angle = angle_between(base_features.mean(0), other_features.mean(0))
     if summary_writer:
-        summary_writer.add_scalar('Feature Vector/Angle', angle.item())
+        summary_writer.add_scalar('Feature Vector/Angle', angle.item(), )
     return (angle - target).abs().pow(2)
 
 

@@ -170,28 +170,28 @@ class JointDCDiscriminator(Module):
         return density, count
 
 
-def spatial_pyramid_pooling(input, output_size):
+def spatial_pyramid_pooling(input_, output_size):
     """
     Adds a spatial pyramid pooling layer.
 
-    :param input: The input to the layer.
-    :type input: torch.Tensor
+    :param input_: The input to the layer.
+    :type input_: torch.Tensor
     :param output_size: The output size of the layer (number of pooling grid cells).
     :type output_size: int
     :return: The pooling layer.
     :rtype: torch.nn.Module
     """
-    assert input.dim() == 4 and input.size(2) == input.size(3)
-    kernel_size = input.size(2) // output_size
+    assert input_.dim() == 4 and input_.size(2) == input_.size(3)
+    kernel_size = input_.size(2) // output_size
     padding = 0
-    if input.size(2) // kernel_size > output_size:
+    if input_.size(2) // kernel_size > output_size:
         kernel_size += 1
         padding = 1
-    return max_pool2d(input, kernel_size=kernel_size, padding=padding)
+    return max_pool2d(input_, kernel_size=kernel_size, padding=padding)
 
 
 class SpatialPyramidPoolingDiscriminator(Module):
-    """A discriminator that uses sptial pyramid pooling as a primary feature."""
+    """A discriminator that uses spatial pyramid pooling as a primary feature."""
     def __init__(self, image_size=128):
         seed_all(0)
         super().__init__()
@@ -254,7 +254,7 @@ class SpatialPyramidPoolingDiscriminator(Module):
 
 
 class FullSpatialPyramidPoolingDiscriminator(Module):
-    """A discriminator that uses sptial pyramid pooling as a primary feature."""
+    """A discriminator that uses spatial pyramid pooling as a primary feature."""
     def __init__(self, image_size=128):
         seed_all(0)
         super().__init__()

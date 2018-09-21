@@ -71,17 +71,17 @@ class AgeExperiment(Experiment):
         train_iterator = iter(train_dataset_loader)
         examples, _ = next(train_iterator)
         images_image = torchvision.utils.make_grid(to_image_range(examples[:9]), nrow=3)
-        gan_summary_writer.add_image('Real', images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
+        gan_summary_writer.add_image('Real', images_image.numpy().transpose([1, 2, 0]).astype(np.uint8), )
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
-        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
+        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8), )
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
-        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8))
+        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy().transpose([1, 2, 0]).astype(np.uint8), )
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
@@ -93,11 +93,11 @@ class AgeExperiment(Experiment):
             ages = np.concatenate([ages, labels])
             predicted_ages = np.concatenate([predicted_ages, batch_predicted_ages])
         mae = np.abs(predicted_ages - ages).mean()
-        summary_writer.add_scalar('{}/MAE'.format(summary_name), mae)
+        summary_writer.add_scalar('{}/MAE'.format(summary_name), mae, )
         mse = (np.abs(predicted_ages - ages) ** 2).mean()
-        summary_writer.add_scalar('{}/MSE'.format(summary_name), mse)
+        summary_writer.add_scalar('{}/MSE'.format(summary_name), mse, )
         if comparison_value is not None:
-            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value)
+            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value, )
         return mae
 
     def images_to_predicted_ages(self, network, images):

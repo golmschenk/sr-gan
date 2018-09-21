@@ -57,7 +57,7 @@ settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'spp shanghai bndo with unlabeled'
+    trial_name = 'base'
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd':
@@ -80,6 +80,6 @@ for settings_ in settings_list:
     trial_name += ' l' if settings_.load_model_path else ''
     settings_.trial_name = clean_scientific_notation(trial_name)
     experiment = Experiment(settings_)
-    experiment.evaluate()
+    experiment.train()
     if experiment.signal_quit:
         break
