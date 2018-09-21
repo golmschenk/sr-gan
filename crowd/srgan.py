@@ -14,7 +14,8 @@ from torchvision.transforms import RandomCrop
 
 from crowd import data
 from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
-from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator
+from crowd.models import DCGenerator, JointDCDiscriminator, SpatialPyramidPoolingDiscriminator, \
+    FullSpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
 from utility import gpu, to_image_range, MixtureModel
@@ -65,7 +66,7 @@ class CrowdExperiment(Experiment):
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
             self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                         unlabeled=True)
+                                                         part='part_A')
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                                        pin_memory=True, num_workers=settings.number_of_data_workers)
             self.validation_dataset = ShanghaiTechDataset(dataset='test', transform=validation_transform, seed=101)
@@ -75,8 +76,8 @@ class CrowdExperiment(Experiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = SpatialPyramidPoolingDiscriminator()
-        self.DNN = SpatialPyramidPoolingDiscriminator()
+        self.D = FullSpatialPyramidPoolingDiscriminator()
+        self.DNN = FullSpatialPyramidPoolingDiscriminator()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
@@ -251,8 +252,9 @@ class CrowdExperiment(Experiment):
                     predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
                     unnormalized_predicted_label_sum = np.sum(predicted_label)
                     if unnormalized_predicted_label_sum != 0:
-                        predicted_label = predicted_label * predicted_label_sum / unnormalized_predicted_label_sum
-                        predicted_count_array = predicted_label * predicted_count / unnormalized_predicted_label_sum
+                        one_sum_label = predicted_label / unnormalized_predicted_label_sum
+                        predicted_label = one_sum_label * predicted_label_sum
+                        predicted_count_array = one_sum_label * predicted_count
                     else:
                         predicted_label = predicted_label
                         predicted_count_array = np.full(predicted_label.shape, predicted_count / predicted_label.size)
@@ -291,6 +293,8 @@ class CrowdExperiment(Experiment):
             totals['predicted_density_sum'] += full_predicted_label.sum()
         for key, value in totals.items():
             print('Total {}: {}'.format(key, value))
+        print('MAE Count: {}'.format(totals['count_error']/len(test_dataset)))
+        print('MAE Density: {}'.format(totals['density_sum_error'] / len(test_dataset)))
 
     def batches_of_patches_with_position(self, full_example, window_step_size=32):
         extract_patch_transform = ExtractPatchForPosition()

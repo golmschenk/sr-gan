@@ -14,7 +14,7 @@ dataset_head_count = 0
 
 
 def generate_density_label(head_positions, label_size, perspective=None, include_body=True, ignore_tiny=False,
-                           force_full_image_count_normalize=True, perspective_resizing=False):
+                           force_full_image_count_normalize=True, perspective_resizing=True):
     """
     Generates a density label given the head positions and other meta data.
 

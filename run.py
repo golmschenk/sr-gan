@@ -38,7 +38,7 @@ elif application_name == 'crowd':
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'ShanghaiTech'
-    settings_.labeled_loss_order = 1
+    settings_.labeled_loss_order = 2
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.unlabeled_dataset_size = [50000]
@@ -52,12 +52,12 @@ settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-settings_.load_model_path = 'logs/spp shanghai al crowd c5i5 ul1e0 fl1e0 gp0e0 mo0e0 lr1e-4 gs1 ls0 u2f0.5g2 bs10 l'
+# settings_.load_model_path = '/home/golmschenk/srgan/logs/spp shanghai smaller label crowd c5i5 ul1e0 fl1e0 gp0e0 mo0e0 lr1e-4 gs1 ls0 u2f0.5g2 bs100 l'
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'spp shanghai al'
+    trial_name = 'spp shanghai bndo with unlabeled'
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd':

@@ -2,7 +2,7 @@
 Code for the model structures.
 """
 import torch
-from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear
+from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout
 from torch.nn.functional import leaky_relu, tanh, max_pool2d
 
 from crowd.data import patch_size
@@ -242,6 +242,77 @@ class SpatialPyramidPoolingDiscriminator(Module):
         f7_6 = spatial_pyramid_pooling(out7, 6).view(-1, 36 * 16)
         f7 = torch.cat([f7_1, f7_2, f7_4, f7_6], dim=1)
         f7 = leaky_relu(self.f7_fc1(f7))
+        f7_density = leaky_relu(self.f7_density(f7))
+        f7_count = leaky_relu(self.f7_count(f7))
+
+        self.features = torch.cat([f5, f7], dim=1)
+        density = f5_density + f7_density
+        density = density.view(-1, self.density_label_size, self.density_label_size)
+        count = f5_count + f7_count
+        count = count.view(-1)
+        return density, count
+
+
+class FullSpatialPyramidPoolingDiscriminator(Module):
+    """A discriminator that uses sptial pyramid pooling as a primary feature."""
+    def __init__(self, image_size=128):
+        seed_all(0)
+        super().__init__()
+        self.density_label_size = image_size // 4
+        self.conv1 = Conv2d(3, 16, kernel_size=7)
+        self.max_pool1 = MaxPool2d(kernel_size=3, stride=2)
+        self.conv2 = Conv2d(self.conv1.out_channels, 32, kernel_size=7)
+        self.bn2 = BatchNorm2d(self.conv2.out_channels)
+        self.max_pool2 = MaxPool2d(kernel_size=3, stride=2)
+        self.conv3 = Conv2d(self.conv2.out_channels, 64, kernel_size=5)
+        self.bn3 = BatchNorm2d(self.conv3.out_channels)
+        self.conv4 = Conv2d(self.conv3.out_channels, 32, kernel_size=3)
+        self.bn4 = BatchNorm2d(self.conv4.out_channels)
+        self.conv5 = Conv2d(self.conv4.out_channels, 16, kernel_size=3)
+        self.bn5 = BatchNorm2d(self.conv5.out_channels)
+        self.conv6 = Conv2d(self.conv5.out_channels, 16, kernel_size=3, dilation=2)
+        self.bn6 = BatchNorm2d(self.conv6.out_channels)
+        self.conv7 = Conv2d(self.conv6.out_channels, 16, kernel_size=3, dilation=2)
+        self.bn7 = BatchNorm2d(self.conv7.out_channels)
+        # Feature 5 regression
+        self.f5_fc1 = Linear(912, 1000)
+        self.f5_dropout = Dropout()
+        self.f5_density = Linear(1000, self.density_label_size ** 2)
+        self.f5_count = Linear(1000, 1)
+        # Feature 7 regression
+        self.f7_fc1 = Linear(912, 1000)
+        self.f7_dropout = Dropout()
+        self.f7_density = Linear(1000, self.density_label_size ** 2)
+        self.f7_count = Linear(1000, 1)
+        self.features = None
+
+    def forward(self, x):
+        """The forward pass of the network."""
+        out = leaky_relu(self.conv1(x))
+        out = self.max_pool1(out)
+        out = leaky_relu(self.bn2(self.conv2(out)))
+        out = self.max_pool2(out)
+        out = leaky_relu(self.bn3(self.conv3(out)))
+        out = leaky_relu(self.bn4(self.conv4(out)))
+        out5 = leaky_relu(self.bn5(self.conv5(out)))
+        out = leaky_relu(self.bn6(self.conv6(out5)))
+        out7 = leaky_relu(self.bn7(self.conv7(out)))
+
+        f5_1 = spatial_pyramid_pooling(out5, 1).view(-1, 1 * 16)
+        f5_2 = spatial_pyramid_pooling(out5, 2).view(-1, 4 * 16)
+        f5_4 = spatial_pyramid_pooling(out5, 4).view(-1, 16 * 16)
+        f5_6 = spatial_pyramid_pooling(out5, 6).view(-1, 36 * 16)
+        f5 = torch.cat([f5_1, f5_2, f5_4, f5_6], dim=1)
+        f5 = self.f5_dropout(leaky_relu(self.f5_fc1(f5)))
+        f5_density = leaky_relu(self.f5_density(f5))
+        f5_count = leaky_relu(self.f5_count(f5))
+
+        f7_1 = spatial_pyramid_pooling(out7, 1).view(-1, 1 * 16)
+        f7_2 = spatial_pyramid_pooling(out7, 2).view(-1, 4 * 16)
+        f7_4 = spatial_pyramid_pooling(out7, 4).view(-1, 16 * 16)
+        f7_6 = spatial_pyramid_pooling(out7, 6).view(-1, 36 * 16)
+        f7 = torch.cat([f7_1, f7_2, f7_4, f7_6], dim=1)
+        f7 = self.f7_dropout(leaky_relu(self.f7_fc1(f7)))
         f7_density = leaky_relu(self.f7_density(f7))
         f7_count = leaky_relu(self.f7_count(f7))
 
