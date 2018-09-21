@@ -104,35 +104,35 @@ class CrowdExperiment(Experiment):
                               comparison_value=dnn_validation_count_mae)
         # Real images.
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        examples, densities = next(train_iterator)
-        predicted_densities, _ = D(examples)
-        real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+        images, densities = next(train_iterator)
+        predicted_densities, _ = D(images)
+        real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
                                                                          predicted_densities)
-        gan_summary_writer.add_image('Real', real_comparison_image, )
-        dnn_predicted_densities, _ = DNN(examples)
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+        gan_summary_writer.add_image('Real', real_comparison_image)
+        dnn_predicted_densities, _ = DNN(images)
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
                                                                              dnn_predicted_densities)
-        dnn_summary_writer.add_image('Real', dnn_real_comparison_image, )
+        dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        examples, densities = next(validation_iterator)
-        predicted_densities, _ = D(examples)
-        validation_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+        images, densities = next(validation_iterator)
+        predicted_densities, _ = D(images)
+        validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
                                                                                predicted_densities)
-        gan_summary_writer.add_image('Validation', validation_comparison_image, )
-        dnn_predicted_densities, _ = DNN(examples)
-        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(examples, densities,
+        gan_summary_writer.add_image('Validation', validation_comparison_image)
+        dnn_predicted_densities, _ = DNN(images)
+        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
                                                                                    dnn_predicted_densities)
-        dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image, )
+        dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
         fake_examples = G(z)
-        fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], range=(-1, 1), nrow=3)
-        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy(), )
+        fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
+        gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
         fake_examples = G(z)
-        fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], range=(-1, 1), nrow=3)
-        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy(), )
+        fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
+        gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
@@ -212,7 +212,7 @@ class CrowdExperiment(Experiment):
                                                                                            predicted_labels[index].data)
             grid_image_list.append(label_heatmap)
             grid_image_list.append(predicted_label_heatmap)
-        return torchvision.utils.make_grid(grid_image_list, nrow=number_of_images)
+        return torchvision.utils.make_grid(grid_image_list, nrow=number_of_images, normalize=True, range=(0, 1))
 
     def labeled_loss_function(self, predicted_labels, labels, order=2):
         """The loss function for the crowd application."""
