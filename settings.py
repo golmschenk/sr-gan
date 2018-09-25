@@ -14,7 +14,7 @@ class Settings:
         self.temporary_directory = 'temporary'
         self.logs_directory = 'logs'
         self.batch_size = 1000
-        self.summary_step_period = 1000
+        self.summary_step_period = 2000
         self.labeled_dataset_size = 50
         self.unlabeled_dataset_size = 50000
         self.validation_dataset_size = 1000
@@ -43,6 +43,7 @@ class Settings:
         self.crowd_dataset = 'World Expo'
         self.number_of_cameras = 5
         self.number_of_images_per_camera = 5
+        self.test_summary_size = 5
 
         # SGAN models only.
         self.number_of_bins = 10

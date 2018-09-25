@@ -2,6 +2,7 @@
 Code for the crowd application.
 """
 import json
+import random
 from collections import defaultdict
 
 import scipy.misc
@@ -134,6 +135,8 @@ class CrowdExperiment(Experiment):
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
+        self.test_summaries(step)
+
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
@@ -227,82 +230,127 @@ class CrowdExperiment(Experiment):
         predicted_densities, predicted_counts = network(images)
         return predicted_densities, predicted_counts
 
-    def evaluate(self, sliding_window_step=10):
+    def test_summaries(self, step):
+        """Evaluates the model on test data during training."""
+        test_dataset = ShanghaiTechDataset(dataset='test')
+        indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
+        for network in [self.DNN, self.D]:
+            totals = defaultdict(lambda: 0)
+            for index in indexes:
+                full_image, full_label = test_dataset[index]
+                full_example = CrowdExample(full_image, full_label)
+                full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
+                totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
+                totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
+                totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
+                totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
+            if network is self.DNN:
+                summary_writer = self.dnn_summary_writer
+            else:
+                summary_writer = self.gan_summary_writer
+            mae_count = totals['Count error'] / len(indexes)
+            summary_writer.add_scalar('0 Test Error/MAE count', mae_count, global_step=step)
+            mae_density = totals['Density sum error'] / len(indexes)
+            summary_writer.add_scalar('0 Test Error/MAE density', mae_density, global_step=step)
+            rmse_count = (totals['SE count'] / len(indexes)) ** 0.5
+            summary_writer.add_scalar('0 Test Error/RMSE count', rmse_count, global_step=step)
+            rmse_density = (totals['SE density'] / len(indexes)) ** 0.5
+            summary_writer.add_scalar('0 Test Error/RMSE density', rmse_density, global_step=step)
+
+    def evaluate(self, during_training=False, step=None, number_of_examples=None):
         """Evaluates the model on test data."""
         super().evaluate()
         settings = self.settings
-        if settings.crowd_dataset == 'ShanghaiTech':
-            test_dataset = ShanghaiTechDataset(dataset='test')
-        else:
-            raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
-        totals = defaultdict(lambda: 0)
-        for full_example_index, (full_image, full_label) in enumerate(test_dataset):
-            print('Processing full example {}...'.format(full_example_index), end='\r')
-            full_example = CrowdExample(full_image, full_label)
-            sum_density_label = np.zeros_like(full_example.label, dtype=np.float32)
-            sum_count_label = np.zeros_like(full_example.label, dtype=np.float32)
-            hit_predicted_label = np.zeros_like(full_example.label, dtype=np.int32)
-            for batch in self.batches_of_patches_with_position(full_example):
-                images = torch.stack([example_with_position.image for example_with_position in batch])
-                network = self.DNN
-                predicted_labels, predicted_counts = network(images)
-                for example_index, example_with_position in enumerate(batch):
-                    predicted_label = predicted_labels[example_index].detach().numpy()
-                    predicted_count = predicted_counts[example_index].detach().numpy()
-                    x, y = example_with_position.x, example_with_position.y
-                    predicted_label_sum = np.sum(predicted_label)
-                    predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
-                    unnormalized_predicted_label_sum = np.sum(predicted_label)
-                    if unnormalized_predicted_label_sum != 0:
-                        one_sum_label = predicted_label / unnormalized_predicted_label_sum
-                        predicted_label = one_sum_label * predicted_label_sum
-                        predicted_count_array = one_sum_label * predicted_count
-                    else:
-                        predicted_label = predicted_label
-                        predicted_count_array = np.full(predicted_label.shape, predicted_count / predicted_label.size)
-                    half_patch_size = patch_size // 2
-                    y_start_offset = 0
-                    if y - half_patch_size < 0:
-                        y_start_offset = half_patch_size - y
-                    y_end_offset = 0
-                    if y + half_patch_size >= full_example.label.shape[0]:
-                        y_end_offset = y + half_patch_size - full_example.label.shape[0]
-                    x_start_offset = 0
-                    if x - half_patch_size < 0:
-                        x_start_offset = half_patch_size - x
-                    x_end_offset = 0
-                    if x + half_patch_size >= full_example.label.shape[1]:
-                        x_end_offset = x + half_patch_size - full_example.label.shape[1]
-                    sum_density_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
-                                      x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                                      ] += predicted_label[y_start_offset:predicted_label.shape[0] - y_end_offset,
-                                                           x_start_offset:predicted_label.shape[1] - x_end_offset]
-                    sum_count_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
+        for network in [self.DNN, self.D]:
+            if settings.crowd_dataset == 'ShanghaiTech':
+                test_dataset = ShanghaiTechDataset(dataset='test')
+            else:
+                raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
+            totals = defaultdict(lambda: 0)
+            for full_example_index, (full_image, full_label) in enumerate(test_dataset):
+                print('Processing full example {}...'.format(full_example_index), end='\r')
+                full_example = CrowdExample(full_image, full_label)
+                full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
+                totals['Count'] += full_example.label.sum()
+                totals['Density error'] += np.abs(full_predicted_label - full_example.label).sum()
+                totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
+                totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
+                totals['Predicted count'] += full_predicted_count
+                totals['Predicted density sum'] += full_predicted_label.sum()
+                totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
+                totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
+            else:
+                if network is self.DNN:
+                    print('=== DNN ===')
+                else:
+                    print('=== GAN ===')
+                print('MAE count: {}'.format(totals['Count error'] / len(test_dataset)))
+                print('MAE density: {}'.format(totals['Density sum error'] / len(test_dataset)))
+                print('MSE count: {}'.format(totals['SE count'] / len(test_dataset)))
+                print('MSE density: {}'.format(totals['SE density'] / len(test_dataset)))
+                for key, value in totals.items():
+                    print('Total {}: {}'.format(key, value))
+
+    def predict_full_example(self, full_example, network):
+        """
+        Runs the prediction for a full example, by processing patches and averaging the patch results.
+
+        :param full_example: The full crowd example to be processed.
+        :type full_example: CrowdExample
+        :param network: The network to process the patches.
+        :type network: torch.nn.Module
+        :return: The predicted count array and density array.
+        :rtype: (np.ndarray, np.ndarray)
+        """
+        sum_density_label = np.zeros_like(full_example.label, dtype=np.float32)
+        sum_count_label = np.zeros_like(full_example.label, dtype=np.float32)
+        hit_predicted_label = np.zeros_like(full_example.label, dtype=np.int32)
+        for batch in self.batches_of_patches_with_position(full_example):
+            images = torch.stack([example_with_position.image for example_with_position in batch])
+            predicted_labels, predicted_counts = network(images)
+            for example_index, example_with_position in enumerate(batch):
+                predicted_label = predicted_labels[example_index].detach().numpy()
+                predicted_count = predicted_counts[example_index].detach().numpy()
+                x, y = example_with_position.x, example_with_position.y
+                predicted_label_sum = np.sum(predicted_label)
+                predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
+                unnormalized_predicted_label_sum = np.sum(predicted_label)
+                if unnormalized_predicted_label_sum != 0:
+                    one_sum_label = predicted_label / unnormalized_predicted_label_sum
+                    predicted_label = one_sum_label * predicted_label_sum
+                    predicted_count_array = one_sum_label * predicted_count
+                else:
+                    predicted_label = predicted_label
+                    predicted_count_array = np.full(predicted_label.shape,
+                                                    predicted_count / predicted_label.size)
+                half_patch_size = patch_size // 2
+                y_start_offset = 0
+                if y - half_patch_size < 0:
+                    y_start_offset = half_patch_size - y
+                y_end_offset = 0
+                if y + half_patch_size >= full_example.label.shape[0]:
+                    y_end_offset = y + half_patch_size - full_example.label.shape[0]
+                x_start_offset = 0
+                if x - half_patch_size < 0:
+                    x_start_offset = half_patch_size - x
+                x_end_offset = 0
+                if x + half_patch_size >= full_example.label.shape[1]:
+                    x_end_offset = x + half_patch_size - full_example.label.shape[1]
+                sum_density_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
+                                  x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
+                                  ] += predicted_label[y_start_offset:predicted_label.shape[0] - y_end_offset,
+                                                       x_start_offset:predicted_label.shape[1] - x_end_offset]
+                sum_count_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
+                                x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
+                                ] += predicted_count_array[y_start_offset:predicted_count_array.shape[0] - y_end_offset,
+                                                           x_start_offset:predicted_count_array.shape[1] - x_end_offset]
+                hit_predicted_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
                                     x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                                    ] += predicted_count_array[y_start_offset:
-                                                               predicted_count_array.shape[0] - y_end_offset,
-                                                               x_start_offset:
-                                                               predicted_count_array.shape[1] - x_end_offset]
-                    hit_predicted_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
-                                        x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
-                                        ] += 1
-            hit_predicted_label[hit_predicted_label == 0] = 1
-            full_predicted_label = sum_density_label / hit_predicted_label.astype(np.float32)
-            full_predicted_count = np.sum(sum_count_label / hit_predicted_label.astype(np.float32))
-            totals['Count'] += full_example.label.sum()
-            totals['Density error'] += np.abs(full_predicted_label - full_example.label).sum()
-            totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
-            totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
-            totals['Predicted count'] += full_predicted_count
-            totals['Predicted density sum'] += full_predicted_label.sum()
-            totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
-            totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
-        print('MAE count: {}'.format(totals['Count error'] / len(test_dataset)))
-        print('MAE density: {}'.format(totals['Density sum error'] / len(test_dataset)))
-        print('MSE count: {}'.format(totals['SE count'] / len(test_dataset)))
-        print('MSE density: {}'.format(totals['SE density'] / len(test_dataset)))
-        for key, value in totals.items():
-            print('Total {}: {}'.format(key, value))
+                                    ] += 1
+        hit_predicted_label[hit_predicted_label == 0] = 1
+        full_predicted_label = sum_density_label / hit_predicted_label.astype(np.float32)
+        full_predicted_count = np.sum(sum_count_label / hit_predicted_label.astype(np.float32))
+        return full_predicted_count, full_predicted_label
 
     def batches_of_patches_with_position(self, full_example, window_step_size=32):
         """
