@@ -25,15 +25,15 @@ class ShanghaiTechDataset(Dataset):
     """
     A class for the UCSD crowd dataset.
     """
-    def __init__(self, dataset='train', transform=None, seed=None, part='part_B'):
+    def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
         seed_all(seed)
         dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         try:
-            self.images = np.load(os.path.join(dataset_directory, 'images.npy'), mmap_mode='r')
-            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')
+            self.images = np.load(os.path.join(dataset_directory, 'images.npy'), mmap_mode='r')[:number_of_examples]
+            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')[:number_of_examples]
         except ValueError:
-            self.images = np.load(os.path.join(dataset_directory, 'images.npy'))
-            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))
+            self.images = np.load(os.path.join(dataset_directory, 'images.npy'))[:number_of_examples]
+            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))[:number_of_examples]
         self.length = self.labels.shape[0]
         self.transform = transform
 

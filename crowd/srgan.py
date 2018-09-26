@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
-from crowd.models import DCGenerator, FullSpatialPyramidPoolingDiscriminator
+from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
 from utility import MixtureModel
@@ -64,11 +64,12 @@ class CrowdExperiment(Experiment):
             validation_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
                                                                    data.NegativeOneToOneNormalizeImage(),
                                                                    data.NumpyArraysToTorchTensors()])
-            self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed)
+            self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
+                                                     number_of_examples=settings.labeled_dataset_size)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
             self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                         part='part_A')
+                                                         part='part_B')
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                        shuffle=True, pin_memory=True,
                                                        num_workers=settings.number_of_data_workers)
@@ -79,8 +80,8 @@ class CrowdExperiment(Experiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = FullSpatialPyramidPoolingDiscriminator()
-        self.DNN = FullSpatialPyramidPoolingDiscriminator()
+        self.D = SpatialPyramidPoolingDiscriminator()
+        self.DNN = SpatialPyramidPoolingDiscriminator()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""

@@ -41,8 +41,8 @@ class Settings:
 
         # Crowd application only.
         self.crowd_dataset = 'World Expo'
-        self.number_of_cameras = 5
-        self.number_of_images_per_camera = 5
+        self.number_of_cameras = 5  # World Expo data only
+        self.number_of_images_per_camera = 5  # World Expo data only
         self.test_summary_size = 5
 
         # SGAN models only.
