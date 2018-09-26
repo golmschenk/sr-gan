@@ -15,7 +15,8 @@ import torchvision
 from torch.utils.data import DataLoader
 
 from crowd import data
-from crowd.data import CrowdDataset, patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
+from crowd.data import patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
+from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
@@ -38,24 +39,24 @@ class CrowdExperiment(Experiment):
             dataset_path = '../World Expo/'
             with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
                 cameras_dict = json.load(json_file)
-            self.train_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
-                                              number_of_cameras=settings.number_of_cameras,
-                                              number_of_images_per_camera=settings.number_of_images_per_camera,
-                                              transform=train_transform, seed=settings.labeled_dataset_seed)
+            self.train_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
+                                                  number_of_cameras=settings.number_of_cameras,
+                                                  number_of_images_per_camera=settings.number_of_images_per_camera,
+                                                  transform=train_transform, seed=settings.labeled_dataset_seed)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=True, num_workers=settings.number_of_data_workers)
             # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
             #                                       transform=train_transform, unlabeled=True,
             #                                       seed=100)
-            self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['train'],
-                                                  number_of_cameras=settings.number_of_cameras,
-                                                  transform=train_transform, unlabeled=True,
-                                                  seed=settings.labeled_dataset_seed)
+            self.unlabeled_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
+                                                      number_of_cameras=settings.number_of_cameras,
+                                                      transform=train_transform, unlabeled=True,
+                                                      seed=settings.labeled_dataset_seed)
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                        shuffle=True, pin_memory=True,
                                                        num_workers=settings.number_of_data_workers)
-            self.validation_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                                   transform=validation_transform, seed=101)
+            self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
+                                                       transform=validation_transform, seed=101)
         elif settings.crowd_dataset == 'ShanghaiTech':
             train_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
                                                               data.RandomHorizontalFlip(),
