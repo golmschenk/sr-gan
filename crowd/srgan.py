@@ -15,7 +15,7 @@ import torchvision
 from torch.utils.data import DataLoader
 
 from crowd import data
-from crowd.data import patch_size, ExtractPatchForPosition, CrowdExampleWithPosition, CrowdExample
+from crowd.data import patch_size, ExtractPatchForPosition, CrowdExample
 from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset
@@ -240,7 +240,7 @@ class CrowdExperiment(Experiment):
             totals = defaultdict(lambda: 0)
             for index in indexes:
                 full_image, full_label = test_dataset[index]
-                full_example = CrowdExample(full_image, full_label)
+                full_example = CrowdExample(image=full_image, label=full_label)
                 full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
                 totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
                 totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
@@ -271,7 +271,7 @@ class CrowdExperiment(Experiment):
             totals = defaultdict(lambda: 0)
             for full_example_index, (full_image, full_label) in enumerate(test_dataset):
                 print('Processing full example {}...'.format(full_example_index), end='\r')
-                full_example = CrowdExample(full_image, full_label)
+                full_example = CrowdExample(image=full_image, label=full_label)
                 full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
                 totals['Count'] += full_example.label.sum()
                 totals['Density error'] += np.abs(full_predicted_label - full_example.label).sum()
@@ -313,7 +313,7 @@ class CrowdExperiment(Experiment):
             for example_index, example_with_position in enumerate(batch):
                 predicted_label = predicted_labels[example_index].detach().numpy()
                 predicted_count = predicted_counts[example_index].detach().numpy()
-                x, y = example_with_position.x, example_with_position.y
+                x, y = example_with_position.patch_center_x, example_with_position.patch_center_y
                 predicted_label_sum = np.sum(predicted_label)
                 predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
                 unnormalized_predicted_label_sum = np.sum(predicted_label)
@@ -373,7 +373,8 @@ class CrowdExperiment(Experiment):
             for x in range(0, full_example.label.shape[1], window_step_size):
                 patch = extract_patch_transform(full_example, y, x)
                 example = test_transform(patch)
-                example_with_position = CrowdExampleWithPosition(example.image, example.label, x, y)
+                example_with_position = CrowdExample(image=example.image, label=example.label,
+                                                     patch_center_x=x, patch_center_y=y)
                 batch.append(example_with_position)
                 if len(batch) == self.settings.batch_size:
                     yield batch

@@ -1,10 +1,13 @@
+"""
+Code for the World Expo dataset.
+"""
 import os
 import random
 
 import numpy as np
 from torch.utils.data import Dataset
 
-from crowd.data import CrowdExampleWithPerspective
+from crowd.data import CrowdExample
 from utility import seed_all
 
 
@@ -51,8 +54,8 @@ class WorldExpoDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        example = CrowdExampleWithPerspective(image=self.images[index], label=self.labels[index], roi=self.rois[index],
-                                              perspective=self.perspectives[index])
+        example = CrowdExample(image=self.images[index], label=self.labels[index], roi=self.rois[index],
+                               perspective=self.perspectives[index])
         if self.transform:
             example = self.transform(example)
         return example.image, example.label
