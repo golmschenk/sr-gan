@@ -95,25 +95,34 @@ class Experiment(ABC):
                 self.eval_mode()
                 self.validation_summaries(step)
                 self.train_mode()
-                while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                    line = sys.stdin.readline()
-                    if 'save' in line:
-                        torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory,
-                                                                       'DNN_model_{}.pth'.format(step)))
-                        torch.save(self.D.state_dict(), os.path.join(self.trial_directory,
-                                                                     'D_model_{}.pth'.format(step)))
-                        torch.save(self.G.state_dict(), os.path.join(self.trial_directory,
-                                                                     'G_model_{}.pth'.format(step)))
-                        print('\rSaved model for step {}...'.format(step))
-                    if 'quit' in line:
-                        self.signal_quit = True
-                        print('\rQuit requested after current experiment...')
+                self.handle_user_input(step)
 
         print('Completed {}'.format(self.trial_directory))
         if self.settings.should_save_models:
             torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model.pth'))
             torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model.pth'))
             torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model.pth'))
+
+    def handle_user_input(self, step):
+        """
+        Handle input from the user.
+
+        :param step: The current step of the program.
+        :type step: int
+        """
+        while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+            line = sys.stdin.readline()
+            if 'save' in line:
+                torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory,
+                                                               'DNN_model_{}.pth'.format(step)))
+                torch.save(self.D.state_dict(), os.path.join(self.trial_directory,
+                                                             'D_model_{}.pth'.format(step)))
+                torch.save(self.G.state_dict(), os.path.join(self.trial_directory,
+                                                             'G_model_{}.pth'.format(step)))
+                print('\rSaved model for step {}...'.format(step))
+            if 'quit' in line:
+                self.signal_quit = True
+                print('\rQuit requested after current experiment...')
 
     def train_mode(self):
         """
