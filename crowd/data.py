@@ -341,7 +341,8 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
         if unnormalized_label_sum != 0:
             label = (label / unnormalized_label_sum) * original_label_sum
         roi = scipy.misc.imresize(patch.roi, self.label_scaled_size, mode='F') > 0.5
-        return CrowdExample(image=patch.image, label=label, roi=roi)
+        perspective = scipy.misc.imresize(patch.perspective, self.label_scaled_size, mode='F')
+        return CrowdExample(image=patch.image, label=label, roi=roi, perspective=perspective)
 
 
 class ExtractPatch:
@@ -379,7 +380,9 @@ class ExtractPatch:
                                     :]
         label_patch = example.label[y - half_patch_size:y + half_patch_size,
                                     x - half_patch_size:x + half_patch_size]
-        return CrowdExample(image=image_patch, label=label_patch)
+        perspective_patch = example.perspective[y - half_patch_size:y + half_patch_size,
+                                                x - half_patch_size:x + half_patch_size]
+        return CrowdExample(image=image_patch, label=label_patch, perspective=perspective_patch)
 
     @staticmethod
     def pad_example(example, y_padding=(0, 0), x_padding=(0, 0)):
@@ -398,7 +401,8 @@ class ExtractPatch:
         z_padding = (0, 0)
         image = np.pad(example.image, (y_padding, x_padding, z_padding), 'constant')
         label = np.pad(example.label, (y_padding, x_padding), 'constant')
-        return CrowdExample(image=image, label=label)
+        perspective = np.pad(example.perspective, (y_padding, x_padding), 'edge')
+        return CrowdExample(image=image, label=label, perspective=perspective)
 
     def resize_label(self, patch):
         """
@@ -414,7 +418,11 @@ class ExtractPatch:
         unnormalized_label_sum = np.sum(label)
         if unnormalized_label_sum != 0:
             label = (label / unnormalized_label_sum) * original_label_sum
-        return CrowdExample(image=patch.image, label=label)
+        if patch.perspective is not None:
+            perspective = scipy.misc.imresize(patch.perspective, self.label_scaled_size, mode='F')
+        else:
+            perspective = None
+        return CrowdExample(image=patch.image, label=label, perspective=perspective)
 
 
 class ExtractPatchForPosition(ExtractPatch):
