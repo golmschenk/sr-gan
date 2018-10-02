@@ -380,8 +380,11 @@ class ExtractPatch:
                                     :]
         label_patch = example.label[y - half_patch_size:y + half_patch_size,
                                     x - half_patch_size:x + half_patch_size]
-        perspective_patch = example.perspective[y - half_patch_size:y + half_patch_size,
-                                                x - half_patch_size:x + half_patch_size]
+        if example.perspective is not None:
+            perspective_patch = example.perspective[y - half_patch_size:y + half_patch_size,
+                                                    x - half_patch_size:x + half_patch_size]
+        else:
+            perspective_patch = None
         return CrowdExample(image=image_patch, label=label_patch, perspective=perspective_patch)
 
     @staticmethod
@@ -401,7 +404,10 @@ class ExtractPatch:
         z_padding = (0, 0)
         image = np.pad(example.image, (y_padding, x_padding, z_padding), 'constant')
         label = np.pad(example.label, (y_padding, x_padding), 'constant')
-        perspective = np.pad(example.perspective, (y_padding, x_padding), 'edge')
+        if example.perspective is not None:
+            perspective = np.pad(example.perspective, (y_padding, x_padding), 'edge')
+        else:
+            perspective = None
         return CrowdExample(image=image, label=label, perspective=perspective)
 
     def resize_label(self, patch):
