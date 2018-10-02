@@ -34,15 +34,15 @@ elif application_name == 'crowd':
     Experiment = CrowdSganExperiment if method_name == 'sgan' else CrowdExperiment
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
-    settings_.batch_size = 100
+    settings_.batch_size = 300
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'ShanghaiTech'
     settings_.labeled_loss_order = 2
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
-settings_.unlabeled_dataset_size = [50000]
-settings_.labeled_dataset_size = [1000]
+settings_.unlabeled_dataset_size = None
+settings_.labeled_dataset_size = [40]
 settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 1000000
@@ -57,10 +57,10 @@ settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'base'
+    trial_name = 'final'
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
-    if application_name == 'crowd':
+    if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':
         trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
     else:
         trial_name += ' le{}'.format(settings_.labeled_dataset_size)

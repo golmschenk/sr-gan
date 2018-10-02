@@ -37,7 +37,7 @@ class Settings:
         self.load_model_path = None
         self.should_save_models = True
         self.skip_completed_experiment = True
-        self.number_of_data_workers = 2
+        self.number_of_data_workers = 4
 
         # Crowd application only.
         self.crowd_dataset = 'World Expo'
