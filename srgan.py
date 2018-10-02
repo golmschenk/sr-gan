@@ -16,7 +16,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 from settings import Settings
-from utility import SummaryWriter, infinite_iter, gpu, make_directory_name_unique, MixtureModel, seed_all
+from utility import SummaryWriter, gpu, make_directory_name_unique, MixtureModel, seed_all
 
 
 class Experiment(ABC):
@@ -76,8 +76,8 @@ class Experiment(ABC):
         self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
 
         step_time_start = datetime.datetime.now()
-        train_dataset_generator = infinite_iter(self.train_dataset_loader)
-        unlabeled_dataset_generator = infinite_iter(self.unlabeled_dataset_loader)
+        train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
+        unlabeled_dataset_generator = self.infinite_iter(self.unlabeled_dataset_loader)
 
         for step in range(self.settings.steps_to_run):
             # DNN.
@@ -355,6 +355,26 @@ class Experiment(ABC):
         self.model_setup()
         self.load_models()
         self.eval_mode()
+
+    def infinite_iter(self, dataset):
+        """Create an infinite generator from a dataset. Forces full batch sizes."""
+        images = None
+        labels = None
+        while True:
+            for examples in dataset:
+                if len(dataset) >= self.settings.batch_size:
+                    if examples[0] >= self.settings.batch_size:
+                        yield examples
+                else:
+                    if labels is None:
+                        images, labels = examples
+                    else:
+                        images = torch.cat([images, examples[0]], dim=0)
+                        labels = torch.cat([labels, examples[1]], dim=0)
+                    if labels.shape[0] >= self.settings.batch_size:
+                        yield images[:self.settings.batch_size], labels[:self.settings.batch_size]
+                        images = None
+                        labels = None
 
 
 def unit_vector(vector):

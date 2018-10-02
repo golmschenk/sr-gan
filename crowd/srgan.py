@@ -363,7 +363,7 @@ class CrowdExperiment(Experiment):
         :param window_step_size: The sliding window size.
         :type window_step_size: int
         :return: A batch of patches.
-        :rtype: list[CrowdExample]
+        :rtype: list[list[CrowdExample]]
         """
         extract_patch_transform = ExtractPatchForPosition()
         test_transform = torchvision.transforms.Compose([data.NegativeOneToOneNormalizeImage(),

@@ -49,13 +49,6 @@ class SummaryWriter(SummaryWriter_):
         return self.step % self.summary_period == 0
 
 
-def infinite_iter(dataset):
-    """Create an infinite generator from a dataset."""
-    while True:
-        for examples in dataset:
-            yield examples
-
-
 def clean_scientific_notation(string):
     """Cleans up scientific notation to remove unneeded fluff digits."""
     regex = r'\.?0*e([+\-])0*([0-9])'
