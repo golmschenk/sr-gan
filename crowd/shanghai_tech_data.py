@@ -177,23 +177,18 @@ class ShanghaiTechCheck:
         """
         print('=' * 50)
         print('part_B')
-        test_dataset_name = 'test'
-        test_dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(test_dataset_name))
-        test_images = np.load(os.path.join(test_dataset_directory, 'images.npy'))
-        test_labels = np.load(os.path.join(test_dataset_directory, 'labels.npy'))
-        self.print_statistics(test_dataset_name, test_images, test_labels)
-        train_dataset_name = 'train'
-        train_dataset_directory = os.path.join(database_directory, 'part_B', '{}_data'.format(train_dataset_name))
-        train_images = np.load(os.path.join(train_dataset_directory, 'images.npy'))
-        train_labels = np.load(os.path.join(train_dataset_directory, 'labels.npy'))
-        self.print_statistics(train_dataset_name, train_images, train_labels)
+        test_dataset = ShanghaiTechDataset('test')
+        test_labels = np.stack([label for (image, label) in test_dataset], axis=0)
+        self.print_statistics('test', test_labels)
+        train_dataset = ShanghaiTechDataset('train')
+        train_labels = np.stack([label for (image, label) in train_dataset], axis=0)
+        self.print_statistics('train', train_labels)
         total_dataset_name = 'total'
-        total_images = np.concatenate([test_images, train_images], axis=0)
         total_labels = np.concatenate([test_labels, train_labels], axis=0)
-        self.print_statistics(total_dataset_name, total_images, total_labels)
+        self.print_statistics(total_dataset_name, total_labels)
 
     @staticmethod
-    def print_statistics(dataset_name, images, labels):
+    def print_statistics(dataset_name, labels):
         """
         Prints the statistics for the given images and labels.
 
@@ -206,8 +201,6 @@ class ShanghaiTechCheck:
         """
         print('-' * 50)
         print('Dataset: {}'.format(dataset_name))
-        print('Images shape: {}'.format(images.shape))
-        print('Labels shape: {}'.format(labels.shape))
         print('Person count: {}'.format(labels.sum()))
         print('Average count: {}'.format(labels.sum(axis=(1, 2)).mean(axis=0)))
         print('Median count: {}'.format(np.median(labels.sum(axis=(1, 2)), axis=0)))
