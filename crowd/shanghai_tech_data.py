@@ -112,6 +112,30 @@ class ShanghaiTechPreprocessing:
                 np.save(os.path.join(database_directory, part, dataset, 'images.npy'), images)
                 np.save(os.path.join(database_directory, part, dataset, 'labels.npy'), labels)
 
+    @staticmethod
+    def preprocess_individual_image_format():
+        """Preprocesses the database to a format with each label and image being it's own file."""
+        for part in ['part_A', 'part_B']:
+            for dataset in ['test_data', 'train_data']:
+                ground_truth_directory = os.path.join(database_directory, part, dataset, 'ground-truth')
+                images_directory = os.path.join(database_directory, part, dataset, 'images')
+                labels_directory = os.path.join(database_directory, part, dataset, 'labels')
+                os.makedirs(labels_directory, exist_ok=True)
+                for mat_filename in os.listdir(ground_truth_directory):
+                    file_name = mat_filename[3:-3]
+                    mat_path = os.path.join(ground_truth_directory, mat_filename)
+                    image_path = os.path.join(images_directory, file_name + 'jpg')
+                    label_path = os.path.join(labels_directory, file_name + 'npy')
+                    image = imageio.imread(image_path)
+                    if len(image.shape) == 2:
+                        image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
+                        imageio.imwrite(image_path, image)
+                    label_size = image.shape[:2]
+                    mat = scipy.io.loadmat(mat_path)
+                    head_positions = mat['image_info'][0, 0][0][0][0]
+                    label = generate_density_label(head_positions, label_size)
+                    np.save(label_path, label)
+
 
 class ShanghaiTechCheck:
     """A class for listing statistics about the ShanghaiTech dataset."""
