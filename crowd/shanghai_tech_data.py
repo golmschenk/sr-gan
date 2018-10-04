@@ -1,6 +1,7 @@
 """
 Code from preprocessing the UCSD dataset.
 """
+import glob
 import os
 import shutil
 import zipfile
@@ -23,7 +24,7 @@ else:
 
 class ShanghaiTechDataset(Dataset):
     """
-    A class for the UCSD crowd dataset.
+    A class for the ShanghaiTech crowd dataset.
     """
     def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
         seed_all(seed)
@@ -33,7 +34,7 @@ class ShanghaiTechDataset(Dataset):
             self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')[:number_of_examples]
         except ValueError:
             self.images = np.load(os.path.join(dataset_directory, 'images.npy'))[:number_of_examples]
-            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))[:number_of_examples]
+            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))
         self.length = self.labels.shape[0]
         self.transform = transform
 
@@ -45,6 +46,37 @@ class ShanghaiTechDataset(Dataset):
         :rtype: torch.Tensor, torch.Tensor
         """
         example = CrowdExample(image=self.images[index], label=self.labels[index])
+        if self.transform:
+            example = self.transform(example)
+        return example.image, example.label
+
+    def __len__(self):
+        return self.length
+
+
+class ShanghaiTechDatasetSingleFile(Dataset):
+    """
+    A class for the ShanghaiTech crowd dataset.
+    """
+    def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
+        seed_all(seed)
+        self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
+        self.file_names = [name for name in os.listdir(os.path.join(database_directory, 'labels'))
+                           if name.endswith('.npy')][:number_of_examples]
+        self.length = len(self.file_names)
+        self.transform = transform
+
+    def __getitem__(self, index):
+        """
+        :param index: The index within the entire dataset.
+        :type index: int
+        :return: An example and label from the crowd dataset.
+        :rtype: torch.Tensor, torch.Tensor
+        """
+        file_name = self.file_names[index]
+        image = imageio.imread(os.path.join(self.dataset_directory, 'images', file_name + '.jpg'))
+        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name + '.npy'))
+        example = CrowdExample(image=image, label=label)
         if self.transform:
             example = self.transform(example)
         return example.image, example.label
