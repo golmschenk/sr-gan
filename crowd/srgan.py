@@ -44,7 +44,8 @@ class CrowdExperiment(Experiment):
                                                   number_of_images_per_camera=settings.number_of_images_per_camera,
                                                   transform=train_transform, seed=settings.labeled_dataset_seed)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                   pin_memory=True, num_workers=settings.number_of_data_workers)
+                                                   pin_memory=self.settings.pin_memory,
+                                                   num_workers=settings.number_of_data_workers)
             # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
             #                                       transform=train_transform, unlabeled=True,
             #                                       seed=100)
@@ -53,7 +54,7 @@ class CrowdExperiment(Experiment):
                                                       transform=train_transform, unlabeled=True,
                                                       seed=settings.labeled_dataset_seed)
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
-                                                       shuffle=True, pin_memory=True,
+                                                       shuffle=True, pin_memory=self.settings.pin_memory,
                                                        num_workers=settings.number_of_data_workers)
             self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
                                                        transform=validation_transform, seed=101)
@@ -68,11 +69,12 @@ class CrowdExperiment(Experiment):
             self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
                                                      number_of_examples=settings.labeled_dataset_size)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                   pin_memory=True, num_workers=settings.number_of_data_workers)
+                                                   pin_memory=self.settings.pin_memory,
+                                                   num_workers=settings.number_of_data_workers)
             self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
                                                          part='part_B')
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
-                                                       shuffle=True, pin_memory=True,
+                                                       shuffle=True, pin_memory=self.settings.pin_memory,
                                                        num_workers=settings.number_of_data_workers)
             self.validation_dataset = ShanghaiTechDataset(dataset='test', transform=validation_transform, seed=101)
         else:

@@ -21,11 +21,11 @@ class CoefficientExperiment(Experiment):
         self.train_dataset = ToyDataset(dataset_size=settings.labeled_dataset_size, observation_count=observation_count,
                                         settings=settings, seed=settings.labeled_dataset_seed)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                               pin_memory=True)
+                                               pin_memory=self.settings.pin_memory)
         self.unlabeled_dataset = ToyDataset(dataset_size=settings.unlabeled_dataset_size,
                                             observation_count=observation_count, settings=settings, seed=100)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                   pin_memory=True)
+                                                   pin_memory=self.settings.pin_memory)
         self.validation_dataset = ToyDataset(settings.validation_dataset_size, observation_count, seed=101,
                                              settings=settings)
 

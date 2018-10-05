@@ -38,6 +38,7 @@ class Settings:
         self.should_save_models = True
         self.skip_completed_experiment = True
         self.number_of_data_workers = 4
+        self.pin_memory = False
 
         # Crowd application only.
         self.crowd_dataset = 'World Expo'

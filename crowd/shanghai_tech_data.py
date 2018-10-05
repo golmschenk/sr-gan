@@ -1,7 +1,6 @@
 """
 Code from preprocessing the UCSD dataset.
 """
-import glob
 import os
 import shutil
 import zipfile
@@ -131,8 +130,6 @@ class ShanghaiTechCheck:
 
         :param dataset_name: The name of the data set being checked.
         :type dataset_name: str
-        :param images: The images of the dataset.
-        :type images: np.ndarray
         :param labels: The labels of the dataset.
         :type labels: np.ndarray
         """
@@ -149,4 +146,4 @@ if __name__ == '__main__':
     preprocessor = ShanghaiTechPreprocessing()
     preprocessor.download_and_preprocess()
     # preprocessor.preprocess()
-    # ShanghaiTechCheck().display_statistics()
+    ShanghaiTechCheck().display_statistics()
