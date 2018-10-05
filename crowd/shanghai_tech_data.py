@@ -28,40 +28,8 @@ class ShanghaiTechDataset(Dataset):
     """
     def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
         seed_all(seed)
-        dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
-        try:
-            self.images = np.load(os.path.join(dataset_directory, 'images.npy'), mmap_mode='r')[:number_of_examples]
-            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'), mmap_mode='r')[:number_of_examples]
-        except ValueError:
-            self.images = np.load(os.path.join(dataset_directory, 'images.npy'))[:number_of_examples]
-            self.labels = np.load(os.path.join(dataset_directory, 'labels.npy'))
-        self.length = self.labels.shape[0]
-        self.transform = transform
-
-    def __getitem__(self, index):
-        """
-        :param index: The index within the entire dataset.
-        :type index: int
-        :return: An example and label from the crowd dataset.
-        :rtype: torch.Tensor, torch.Tensor
-        """
-        example = CrowdExample(image=self.images[index], label=self.labels[index])
-        if self.transform:
-            example = self.transform(example)
-        return example.image, example.label
-
-    def __len__(self):
-        return self.length
-
-
-class ShanghaiTechDatasetSingleFile(Dataset):
-    """
-    A class for the ShanghaiTech crowd dataset.
-    """
-    def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
-        seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
-        self.file_names = [name for name in os.listdir(os.path.join(database_directory, 'labels'))
+        self.file_names = [name[:-4] for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
         self.length = len(self.file_names)
         self.transform = transform
@@ -115,37 +83,6 @@ class ShanghaiTechPreprocessing:
 
     @staticmethod
     def preprocess():
-        """Preprocesses the database to the format needed by the network."""
-        for part in ['part_A', 'part_B']:
-            for dataset in ['test_data', 'train_data']:
-                image_list = []
-                label_list = []
-                ground_truth_directory = os.path.join(database_directory, part, dataset, 'ground-truth')
-                image_directory = os.path.join(database_directory, part, dataset, 'images')
-                for mat_filename in os.listdir(ground_truth_directory):
-                    image_filename = mat_filename[3:-3]
-                    mat_path = os.path.join(ground_truth_directory, mat_filename)
-                    image_path = os.path.join(image_directory, image_filename + 'jpg')
-                    image = imageio.imread(image_path)
-                    if len(image.shape) == 2:
-                        image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
-                    label_size = image.shape[:2]
-                    mat = scipy.io.loadmat(mat_path)
-                    head_positions = mat['image_info'][0, 0][0][0][0]
-                    label = generate_density_label(head_positions, label_size)
-                    image_list.append(image)
-                    label_list.append(label)
-                try:
-                    images = np.stack(image_list)
-                    labels = np.stack(label_list)
-                except ValueError:
-                    images = np.array(image_list)
-                    labels = np.array(label_list)
-                np.save(os.path.join(database_directory, part, dataset, 'images.npy'), images)
-                np.save(os.path.join(database_directory, part, dataset, 'labels.npy'), labels)
-
-    @staticmethod
-    def preprocess_individual_image_format():
         """Preprocesses the database to a format with each label and image being it's own file."""
         for part in ['part_A', 'part_B']:
             for dataset in ['test_data', 'train_data']:
@@ -212,4 +149,4 @@ if __name__ == '__main__':
     preprocessor = ShanghaiTechPreprocessing()
     preprocessor.download_and_preprocess()
     # preprocessor.preprocess()
-    ShanghaiTechCheck().display_statistics()
+    # ShanghaiTechCheck().display_statistics()
