@@ -111,18 +111,15 @@ class CrowdExperiment(Experiment):
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities = next(train_iterator)
         predicted_densities, _ = D(images)
-        real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                         predicted_densities)
+        real_comparison_image = self.create_crowd_images_comparison_grid(images, densities, predicted_densities)
         gan_summary_writer.add_image('Real', real_comparison_image)
         dnn_predicted_densities, _ = DNN(images)
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                             dnn_predicted_densities)
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities, dnn_predicted_densities)
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities = next(validation_iterator)
         predicted_densities, _ = D(images)
-        validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                               predicted_densities)
+        validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities, predicted_densities)
         gan_summary_writer.add_image('Validation', validation_comparison_image)
         dnn_predicted_densities, _ = DNN(images)
         dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
@@ -158,17 +155,17 @@ class CrowdExperiment(Experiment):
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
         count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
-        summary_writer.add_scalar('{}/ME'.format(summary_name), count_me, )
+        summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
-        summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae, )
+        summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
         density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
-        summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae, )
+        summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae)
         count_mse = (np.abs(predicted_counts - densities.sum(1).sum(1)) ** 2).mean()
         summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse, )
         density_mse = (np.abs(predicted_densities - densities) ** 2).sum(1).sum(1).mean()
-        summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse, )
+        summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse)
         if comparison_value is not None:
-            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value, )
+            summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
         return count_mae
 
     @staticmethod
@@ -238,6 +235,7 @@ class CrowdExperiment(Experiment):
         """Evaluates the model on test data during training."""
         test_dataset = ShanghaiTechDataset(dataset='test')
         indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
+        dnn_mae_count = None
         for network in [self.DNN, self.D]:
             totals = defaultdict(lambda: 0)
             for index in indexes:
@@ -253,13 +251,17 @@ class CrowdExperiment(Experiment):
             else:
                 summary_writer = self.gan_summary_writer
             mae_count = totals['Count error'] / len(indexes)
-            summary_writer.add_scalar('0 Test Error/MAE count', mae_count, global_step=step)
+            summary_writer.add_scalar('0 Test Error/MAE count', mae_count)
             mae_density = totals['Density sum error'] / len(indexes)
-            summary_writer.add_scalar('0 Test Error/MAE density', mae_density, global_step=step)
+            summary_writer.add_scalar('0 Test Error/MAE density', mae_density)
             rmse_count = (totals['SE count'] / len(indexes)) ** 0.5
-            summary_writer.add_scalar('0 Test Error/RMSE count', rmse_count, global_step=step)
+            summary_writer.add_scalar('0 Test Error/RMSE count', rmse_count)
             rmse_density = (totals['SE density'] / len(indexes)) ** 0.5
-            summary_writer.add_scalar('0 Test Error/RMSE density', rmse_density, global_step=step)
+            summary_writer.add_scalar('0 Test Error/RMSE density', rmse_density)
+            if network is self.DNN:
+                dnn_mae_count = mae_count
+            else:
+                summary_writer.add_scalar('0 Test Error/Ratio MAE GAN DNN', mae_count / dnn_mae_count)
 
     def evaluate(self, during_training=False, step=None, number_of_examples=None):
         """Evaluates the model on test data."""
