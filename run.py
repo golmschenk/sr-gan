@@ -34,7 +34,7 @@ elif application_name == 'crowd':
     Experiment = CrowdSganExperiment if method_name == 'sgan' else CrowdExperiment
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
-    settings_.batch_size = 100
+    settings_.batch_size = 300
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'ShanghaiTech'
@@ -47,14 +47,15 @@ settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 1000000
 settings_.learning_rate = [1e-4]
-settings_.gradient_penalty_multiplier = [100]
+settings_.gradient_penalty_multiplier = [10]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-settings_.load_model_path = 'logs/final gp crowd le40 ueNone ul1e0 fl1e0 gp1e1 mo0e0 lr1e-4 gs1 ls0 u2f0.5g2 bs100'
+# settings_.load_model_path = 'logs/base'
+settings_.number_of_data_workers = 6
+settings_.pin_memory = True
 settings_.local_setup()
-settings_.number_of_data_workers = 0
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:

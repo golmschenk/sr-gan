@@ -67,12 +67,13 @@ class CrowdExperiment(Experiment):
                                                                    data.NegativeOneToOneNormalizeImage(),
                                                                    data.NumpyArraysToTorchTensors()])
             self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                     number_of_examples=settings.labeled_dataset_size)
+                                                     number_of_examples=settings.labeled_dataset_size,
+                                                     fake_dataset_length=True)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                         part='part_B')
+                                                         part='part_B', fake_dataset_length=True)
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                        shuffle=True, pin_memory=self.settings.pin_memory,
                                                        num_workers=settings.number_of_data_workers)
@@ -136,7 +137,7 @@ class CrowdExperiment(Experiment):
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
-        self.test_summaries(step)
+        self.test_summaries()
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
@@ -231,7 +232,7 @@ class CrowdExperiment(Experiment):
         predicted_densities, predicted_counts = network(images)
         return predicted_densities, predicted_counts
 
-    def test_summaries(self, step):
+    def test_summaries(self):
         """Evaluates the model on test data during training."""
         test_dataset = ShanghaiTechDataset(dataset='test')
         indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)

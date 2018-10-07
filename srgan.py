@@ -356,25 +356,12 @@ class Experiment(ABC):
         self.load_models()
         self.eval_mode()
 
-    def infinite_iter(self, dataset):
+    @staticmethod
+    def infinite_iter(dataset):
         """Create an infinite generator from a dataset. Forces full batch sizes."""
-        images = None
-        labels = None
         while True:
             for examples in dataset:
-                if len(dataset) >= self.settings.batch_size:
-                    if examples[0] >= self.settings.batch_size:
-                        yield examples
-                else:
-                    if labels is None:
-                        images, labels = examples
-                    else:
-                        images = torch.cat([images, examples[0]], dim=0)
-                        labels = torch.cat([labels, examples[1]], dim=0)
-                    if labels.shape[0] >= self.settings.batch_size:
-                        yield images[:self.settings.batch_size], labels[:self.settings.batch_size]
-                        images = None
-                        labels = None
+                yield examples
 
 
 def unit_vector(vector):

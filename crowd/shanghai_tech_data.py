@@ -2,6 +2,7 @@
 Code from preprocessing the UCSD dataset.
 """
 import os
+import random
 import shutil
 import zipfile
 from urllib.request import urlretrieve
@@ -25,12 +26,16 @@ class ShanghaiTechDataset(Dataset):
     """
     A class for the ShanghaiTech crowd dataset.
     """
-    def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
+    def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None,
+                 fake_dataset_length=False):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
-        self.length = len(self.file_names)
+        if fake_dataset_length:
+            self.length = int(1e6)
+        else:
+            self.length = len(self.file_names)
         self.transform = transform
 
     def __getitem__(self, index):
@@ -40,7 +45,8 @@ class ShanghaiTechDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        file_name = self.file_names[index]
+        example_index = random.randrange(len(self.file_names))
+        file_name = self.file_names[example_index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
         example = CrowdExample(image=image, label=label)
