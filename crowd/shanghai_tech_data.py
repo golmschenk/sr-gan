@@ -28,7 +28,7 @@ class ShanghaiTechDataset(Dataset):
     def __init__(self, dataset='train', transform=None, seed=None, part='part_B', number_of_examples=None):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
-        self.file_names = [name[:-4] for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
+        self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
         self.length = len(self.file_names)
         self.transform = transform
@@ -41,8 +41,8 @@ class ShanghaiTechDataset(Dataset):
         :rtype: torch.Tensor, torch.Tensor
         """
         file_name = self.file_names[index]
-        image = imageio.imread(os.path.join(self.dataset_directory, 'images', file_name + '.jpg'))
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name + '.npy'))
+        image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
+        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
         example = CrowdExample(image=image, label=label)
         if self.transform:
             example = self.transform(example)
@@ -92,16 +92,17 @@ class ShanghaiTechPreprocessing:
                 for mat_filename in os.listdir(ground_truth_directory):
                     file_name = mat_filename[3:-3]
                     mat_path = os.path.join(ground_truth_directory, mat_filename)
-                    image_path = os.path.join(images_directory, file_name + 'jpg')
+                    original_image_path = os.path.join(images_directory, file_name + 'jpg')
+                    image_path = os.path.join(images_directory, file_name + 'npy')
                     label_path = os.path.join(labels_directory, file_name + 'npy')
-                    image = imageio.imread(image_path)
+                    image = imageio.imread(original_image_path)
                     if len(image.shape) == 2:
                         image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
-                        imageio.imwrite(image_path, image)
                     label_size = image.shape[:2]
                     mat = scipy.io.loadmat(mat_path)
                     head_positions = mat['image_info'][0, 0][0][0][0]
                     label = generate_density_label(head_positions, label_size)
+                    np.save(image_path, image)
                     np.save(label_path, label)
 
 
