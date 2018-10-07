@@ -236,6 +236,7 @@ class CrowdExperiment(Experiment):
         test_dataset = ShanghaiTechDataset(dataset='test')
         indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
         dnn_mae_count = None
+        dnn_rmse_count = None
         for network in [self.DNN, self.D]:
             totals = defaultdict(lambda: 0)
             for index in indexes:
@@ -260,8 +261,10 @@ class CrowdExperiment(Experiment):
             summary_writer.add_scalar('0 Test Error/RMSE density', rmse_density)
             if network is self.DNN:
                 dnn_mae_count = mae_count
+                dnn_rmse_count = rmse_count
             else:
                 summary_writer.add_scalar('0 Test Error/Ratio MAE GAN DNN', mae_count / dnn_mae_count)
+                summary_writer.add_scalar('0 Test Error/Ratio RMSE GAN DNN', rmse_count / dnn_rmse_count)
 
     def evaluate(self, during_training=False, step=None, number_of_examples=None):
         """Evaluates the model on test data."""
