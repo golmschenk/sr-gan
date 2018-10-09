@@ -65,6 +65,7 @@ class Experiment(ABC):
         self.dataset_setup()
         self.model_setup()
         self.load_models()
+        self.gpu_mode()
         self.train_mode()
 
         d_lr = self.settings.learning_rate
@@ -126,22 +127,32 @@ class Experiment(ABC):
 
     def train_mode(self):
         """
-        Converts the networks to train mode, including moving them to the GPU.
+        Converts the networks to train mode.
         """
         self.D.train()
         self.DNN.train()
         self.G.train()
+
+    def gpu_mode(self):
+        """
+        Moves the networks to the GPU (if available).
+        """
         self.D.to(gpu)
         self.DNN.to(gpu)
         self.G.to(gpu)
 
     def eval_mode(self):
         """
-        Changes the network to evaluation mode, including using the CPU.
+        Changes the network to evaluation mode.
         """
         self.D.eval()
         self.DNN.eval()
         self.G.eval()
+
+    def cpu_mode(self):
+        """
+        Moves the networks to the CPU.
+        """
         self.D.to('cpu')
         self.DNN.to('cpu')
         self.G.to('cpu')

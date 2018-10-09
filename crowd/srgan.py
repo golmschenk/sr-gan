@@ -18,7 +18,7 @@ from crowd import data
 from crowd.data import patch_size, ExtractPatchForPosition, CrowdExample
 from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
-from crowd.shanghai_tech_data import ShanghaiTechDataset
+from crowd.shanghai_tech_data import ShanghaiTechDataset, ImageSlidingWindowDataset
 from srgan import Experiment
 from utility import MixtureModel
 
@@ -141,10 +141,10 @@ class CrowdExperiment(Experiment):
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
         """Runs the evaluation and summaries for the data in the dataset."""
-        dataset_loader = DataLoader(dataset, batch_size=settings.batch_size)
+        dataset_loader = DataLoader(dataset, batch_size=settings.batch_size, shuffle=True)
         predicted_counts, densities, predicted_densities = np.array([]), np.array(
             []), np.array([])
-        for images, labels in dataset_loader:
+        for index, (images, labels) in enumerate(dataset_loader):
             batch_predicted_densities, batch_predicted_counts = self.images_to_predicted_labels(network, images)
             batch_predicted_densities = batch_predicted_densities.detach().numpy()
             batch_predicted_counts = batch_predicted_counts.detach().numpy()
@@ -155,6 +155,8 @@ class CrowdExperiment(Experiment):
             if densities.size == 0:
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
+            if index >= 3:
+                break
         count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
@@ -235,7 +237,10 @@ class CrowdExperiment(Experiment):
     def test_summaries(self):
         """Evaluates the model on test data during training."""
         test_dataset = ShanghaiTechDataset(dataset='test')
-        indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
+        if self.settings.test_summary_size is not None:
+            indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
+        else:
+            indexes = range(test_dataset.length)
         dnn_mae_count = None
         dnn_rmse_count = None
         for network in [self.DNN, self.D]:
@@ -315,13 +320,18 @@ class CrowdExperiment(Experiment):
         sum_density_label = np.zeros_like(full_example.label, dtype=np.float32)
         sum_count_label = np.zeros_like(full_example.label, dtype=np.float32)
         hit_predicted_label = np.zeros_like(full_example.label, dtype=np.int32)
-        for batch in self.batches_of_patches_with_position(full_example):
-            images = torch.stack([example_with_position.image for example_with_position in batch])
+        full_example_dataset = ImageSlidingWindowDataset(full_example)
+        full_example_dataloader = DataLoader(full_example_dataset, batch_size=self.settings.batch_size,
+                                             pin_memory=self.settings.pin_memory,
+                                             num_workers=self.settings.number_of_data_workers)
+        for batch in full_example_dataloader:
+            images = torch.stack([image for image in batch[0]])
             predicted_labels, predicted_counts = network(images)
-            for example_index, example_with_position in enumerate(batch):
+            for example_index, image in enumerate(batch[0]):
+                x = batch[2][example_index]
+                y = batch[3][example_index]
                 predicted_label = predicted_labels[example_index].detach().numpy()
                 predicted_count = predicted_counts[example_index].detach().numpy()
-                x, y = example_with_position.patch_center_x, example_with_position.patch_center_y
                 predicted_label_sum = np.sum(predicted_label)
                 predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
                 unnormalized_predicted_label_sum = np.sum(predicted_label)
