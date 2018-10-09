@@ -90,7 +90,7 @@ class Experiment(ABC):
             unlabeled_examples = unlabeled_examples.to(gpu)
             self.gan_training_step(labeled_examples, labels, unlabeled_examples, step)
 
-            if self.gan_summary_writer.is_summary_step():
+            if self.gan_summary_writer.is_summary_step() or step == self.settings.steps_to_run - 1:
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
                 step_time_start = datetime.datetime.now()
                 self.eval_mode()
