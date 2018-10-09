@@ -20,7 +20,7 @@ from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
 from crowd.shanghai_tech_data import ShanghaiTechDataset, ImageSlidingWindowDataset
 from srgan import Experiment
-from utility import MixtureModel
+from utility import MixtureModel, gpu
 
 
 class CrowdExperiment(Experiment):
@@ -111,29 +111,32 @@ class CrowdExperiment(Experiment):
         # Real images.
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities = next(train_iterator)
-        predicted_densities, _ = D(images)
-        real_comparison_image = self.create_crowd_images_comparison_grid(images, densities, predicted_densities)
+        predicted_densities, _ = D(images.to(gpu))
+        real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
+                                                                         predicted_densities.to('cpu'))
         gan_summary_writer.add_image('Real', real_comparison_image)
-        dnn_predicted_densities, _ = DNN(images)
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities, dnn_predicted_densities)
+        dnn_predicted_densities, _ = DNN(images.to(gpu))
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
+                                                                             dnn_predicted_densities.to('cpu'))
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities = next(validation_iterator)
-        predicted_densities, _ = D(images)
-        validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities, predicted_densities)
+        predicted_densities, _ = D(images.to(gpu))
+        validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
+                                                                               predicted_densities.to('cpu'))
         gan_summary_writer.add_image('Validation', validation_comparison_image)
-        dnn_predicted_densities, _ = DNN(images)
+        dnn_predicted_densities, _ = DNN(images.to(gpu))
         dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                                   dnn_predicted_densities)
+                                                                                   dnn_predicted_densities.to('cpu'))
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
-        fake_examples = G(z)
+        fake_examples = G(z.to(gpu)).to('cpu')
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
-        fake_examples = G(z)
+        fake_examples = G(z.to(gpu)).to('cpu')
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
@@ -145,9 +148,10 @@ class CrowdExperiment(Experiment):
         predicted_counts, densities, predicted_densities = np.array([]), np.array(
             []), np.array([])
         for index, (images, labels) in enumerate(dataset_loader):
+            images, labels = images.to(gpu), labels.to(gpu)
             batch_predicted_densities, batch_predicted_counts = self.images_to_predicted_labels(network, images)
-            batch_predicted_densities = batch_predicted_densities.detach().numpy()
-            batch_predicted_counts = batch_predicted_counts.detach().numpy()
+            batch_predicted_densities = batch_predicted_densities.detach().to('cpu').numpy()
+            batch_predicted_counts = batch_predicted_counts.detach().to('cpu').numpy()
             predicted_counts = np.concatenate([predicted_counts, batch_predicted_counts])
             if predicted_densities.size == 0:
                 predicted_densities = predicted_densities.reshape([0, *batch_predicted_densities.shape[1:]])
@@ -164,7 +168,7 @@ class CrowdExperiment(Experiment):
         density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
         summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae)
         count_mse = (np.abs(predicted_counts - densities.sum(1).sum(1)) ** 2).mean()
-        summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse, )
+        summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse)
         density_mse = (np.abs(predicted_densities - densities) ** 2).sum(1).sum(1).mean()
         summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse)
         if comparison_value is not None:
@@ -326,7 +330,8 @@ class CrowdExperiment(Experiment):
                                              num_workers=self.settings.number_of_data_workers)
         for batch in full_example_dataloader:
             images = torch.stack([image for image in batch[0]])
-            predicted_labels, predicted_counts = network(images)
+            predicted_labels, predicted_counts = network(images.to(gpu))
+            predicted_labels, predicted_counts = predicted_labels.to('cpu'), predicted_counts.to('cpu')
             for example_index, image in enumerate(batch[0]):
                 x = batch[2][example_index]
                 y = batch[3][example_index]
