@@ -66,7 +66,7 @@ class ImageSlidingWindowDataset(Dataset):
     Creates a database for a sliding window extraction of 1 full example (i.e. each of the patches of the full example).
     """
     def __init__(self, full_example, window_step_size=32):
-        self.full_example = full_example
+        self.full_example = CrowdExample(image=full_example.image)  # We don't need the label in this case.
         height, width = full_example.label.shape
         self.window_step_size = window_step_size
         vertical_steps = floor(height / self.window_step_size)

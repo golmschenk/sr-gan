@@ -378,8 +378,11 @@ class ExtractPatch:
         image_patch = example.image[y - half_patch_size:y + half_patch_size,
                                     x - half_patch_size:x + half_patch_size,
                                     :]
-        label_patch = example.label[y - half_patch_size:y + half_patch_size,
-                                    x - half_patch_size:x + half_patch_size]
+        if example.label is not None:
+            label_patch = example.label[y - half_patch_size:y + half_patch_size,
+                                        x - half_patch_size:x + half_patch_size]
+        else:
+            label_patch = None
         if example.perspective is not None:
             perspective_patch = example.perspective[y - half_patch_size:y + half_patch_size,
                                                     x - half_patch_size:x + half_patch_size]
