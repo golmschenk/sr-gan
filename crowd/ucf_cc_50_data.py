@@ -32,7 +32,8 @@ class UcfCc50Dataset(Dataset):
         self.dataset_directory = database_directory
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
-        if fake_dataset_length:
+        self.fake_dataset_length = fake_dataset_length
+        if self.fake_dataset_length:
             self.length = int(1e6)
         else:
             self.length = len(self.file_names)
@@ -45,8 +46,11 @@ class UcfCc50Dataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        example_index = random.randrange(len(self.file_names))
-        file_name = self.file_names[example_index]
+        if self.fake_dataset_length:
+            random_index = random.randrange(len(self.file_names))
+            file_name = self.file_names[random_index]
+        else:
+            file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
         example = CrowdExample(image=image, label=label)
@@ -121,29 +125,19 @@ class UcfCc50Check:
         print('=' * 50)
         print('UCF CC 50')
         dataset = UcfCc50Dataset()
-        labels = [label for (image, label) in dataset]
-        self.print_statistics(labels)
-
-    @staticmethod
-    def print_statistics(labels):
-        """
-        Prints the statistics for the given images and labels.
-
-        :param dataset_name_: The name of the data set being checked.
-        :type dataset_name_: str
-        :param labels: The labels of the dataset.
-        :type labels: list[np.ndarray]
-        """
-        print('-' * 50)
-        print('Person count: {}'.format(np.array([label.sum() for label in labels]).sum()))
-        print('Average count: {}'.format(np.array([label.sum(axis=(1, 2)) for label in labels]).mean(axis=0)))
-        print('Median count: {}'.format(np.median(np.array([label.sum(axis=(1, 2)) for label in labels]), axis=0)))
-        print('Max single image count: {}'.format(np.array([label.sum(axis=(1, 2)) for label in labels]).max(axis=0)))
-        print('Min single image count: {}'.format(np.array([label.sum(axis=(1, 2)) for label in labels]).min(axis=0)))
+        label_sums = []
+        for image, label in dataset:
+            label_sums.append(label.sum())
+        label_sums = np.array(label_sums)
+        print('Person count: {}'.format(label_sums.sum()))
+        print('Average count: {}'.format(label_sums.mean(axis=0)))
+        print('Median count: {}'.format(np.median(label_sums, axis=0)))
+        print('Max single image count: {}'.format(label_sums.max(axis=0)))
+        print('Min single image count: {}'.format(label_sums.min(axis=0)))
 
 
 if __name__ == '__main__':
-    preprocessor = UcfCc50Preprocessing()
-    preprocessor.download_and_preprocess()
+    # preprocessor = UcfCc50Preprocessing()
+    # preprocessor.download_and_preprocess()
     # preprocessor.preprocess()
     UcfCc50Check().display_statistics()
