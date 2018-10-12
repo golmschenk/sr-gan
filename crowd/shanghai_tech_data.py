@@ -35,7 +35,8 @@ class ShanghaiTechDataset(Dataset):
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
-        if fake_dataset_length:
+        self.fake_dataset_length = fake_dataset_length
+        if self.fake_dataset_length:
             self.length = int(1e6)
         else:
             self.length = len(self.file_names)
@@ -48,8 +49,11 @@ class ShanghaiTechDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        example_index = random.randrange(len(self.file_names))
-        file_name = self.file_names[example_index]
+        if self.fake_dataset_length:
+            random_index = random.randrange(len(self.file_names))
+            file_name = self.file_names[random_index]
+        else:
+            file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
         example = CrowdExample(image=image, label=label)
