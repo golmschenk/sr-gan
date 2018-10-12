@@ -110,8 +110,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
                          ] += body_gaussian[y_start_offset:body_gaussian.shape[0] - y_end_offset,
                                             x_start_offset:body_gaussian.shape[1] - x_end_offset]
         if person_label.sum() <= 0:
-            raise ValueError('Person label should not be less than zero (though it\'s possible if the person was '
-                             'labeled outside the image).')
+            print('A person label was <= zero (likely a person was labeled outside the image range).')
         label += person_label
     if force_full_image_count_normalize:
         label = head_count * (label / label.sum())
