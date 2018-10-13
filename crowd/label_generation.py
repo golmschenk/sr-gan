@@ -11,6 +11,7 @@ body_height_standard_deviation_meters = 0.5
 body_height_offset_meters = 0.875
 
 dataset_head_count = 0
+problematic_head_labels = 0
 
 
 def generate_density_label(head_positions, label_size, perspective=None, include_body=True, ignore_tiny=False,
@@ -36,6 +37,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     :rtype: np.ndarray
     """
     global dataset_head_count
+    global problematic_head_labels
     head_count = 0
     body_parts = 2 if include_body else 1
     number_of_neighbors = min(11, len(head_positions))
@@ -80,6 +82,12 @@ def generate_density_label(head_positions, label_size, perspective=None, include
         x_end_offset = 0
         if x + off_center_size >= person_label.shape[1]:
             x_end_offset = (x + off_center_size + 1) - person_label.shape[1]
+        y_out_of_bounds = head_gaussian.shape[0] <= max(y_start_offset, y_end_offset)
+        x_out_of_bounds = head_gaussian.shape[1] <= max(x_start_offset, x_end_offset)
+        if y_out_of_bounds or x_out_of_bounds:
+            print('Offset out of head gaussian bounds. Skipping person.')
+            problematic_head_labels += 1
+            continue
         person_label[y - off_center_size + y_start_offset:y + off_center_size + 1 - y_end_offset,
                      x - off_center_size + x_start_offset:x + off_center_size + 1 - x_end_offset
                      ] += head_gaussian[y_start_offset:head_gaussian.shape[0] - y_end_offset,
@@ -111,6 +119,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
                                             x_start_offset:body_gaussian.shape[1] - x_end_offset]
         if person_label.sum() <= 0:
             print('A person label was <= zero (likely a person was labeled outside the image range).')
+            problematic_head_labels += 1
         label += person_label
     if force_full_image_count_normalize:
         label = head_count * (label / label.sum())
