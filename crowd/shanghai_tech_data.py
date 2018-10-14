@@ -5,17 +5,14 @@ import os
 import random
 import shutil
 import zipfile
-from math import floor
 from urllib.request import urlretrieve
 
 import imageio
 import numpy as np
 import scipy.io
-import torchvision
 from torch.utils.data import Dataset
 
-from crowd import data
-from crowd.data import CrowdExample, ExtractPatchForPosition
+from crowd.data import CrowdExample
 from crowd.label_generation import generate_density_label
 from utility import seed_all
 
@@ -60,40 +57,6 @@ class ShanghaiTechDataset(Dataset):
         if self.transform:
             example = self.transform(example)
         return example.image, example.label
-
-    def __len__(self):
-        return self.length
-
-
-class ImageSlidingWindowDataset(Dataset):
-    """
-    Creates a database for a sliding window extraction of 1 full example (i.e. each of the patches of the full example).
-    """
-    def __init__(self, full_example, window_step_size=32):
-        self.full_example = CrowdExample(image=full_example.image)  # We don't need the label in this case.
-        height, width = full_example.label.shape
-        self.window_step_size = window_step_size
-        vertical_steps = floor(height / self.window_step_size)
-        horizontal_steps = floor(width / self.window_step_size)
-        self.step_shape = np.array([vertical_steps, horizontal_steps])
-        self.length = self.step_shape.prod()
-
-    def __getitem__(self, index):
-        """
-        :param index: The index within the entire dataset (the specific patch of the image).
-        :type index: int
-        :return: An example and label from the crowd dataset.
-        :rtype: torch.Tensor, torch.Tensor
-        """
-        extract_patch_transform = ExtractPatchForPosition()
-        test_transform = torchvision.transforms.Compose([data.NegativeOneToOneNormalizeImage(),
-                                                         data.NumpyArraysToTorchTensors()])
-        vertical_step, horizontal_step = np.unravel_index(index, self.step_shape)
-        y = vertical_step * self.window_step_size
-        x = horizontal_step * self.window_step_size
-        patch = extract_patch_transform(self.full_example, y, x)
-        example = test_transform(patch)
-        return example.image, example.label, x, y
 
     def __len__(self):
         return self.length

@@ -2,12 +2,12 @@
 Code for the crowd data dataset.
 """
 import random
+from math import floor
 import scipy.misc
-
 import torch
 import numpy as np
-
-patch_size = 128
+import torchvision
+from torch.utils.data import Dataset
 
 
 class CrowdExample:
@@ -16,8 +16,8 @@ class CrowdExample:
     label: np.ndarray or torch.Tensor or None
     roi: np.ndarray or torch.Tensor or None
     perspective: np.ndarray or torch.Tensor or None
-    patch_center_y: int
-    patch_center_x: int
+    patch_center_y: int or None
+    patch_center_x: int or None
 
     def __init__(self, image, label=None, roi=None, perspective=None, patch_center_y=None, patch_center_x=None):
         self.image = image
@@ -42,7 +42,8 @@ class NumpyArraysToTorchTensors:
         """
         example.image = example.image.transpose((2, 0, 1))
         example.image = torch.tensor(example.image)
-        example.label = torch.tensor(example.label)
+        if example.label is not None:
+            example.label = torch.tensor(example.label)
         if example.roi is not None:
             example.roi = torch.tensor(example.roi.astype(np.float32))
         if example.perspective is not None:
@@ -117,9 +118,10 @@ class PatchAndRescale:
     """
     Select a patch based on a position and rescale it based on the perspective map.
     """
-    def __init__(self):
-        self.image_scaled_size = [patch_size, patch_size]
-        self.label_scaled_size = [int(patch_size / 4), int(patch_size / 4)]
+    def __init__(self, patch_size=128):
+        self.patch_size = patch_size
+        self.image_scaled_size = [self.patch_size, self.patch_size]
+        self.label_scaled_size = [int(self.patch_size / 4), int(self.patch_size / 4)]
 
     def get_patch_for_position(self, example, y, x):
         """
@@ -266,8 +268,7 @@ class RandomlySelectPatchAndRescale(PatchAndRescale):
 
 class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
     """A transformation to randomly select a patch."""
-    @staticmethod
-    def get_patch_size_for_position(example, y, x):
+    def get_patch_size_for_position(self, example, y, x):
         """
         Always returns the patch size (overriding the super class)
 
@@ -280,7 +281,7 @@ class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
         :return: The size of the patch to be extracted.
         :rtype: int
         """
-        return patch_size
+        return self.patch_size
 
     def resize_patch(self, patch):
         """
@@ -310,8 +311,7 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
         example = self.resize_patch(patch)
         return example, original_patch_size
 
-    @staticmethod
-    def get_patch_size_for_position(example, y, x):
+    def get_patch_size_for_position(self, example, y, x):
         """
         Always returns the patch size (overriding the super class)
 
@@ -324,7 +324,7 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
         :return: The size of the patch to be extracted.
         :rtype: int
         """
-        return patch_size
+        return self.patch_size
 
     def resize_patch(self, patch):
         """
@@ -347,9 +347,10 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
 
 class ExtractPatch:
     """A transform to extract a patch from an example."""
-    def __init__(self):
-        self.image_patch_size = patch_size
-        self.label_scaled_size = [int(patch_size / 4), int(patch_size / 4)]
+    def __init__(self, patch_size=128):
+        self.patch_size = patch_size
+        self.image_patch_size = self.patch_size
+        self.label_scaled_size = [int(self.patch_size / 4), int(self.patch_size / 4)]
 
     def get_patch_for_position(self, example, y, x):
         """
@@ -368,13 +369,13 @@ class ExtractPatch:
         if y - half_patch_size < 0:
             example = self.pad_example(example, y_padding=(half_patch_size - y, 0))
             y += half_patch_size - y
-        if y + half_patch_size > example.label.shape[0]:
-            example = self.pad_example(example, y_padding=(0, y + half_patch_size - example.label.shape[0]))
+        if y + half_patch_size > example.image.shape[0]:
+            example = self.pad_example(example, y_padding=(0, y + half_patch_size - example.image.shape[0]))
         if x - half_patch_size < 0:
             example = self.pad_example(example, x_padding=(half_patch_size - x, 0))
             x += half_patch_size - x
-        if x + half_patch_size > example.label.shape[1]:
-            example = self.pad_example(example, x_padding=(0, x + half_patch_size - example.label.shape[1]))
+        if x + half_patch_size > example.image.shape[1]:
+            example = self.pad_example(example, x_padding=(0, x + half_patch_size - example.image.shape[1]))
         image_patch = example.image[y - half_patch_size:y + half_patch_size,
                                     x - half_patch_size:x + half_patch_size,
                                     :]
@@ -406,7 +407,10 @@ class ExtractPatch:
         """
         z_padding = (0, 0)
         image = np.pad(example.image, (y_padding, x_padding, z_padding), 'constant')
-        label = np.pad(example.label, (y_padding, x_padding), 'constant')
+        if example.label is not None:
+            label = np.pad(example.label, (y_padding, x_padding), 'constant')
+        else:
+            label = None
         if example.perspective is not None:
             perspective = np.pad(example.perspective, (y_padding, x_padding), 'edge')
         else:
@@ -422,11 +426,14 @@ class ExtractPatch:
         :return: The patch with the resized label.
         :rtype: CrowdExample
         """
-        original_label_sum = np.sum(patch.label)
-        label = scipy.misc.imresize(patch.label, self.label_scaled_size, mode='F')
-        unnormalized_label_sum = np.sum(label)
-        if unnormalized_label_sum != 0:
-            label = (label / unnormalized_label_sum) * original_label_sum
+        if patch.label is not None:
+            original_label_sum = np.sum(patch.label)
+            label = scipy.misc.imresize(patch.label, self.label_scaled_size, mode='F')
+            unnormalized_label_sum = np.sum(label)
+            if unnormalized_label_sum != 0:
+                label = (label / unnormalized_label_sum) * original_label_sum
+        else:
+            label = None
         if patch.perspective is not None:
             perspective = scipy.misc.imresize(patch.perspective, self.label_scaled_size, mode='F')
         else:
@@ -463,3 +470,38 @@ class ExtractPatchForRandomPosition(ExtractPatch):
         y = np.random.randint(example.label.shape[0])
         x = np.random.randint(example.label.shape[1])
         return y, x
+
+
+class ImageSlidingWindowDataset(Dataset):
+    """
+    Creates a database for a sliding window extraction of 1 full example (i.e. each of the patches of the full example).
+    """
+    def __init__(self, full_example, image_patch_size=128, window_step_size=32):
+        self.full_example = CrowdExample(image=full_example.image)  # We don't need the label in this case.
+        height, width = full_example.label.shape
+        self.window_step_size = window_step_size
+        self.image_patch_size = image_patch_size
+        vertical_steps = floor(height / self.window_step_size)
+        horizontal_steps = floor(width / self.window_step_size)
+        self.step_shape = np.array([vertical_steps, horizontal_steps])
+        self.length = self.step_shape.prod()
+
+    def __getitem__(self, index):
+        """
+        :param index: The index within the entire dataset (the specific patch of the image).
+        :type index: int
+        :return: An example and label from the crowd dataset.
+        :rtype: torch.Tensor, torch.Tensor
+        """
+        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size)
+        test_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
+                                                         NumpyArraysToTorchTensors()])
+        vertical_step, horizontal_step = np.unravel_index(index, self.step_shape)
+        y = vertical_step * self.window_step_size
+        x = horizontal_step * self.window_step_size
+        patch = extract_patch_transform(self.full_example, y, x)
+        example = test_transform(patch)
+        return example.image, x, y
+
+    def __len__(self):
+        return self.length

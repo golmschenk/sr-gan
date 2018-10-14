@@ -4,8 +4,8 @@ Code for the model structures.
 import torch
 from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout
 from torch.nn.functional import leaky_relu, tanh, max_pool2d
+from torchvision.models import densenet201
 
-from crowd.data import patch_size
 from utility import seed_all
 
 
@@ -45,6 +45,7 @@ class JointCNN(Module):
         :return: The predicted density labels.
         :rtype: torch.autograd.Variable
         """
+        patch_size = x.shape[2]
         x = leaky_relu(self.conv1(x))
         x = self.max_pool1(x)
         x = leaky_relu(self.conv2(x))
@@ -150,7 +151,7 @@ class JointDCDiscriminator(Module):
         self.layer3 = convolution(conv_dim * 2, conv_dim * 4, 4)
         self.layer4 = convolution(conv_dim * 4, conv_dim * 8, 4)
         self.count_layer5 = convolution(conv_dim * 8, self.number_of_outputs, int(image_size / 16), 1, 0, False)
-        self.density_layer5 = convolution(conv_dim * 8, int(patch_size / 4) ** 2, int(image_size / 16), 1, 0,
+        self.density_layer5 = convolution(conv_dim * 8, int(image_size / 4) ** 2, int(image_size / 16), 1, 0,
                                           False)
         self.features = None
 
@@ -166,7 +167,7 @@ class JointDCDiscriminator(Module):
             count = count.view(-1)
         else:
             count = count.view(-1, self.number_of_outputs)
-        density = self.density_layer5(out).view(-1, int(patch_size / 4), int(patch_size / 4))
+        density = self.density_layer5(out).view(-1, int(x.shape[2] / 4), int(x.shape[2] / 4))
         return density, count
 
 
@@ -322,3 +323,18 @@ class FullSpatialPyramidPoolingDiscriminator(Module):
         count = f5_count + f7_count
         count = count.view(-1)
         return density, count
+
+
+class DenseNetDiscriminator(Module):
+    """The DenseNet as a discriminator."""
+    def __init__(self):
+        seed_all(0)
+        super().__init__()
+        self.dense_net_module = densenet201(pretrained=True, num_classes=1)
+
+    def forward(self, x):
+        """The forward pass of the network."""
+        batch_size = x.shape[0]
+        out = self.dense_net_module(x)
+        out = out.view(-1)
+        return torch.zeros([batch_size, 56, 56]), out

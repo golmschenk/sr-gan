@@ -45,6 +45,8 @@ class Settings:
         self.number_of_cameras = 5  # World Expo data only
         self.number_of_images_per_camera = 5  # World Expo data only
         self.test_summary_size = None
+        self.test_sliding_window_size = 128
+        self.image_patch_size = 224
 
         # SGAN models only.
         self.number_of_bins = 10

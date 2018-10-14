@@ -7,6 +7,7 @@ from age.sgan import AgeSganExperiment
 from age.srgan import AgeExperiment
 from coefficient.sgan import CoefficientSganExperiment
 from coefficient.srgan import CoefficientExperiment
+from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
@@ -17,27 +18,27 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
 application_name = 'crowd'
-method_name = 'srgan'
+method_name = 'dnn'
 
 settings_ = Settings()
 if application_name == 'age':
-    Experiment = AgeSganExperiment if method_name == 'sgan' else AgeExperiment
+    Experiment = {'srgan': AgeExperiment, 'sgan': AgeSganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 100
 elif application_name == 'coef':
-    Experiment = CoefficientSganExperiment if method_name == 'sgan' else CoefficientExperiment
+    Experiment = {'srgan': CoefficientExperiment, 'sgan': CoefficientSganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e-2]
     settings_.fake_loss_multiplier = [1e-2]
     settings_.batch_size = 1000
 elif application_name == 'crowd':
-    Experiment = CrowdSganExperiment if method_name == 'sgan' else CrowdExperiment
+    Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e-1, 1e0, 1e1]
     settings_.fake_loss_multiplier = [1e-1, 1e0, 1e1]
     settings_.batch_size = 300
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
-    settings_.crowd_dataset = 'ShanghaiTech'
+    settings_.crowd_dataset = 'UCF QNRF'
     settings_.labeled_loss_order = 2
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
@@ -45,10 +46,10 @@ settings_.unlabeled_dataset_size = None
 settings_.labeled_dataset_size = [40]
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = [0]
-settings_.steps_to_run = 30000
+settings_.steps_to_run = 100000
 settings_.learning_rate = [1e-4]
-settings_.gradient_penalty_multiplier = [0.1, 1, 10]
-settings_.mean_offset = [0, 1]
+settings_.gradient_penalty_multiplier = [0.1]
+settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2

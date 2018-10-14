@@ -26,6 +26,7 @@ class Experiment(ABC):
         self.trial_directory: str = None
         self.dnn_summary_writer: SummaryWriter = None
         self.gan_summary_writer: SummaryWriter = None
+        self.dataset_class = None
         self.train_dataset: Dataset = None
         self.train_dataset_loader: DataLoader = None
         self.unlabeled_dataset: Dataset = None
@@ -56,10 +57,7 @@ class Experiment(ABC):
         self.trial_directory = make_directory_name_unique(self.trial_directory)
         print(self.trial_directory)
         os.makedirs(os.path.join(self.trial_directory, self.settings.temporary_directory))
-        self.dnn_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'DNN'))
-        self.gan_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'GAN'))
-        self.dnn_summary_writer.summary_period = self.settings.summary_step_period
-        self.gan_summary_writer.summary_period = self.settings.summary_step_period
+        self.prepare_summary_writers()
         seed_all(0)
 
         self.dataset_setup()
@@ -67,19 +65,29 @@ class Experiment(ABC):
         self.load_models()
         self.gpu_mode()
         self.train_mode()
+        self.prepare_optimizers()
 
-        d_lr = self.settings.learning_rate
-        g_lr = d_lr
-        # betas = (0.9, 0.999)
-        weight_decay = 1e-2
-        self.d_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
-        self.g_optimizer = Adam(self.G.parameters(), lr=g_lr)
-        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.training_loop()
 
-        step_time_start = datetime.datetime.now()
+        print('Completed {}'.format(self.trial_directory))
+        if self.settings.should_save_models:
+            self.save_models()
+
+    def save_models(self, step=None):
+        """Saves the network models."""
+        if step is not None:
+            suffix = '_{}'.format(step)
+        else:
+            suffix = ''
+        torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model{}.pth'.format(suffix)))
+        torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model{}.pth'.format(suffix)))
+        torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model{}.pth'.format(suffix)))
+
+    def training_loop(self):
+        """Runs the main training loop."""
         train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
         unlabeled_dataset_generator = self.infinite_iter(self.unlabeled_dataset_loader)
-
+        step_time_start = datetime.datetime.now()
         for step in range(self.settings.steps_to_run):
             # DNN.
             labeled_examples, labels = next(train_dataset_generator)
@@ -98,11 +106,22 @@ class Experiment(ABC):
                 self.train_mode()
                 self.handle_user_input(step)
 
-        print('Completed {}'.format(self.trial_directory))
-        if self.settings.should_save_models:
-            torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model.pth'))
-            torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model.pth'))
-            torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model.pth'))
+    def prepare_optimizers(self):
+        """Prepares the optimizers of the network."""
+        d_lr = self.settings.learning_rate
+        g_lr = d_lr
+        # betas = (0.9, 0.999)
+        weight_decay = 1e-2
+        self.d_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.g_optimizer = Adam(self.G.parameters(), lr=g_lr)
+        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+
+    def prepare_summary_writers(self):
+        """Prepares the summary writers for TensorBoard."""
+        self.dnn_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'DNN'))
+        self.gan_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'GAN'))
+        self.dnn_summary_writer.summary_period = self.settings.summary_step_period
+        self.gan_summary_writer.summary_period = self.settings.summary_step_period
 
     def handle_user_input(self, step):
         """
@@ -114,12 +133,7 @@ class Experiment(ABC):
         while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
             line = sys.stdin.readline()
             if 'save' in line:
-                torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory,
-                                                               'DNN_model_{}.pth'.format(step)))
-                torch.save(self.D.state_dict(), os.path.join(self.trial_directory,
-                                                             'D_model_{}.pth'.format(step)))
-                torch.save(self.G.state_dict(), os.path.join(self.trial_directory,
-                                                             'G_model_{}.pth'.format(step)))
+                self.save_models(step)
                 print('\rSaved model for step {}...'.format(step))
             if 'quit' in line:
                 self.signal_quit = True
@@ -226,10 +240,9 @@ class Experiment(ABC):
         self.dnn_optimizer.step()
         # Summaries.
         if self.dnn_summary_writer.is_summary_step():
-            self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item(), )
-            if self.DNN.features is not None:
-                self.dnn_summary_writer.add_scalar('Feature Norm/Labeled',
-                                                   self.DNN.features.norm(dim=1).mean().item(), )
+            self.dnn_summary_writer.add_scalar('Discriminator/Labeled Loss', dnn_loss.item())
+            if hasattr(self.DNN, 'features') and self.DNN.features is not None:
+                self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', self.DNN.features.norm(dim=1).mean().item())
 
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""

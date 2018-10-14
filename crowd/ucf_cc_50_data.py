@@ -118,7 +118,8 @@ class UcfCc50Preprocessing:
 
 class UcfCc50Check:
     """A class for listing statistics about the UCF CC 50 dataset."""
-    def display_statistics(self):
+    @staticmethod
+    def display_statistics():
         """
         Displays the statistics of the database.
         """

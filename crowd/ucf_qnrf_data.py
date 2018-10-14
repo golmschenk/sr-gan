@@ -79,7 +79,7 @@ class UcfQnrfPreprocessing:
             shutil.rmtree(database_directory)
         os.makedirs(database_directory)
         urlretrieve('http://crcv.ucf.edu/data/ucf-qnrf/UCF-QNRF_ECCV18.zip',
-                   os.path.join(database_directory, 'temporary'))
+                    os.path.join(database_directory, 'temporary'))
         patoolib.extract_archive(os.path.join(database_directory, 'temporary'), outdir=database_directory)
         default_directory_name = 'UCF-QNRF_ECCV18'
         files = os.listdir(os.path.join(database_directory, default_directory_name))
@@ -139,17 +139,17 @@ class UcfQnrfCheck:
         self.print_statistics(train_label_sums + test_label_sums, 'total')
 
     @staticmethod
-    def print_statistics(label_sums, dataset_name):
+    def print_statistics(label_sums, dataset_name_):
         """
         Prints the statistics for the given images and labels.
 
         :param dataset_name_: The name of the data set being checked.
         :type dataset_name_: str
-        :param labels: The labels of the dataset.
-        :type labels: list[np.ndarray]
+        :param label_sums: The sums of the labels of the dataset.
+        :type label_sums: list[float]
         """
         print('-' * 50)
-        print(dataset_name)
+        print(dataset_name_)
         label_sums = np.array(label_sums)
         print('Person count: {}'.format(label_sums.sum()))
         print('Average count: {}'.format(label_sums.mean(axis=0)))
@@ -160,6 +160,6 @@ class UcfQnrfCheck:
 
 if __name__ == '__main__':
     preprocessor = UcfQnrfPreprocessing()
-    # preprocessor.download_and_preprocess()
+    # preprocessor.download()
     preprocessor.preprocess()
     UcfQnrfCheck().display_statistics()

@@ -15,10 +15,10 @@ import torchvision
 from torch.utils.data import DataLoader
 
 from crowd import data
-from crowd.data import patch_size, ExtractPatchForPosition, CrowdExample
+from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset
 from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
-from crowd.shanghai_tech_data import ShanghaiTechDataset, ImageSlidingWindowDataset
+from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
 from utility import MixtureModel, gpu
 
@@ -59,6 +59,7 @@ class CrowdExperiment(Experiment):
             self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
                                                        transform=validation_transform, seed=101)
         elif settings.crowd_dataset == 'ShanghaiTech':
+            self.dataset_class = ShanghaiTechDataset
             train_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
                                                               data.RandomHorizontalFlip(),
                                                               data.NegativeOneToOneNormalizeImage(),
@@ -175,8 +176,7 @@ class CrowdExperiment(Experiment):
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
         return count_mae
 
-    @staticmethod
-    def convert_density_maps_to_heatmaps(label, predicted_label):
+    def convert_density_maps_to_heatmaps(self, label, predicted_label):
         """
         Converts a label and predicted label density map into their respective heatmap images.
 
@@ -192,6 +192,7 @@ class CrowdExperiment(Experiment):
         predicted_label_array = predicted_label.numpy()
         mappable.set_clim(vmin=min(label_array.min(), predicted_label_array.min()),
                           vmax=max(label_array.max(), predicted_label_array.max()))
+        patch_size = self.settings.image_patch_size
         resized_label_array = scipy.misc.imresize(label_array, (patch_size, patch_size), mode='F')
         label_heatmap_array = mappable.to_rgba(resized_label_array).astype(np.float32)
         label_heatmap_tensor = torch.from_numpy(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
@@ -240,7 +241,7 @@ class CrowdExperiment(Experiment):
 
     def test_summaries(self):
         """Evaluates the model on test data during training."""
-        test_dataset = ShanghaiTechDataset(dataset='test')
+        test_dataset = self.dataset_class(dataset='test')
         if self.settings.test_summary_size is not None:
             indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
         else:
@@ -282,7 +283,7 @@ class CrowdExperiment(Experiment):
         settings = self.settings
         for network in [self.DNN, self.D]:
             if settings.crowd_dataset == 'ShanghaiTech':
-                test_dataset = ShanghaiTechDataset(dataset='test')
+                test_dataset = self.dataset_class(dataset='test')
             else:
                 raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
             totals = defaultdict(lambda: 0)
@@ -324,17 +325,19 @@ class CrowdExperiment(Experiment):
         sum_density_label = np.zeros_like(full_example.label, dtype=np.float32)
         sum_count_label = np.zeros_like(full_example.label, dtype=np.float32)
         hit_predicted_label = np.zeros_like(full_example.label, dtype=np.int32)
-        full_example_dataset = ImageSlidingWindowDataset(full_example)
+        full_example_dataset = ImageSlidingWindowDataset(full_example, self.settings.image_patch_size,
+                                                         self.settings.test_sliding_window_size)
         full_example_dataloader = DataLoader(full_example_dataset, batch_size=self.settings.batch_size,
                                              pin_memory=self.settings.pin_memory,
                                              num_workers=self.settings.number_of_data_workers)
+        patch_size = self.settings.image_patch_size
         for batch in full_example_dataloader:
             images = torch.stack([image for image in batch[0]])
             predicted_labels, predicted_counts = network(images.to(gpu))
             predicted_labels, predicted_counts = predicted_labels.to('cpu'), predicted_counts.to('cpu')
             for example_index, image in enumerate(batch[0]):
-                x = batch[2][example_index]
-                y = batch[3][example_index]
+                x = batch[1][example_index]
+                y = batch[2][example_index]
                 predicted_label = predicted_labels[example_index].detach().numpy()
                 predicted_count = predicted_counts[example_index].detach().numpy()
                 predicted_label_sum = np.sum(predicted_label)
