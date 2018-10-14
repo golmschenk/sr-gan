@@ -1,12 +1,18 @@
 """
 Code for the model structures.
 """
+import re
+from collections import OrderedDict
+
 import torch
+from torch import nn
 from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout
 from torch.nn.functional import leaky_relu, tanh, max_pool2d
-from torchvision.models import densenet201
+import torch.nn.functional as F
+from torch.utils import model_zoo
+from torchvision.models.densenet import model_urls, DenseNet
 
-from utility import seed_all
+from utility import seed_all, gpu
 
 
 class JointCNN(Module):
@@ -325,6 +331,155 @@ class FullSpatialPyramidPoolingDiscriminator(Module):
         return density, count
 
 
+class _DenseLayer(nn.Sequential):
+    def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
+        super(_DenseLayer, self).__init__()
+        self.add_module('norm1', nn.BatchNorm2d(num_input_features)),
+        self.add_module('relu1', nn.ReLU(inplace=True)),
+        self.add_module('conv1', nn.Conv2d(num_input_features, bn_size *
+                        growth_rate, kernel_size=1, stride=1, bias=False)),
+        self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
+        self.add_module('relu2', nn.ReLU(inplace=True)),
+        self.add_module('conv2', nn.Conv2d(bn_size * growth_rate, growth_rate,
+                        kernel_size=3, stride=1, padding=1, bias=False)),
+        self.drop_rate = drop_rate
+
+    def forward(self, x):
+        new_features = super(_DenseLayer, self).forward(x)
+        if self.drop_rate > 0:
+            new_features = F.dropout(new_features, p=self.drop_rate, training=self.training)
+        return torch.cat([x, new_features], 1)
+
+
+class _DenseBlock(nn.Sequential):
+    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate):
+        super(_DenseBlock, self).__init__()
+        for i in range(num_layers):
+            layer = _DenseLayer(num_input_features + i * growth_rate, growth_rate, bn_size, drop_rate)
+            self.add_module('denselayer%d' % (i + 1), layer)
+
+
+class _Transition(nn.Sequential):
+    def __init__(self, num_input_features, num_output_features):
+        super(_Transition, self).__init__()
+        self.add_module('norm', nn.BatchNorm2d(num_input_features))
+        self.add_module('relu', nn.ReLU(inplace=True))
+        self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
+                                          kernel_size=1, stride=1, bias=False))
+        self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=2))
+
+
+class SppDenseNet(nn.Module):
+    r"""Densenet-BC model class, based on
+    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
+
+    Args:
+        growth_rate (int) - how many filters to add each layer (`k` in paper)
+        block_config (list of 4 ints) - how many layers in each pooling block
+        num_init_features (int) - the number of filters to learn in the first convolution layer
+        bn_size (int) - multiplicative factor for number of bottle neck layers
+          (i.e. bn_size * k features in the bottleneck layer)
+        drop_rate (float) - dropout rate after each dense layer
+        num_classes (int) - number of classification classes
+    """
+    def __init__(self, growth_rate=32, block_config=(6, 12, 48, 32),
+                 num_init_features=64, bn_size=4, drop_rate=0):
+
+        super(SppDenseNet, self).__init__()
+
+        self.dense_blocks = nn.ModuleList()
+        self.transition_layers = nn.ModuleList()
+
+        # First convolution
+        self.conv1 = nn.Sequential(OrderedDict([
+            ('conv0', nn.Conv2d(3, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
+            ('norm0', nn.BatchNorm2d(num_init_features)),
+            ('relu0', nn.ReLU(inplace=True)),
+            ('pool0', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
+        ]))
+
+        # Each denseblock
+        num_features = num_init_features
+        for i, num_layers in enumerate(block_config):
+            block = _DenseBlock(num_layers=num_layers, num_input_features=num_features,
+                                bn_size=bn_size, growth_rate=growth_rate, drop_rate=drop_rate)
+            self.dense_blocks.add_module('denseblock%d' % (i + 1), block)
+            num_features = num_features + num_layers * growth_rate
+            if i != len(block_config) - 1:
+                trans = _Transition(num_input_features=num_features, num_output_features=num_features // 2)
+                self.transition_layers.add_module('transition%d' % (i + 1), trans)
+                num_features = num_features // 2
+
+        # Final batch norm
+        self.norm5 = nn.BatchNorm2d(num_features)
+
+        # Linear layer
+        self.count_layer = nn.Linear(num_features, 1)
+        self.density_layer = nn.Linear(num_features, 56 ** 2)
+
+        # Official init from torch repo.
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal(m.weight.data)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                m.bias.data.zero_()
+
+    def forward(self, x):
+        out = self.conv1(x)
+        db1_out = self.dense_blocks.denseblock1(out)
+        t1_out = self.transition_layers.transition1(db1_out)
+        db2_out = self.dense_blocks.denseblock2(t1_out)
+        t2_out = self.transition_layers.transition2(db2_out)
+        db3_out = self.dense_blocks.denseblock3(t2_out)
+        t3_out = self.transition_layers.transition3(db3_out)
+        db4_out = self.dense_blocks.denseblock4(t3_out)
+        n5_out = self.norm5(db4_out)
+
+
+        out = F.relu(n5_out, inplace=True)
+        out = F.avg_pool2d(out, kernel_size=7, stride=1).view(n5_out.size(0), -1)
+        count = self.count_layer(out)
+        count = count.view(-1)
+        density = self.density_layer(out)
+        density = density.view(-1, 56, 56)
+        return density, count
+
+
+
+def densenet201(pretrained=False, **kwargs):
+    r"""Densenet-201 model from
+    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+
+    This copied directly from the model zoo removing the count_layer to fix the class_num change bug
+    """
+    model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32),
+                     **kwargs)
+    if pretrained:
+        # '.'s are no longer allowed in module names, but previous _DenseLayer
+        # has keys 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
+        # They are also in the checkpoints in model_urls. This pattern is used
+        # to find such keys.
+        pattern = re.compile(
+            r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
+        state_dict = model_zoo.load_url(model_urls['densenet201'])
+        for key in list(state_dict.keys()):
+            res = pattern.match(key)
+            if res:
+                new_key = res.group(1) + res.group(2)
+                state_dict[new_key] = state_dict[key]
+                del state_dict[key]
+        del state_dict['count_layer.weight']
+        del state_dict['count_layer.bias']
+        model.load_state_dict(state_dict, strict=False)
+    return model
+
+
 class DenseNetDiscriminator(Module):
     """The DenseNet as a discriminator."""
     def __init__(self):
@@ -337,4 +492,4 @@ class DenseNetDiscriminator(Module):
         batch_size = x.shape[0]
         out = self.dense_net_module(x)
         out = out.view(-1)
-        return torch.zeros([batch_size, 56, 56]), out
+        return torch.zeros([batch_size, 56, 56], device=gpu), out

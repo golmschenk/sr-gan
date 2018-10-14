@@ -25,10 +25,11 @@ from utility import MixtureModel, gpu
 
 class CrowdExperiment(Experiment):
     """The crowd application."""
+
     def dataset_setup(self):
         """Sets up the datasets for the application."""
         settings = self.settings
-        if settings.crowd_dataset == 'World Expo':
+        if settings.dataset_class is WorldExpoDataset:
             train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
                                                               data.RandomHorizontalFlip(),
                                                               data.NegativeOneToOneNormalizeImage(),
@@ -58,8 +59,7 @@ class CrowdExperiment(Experiment):
                                                        num_workers=settings.number_of_data_workers)
             self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
                                                        transform=validation_transform, seed=101)
-        elif settings.crowd_dataset == 'ShanghaiTech':
-            self.dataset_class = ShanghaiTechDataset
+        elif settings.dataset_class is ShanghaiTechDataset:
             train_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
                                                               data.RandomHorizontalFlip(),
                                                               data.NegativeOneToOneNormalizeImage(),
@@ -67,18 +67,19 @@ class CrowdExperiment(Experiment):
             validation_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
                                                                    data.NegativeOneToOneNormalizeImage(),
                                                                    data.NumpyArraysToTorchTensors()])
-            self.train_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                     number_of_examples=settings.labeled_dataset_size,
-                                                     fake_dataset_length=True)
+            self.train_dataset = settings.dataset_class(transform=train_transform, seed=settings.labeled_dataset_seed,
+                                                        number_of_examples=settings.labeled_dataset_size,
+                                                        fake_dataset_length=True)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-            self.unlabeled_dataset = ShanghaiTechDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                         part='part_B', fake_dataset_length=True)
+            self.unlabeled_dataset = settings.dataset_class(transform=train_transform,
+                                                            seed=settings.labeled_dataset_seed,
+                                                            part='part_B', fake_dataset_length=True)
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                        shuffle=True, pin_memory=self.settings.pin_memory,
                                                        num_workers=settings.number_of_data_workers)
-            self.validation_dataset = ShanghaiTechDataset(dataset='test', transform=validation_transform, seed=101)
+            self.validation_dataset = settings.dataset_class(dataset='test', transform=validation_transform, seed=101)
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
@@ -280,12 +281,8 @@ class CrowdExperiment(Experiment):
     def evaluate(self, during_training=False, step=None, number_of_examples=None):
         """Evaluates the model on test data."""
         super().evaluate()
-        settings = self.settings
         for network in [self.DNN, self.D]:
-            if settings.crowd_dataset == 'ShanghaiTech':
-                test_dataset = self.dataset_class(dataset='test')
-            else:
-                raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
+            test_dataset = self.settings.dataset_class(dataset='test')
             totals = defaultdict(lambda: 0)
             for full_example_index, (full_image, full_label) in enumerate(test_dataset):
                 print('Processing full example {}...'.format(full_example_index), end='\r')

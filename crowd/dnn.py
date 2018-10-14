@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import CrowdExample
-from crowd.models import DenseNetDiscriminator
+from crowd.models import DenseNetDiscriminator, SppDenseNet
 from crowd.srgan import CrowdExperiment
 from crowd.ucf_qnrf_data import UcfQnrfDataset
 from dnn import DnnExperiment
@@ -44,7 +44,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = DenseNetDiscriminator()
+        self.DNN = SppDenseNet()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""

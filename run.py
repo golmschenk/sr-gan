@@ -33,9 +33,9 @@ elif application_name == 'coef':
     settings_.batch_size = 1000
 elif application_name == 'crowd':
     Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e-1, 1e0, 1e1]
-    settings_.fake_loss_multiplier = [1e-1, 1e0, 1e1]
-    settings_.batch_size = 300
+    settings_.unlabeled_loss_multiplier = [1e0]
+    settings_.fake_loss_multiplier = [1e0]
+    settings_.batch_size = 12
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'UCF QNRF'
@@ -58,7 +58,7 @@ settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'final'
+    trial_name = 'densenet'
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':

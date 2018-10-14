@@ -160,6 +160,6 @@ class UcfQnrfCheck:
 
 if __name__ == '__main__':
     preprocessor = UcfQnrfPreprocessing()
-    # preprocessor.download()
+    preprocessor.download()
     preprocessor.preprocess()
     UcfQnrfCheck().display_statistics()
