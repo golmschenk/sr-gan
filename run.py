@@ -46,7 +46,7 @@ settings_.unlabeled_dataset_size = None
 settings_.labeled_dataset_size = [40]
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = [0]
-settings_.steps_to_run = 100000
+settings_.steps_to_run = 1000000
 settings_.learning_rate = [1e-4]
 settings_.gradient_penalty_multiplier = [0.1]
 settings_.mean_offset = [0]
@@ -58,7 +58,7 @@ settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'densenet'
+    trial_name = 'dn do'
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':
