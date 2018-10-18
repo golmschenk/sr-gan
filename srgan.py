@@ -104,7 +104,7 @@ class Experiment(ABC):
                 self.eval_mode()
                 self.validation_summaries(step)
                 self.train_mode()
-                self.handle_user_input(step)
+            self.handle_user_input(step)
 
     def prepare_optimizers(self):
         """Prepares the optimizers of the network."""
