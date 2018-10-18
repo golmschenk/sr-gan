@@ -33,11 +33,13 @@ class UcfQnrfDataset(Dataset):
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
         self.fake_dataset_length = fake_dataset_length
+        self.transform = transform
+        if self.transform is not None and dataset == 'test':
+            self.file_names.remove('img_0100.npy')  # Image too small for non-test phase transform.
         if self.fake_dataset_length:
             self.length = int(1e6)
         else:
             self.length = len(self.file_names)
-        self.transform = transform
 
     def __getitem__(self, index):
         """
