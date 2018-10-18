@@ -44,7 +44,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = SppDenseNet()
+        self.DNN = DenseNetDiscriminator()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
@@ -97,3 +97,29 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         summary_writer.add_scalar('0 Test Error/RMSE count', rmse_count)
         rmse_density = (totals['SE density'] / len(indexes)) ** 0.5
         summary_writer.add_scalar('0 Test Error/RMSE density', rmse_density)
+
+    def evaluate(self, during_training=False, step=None, number_of_examples=None):
+        """Evaluates the model on test data."""
+        self.model_setup()
+        self.load_models()
+        self.eval_mode()
+        self.settings.dataset_class = UcfQnrfDataset
+        test_dataset = self.settings.dataset_class(dataset='test')
+        if self.settings.test_summary_size is not None:
+            indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
+        else:
+            indexes = range(test_dataset.length)
+        network = self.DNN
+        totals = defaultdict(lambda: 0)
+        for index in indexes:
+            full_image, full_label = test_dataset[index]
+            full_example = CrowdExample(image=full_image, label=full_label)
+            full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
+            totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
+            totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
+            totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
+            totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
+        print('Count MAE: {}'.format(totals['Count error'] / len(indexes)))
+        print('Count RMSE: {}'.format((totals['SE count'] / len(indexes)) ** 0.5))
+        print('Density MAE: {}'.format(totals['Density sum error'] / len(indexes)))
+        print('Density RMSE: {}'.format((totals['SE density'] / len(indexes)) ** 0.5))
