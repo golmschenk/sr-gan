@@ -347,7 +347,8 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
 
 class ExtractPatch:
     """A transform to extract a patch from an example."""
-    def __init__(self, patch_size=128):
+    def __init__(self, patch_size=128, allow_padded=False):
+        self.allow_padded = allow_padded
         self.patch_size = patch_size
         self.image_patch_size = self.patch_size
         self.label_scaled_size = [int(self.patch_size / 4), int(self.patch_size / 4)]
@@ -366,16 +367,20 @@ class ExtractPatch:
         :rtype: CrowdExample
         """
         half_patch_size = int(self.image_patch_size // 2)
-        if y - half_patch_size < 0:
-            example = self.pad_example(example, y_padding=(half_patch_size - y, 0))
-            y += half_patch_size - y
-        if y + half_patch_size > example.image.shape[0]:
-            example = self.pad_example(example, y_padding=(0, y + half_patch_size - example.image.shape[0]))
-        if x - half_patch_size < 0:
-            example = self.pad_example(example, x_padding=(half_patch_size - x, 0))
-            x += half_patch_size - x
-        if x + half_patch_size > example.image.shape[1]:
-            example = self.pad_example(example, x_padding=(0, x + half_patch_size - example.image.shape[1]))
+        if self.allow_padded:
+            if y - half_patch_size < 0:
+                example = self.pad_example(example, y_padding=(half_patch_size - y, 0))
+                y += half_patch_size - y
+            if y + half_patch_size > example.image.shape[0]:
+                example = self.pad_example(example, y_padding=(0, y + half_patch_size - example.image.shape[0]))
+            if x - half_patch_size < 0:
+                example = self.pad_example(example, x_padding=(half_patch_size - x, 0))
+                x += half_patch_size - x
+            if x + half_patch_size > example.image.shape[1]:
+                example = self.pad_example(example, x_padding=(0, x + half_patch_size - example.image.shape[1]))
+        else:
+            assert half_patch_size <= y <= example.image.shape[0] - half_patch_size
+            assert half_patch_size <= x <= example.image.shape[1] - half_patch_size
         image_patch = example.image[y - half_patch_size:y + half_patch_size,
                                     x - half_patch_size:x + half_patch_size,
                                     :]
@@ -457,8 +462,7 @@ class ExtractPatchForRandomPosition(ExtractPatch):
         example = self.resize_label(patch)
         return example
 
-    @staticmethod
-    def select_random_position(example):
+    def select_random_position(self, example):
         """
         Selects a random position from the example.
 
@@ -467,8 +471,13 @@ class ExtractPatchForRandomPosition(ExtractPatch):
         :return: The patch.
         :rtype: CrowdExample
         """
-        y = np.random.randint(example.label.shape[0])
-        x = np.random.randint(example.label.shape[1])
+        if self.allow_padded:
+            y = np.random.randint(example.label.shape[0])
+            x = np.random.randint(example.label.shape[1])
+        else:
+            half_patch_size = int(self.image_patch_size // 2)
+            y = np.random.randint(half_patch_size, example.label.shape[0] - half_patch_size + 1)
+            x = np.random.randint(half_patch_size, example.label.shape[1] - half_patch_size + 1)
         return y, x
 
 
@@ -493,7 +502,7 @@ class ImageSlidingWindowDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size)
+        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size, allow_padded=True)
         test_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                          NumpyArraysToTorchTensors()])
         vertical_step, horizontal_step = np.unravel_index(index, self.step_shape)
