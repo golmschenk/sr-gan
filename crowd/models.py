@@ -397,8 +397,7 @@ class SppModule(nn.Module):
 
 
 class SppDenseNet(nn.Module):
-    r"""Densenet-BC model class, based on
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
+    r"""A spatial pooling pyramid network based on DenseNet
 
     Args:
         growth_rate (int) - how many filters to add each layer (`k` in paper)
@@ -407,7 +406,6 @@ class SppDenseNet(nn.Module):
         bn_size (int) - multiplicative factor for number of bottle neck layers
           (i.e. bn_size * k features in the bottleneck layer)
         drop_rate (float) - dropout rate after each dense layer
-        num_classes (int) - number of classification classes
     """
     def __init__(self, growth_rate=32, block_config=(6, 12, 48, 32),
                  num_init_features=64, bn_size=4, drop_rate=0, pretrained=True):
@@ -418,7 +416,7 @@ class SppDenseNet(nn.Module):
         self.transition_layers = nn.ModuleList()
 
         # First convolution
-        self.conv1 = nn.Sequential(OrderedDict([
+        self.conv_layer1 = nn.Sequential(OrderedDict([
             ('conv0', nn.Conv2d(3, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
@@ -464,16 +462,26 @@ class SppDenseNet(nn.Module):
                     new_key = res.group(1) + res.group(2)
                     state_dict[new_key] = state_dict[key]
                     del state_dict[key]
+            new_name_state_dict = OrderedDict()
+            for key, value in state_dict.items():
+                new_key = key.replace('features.denseblock', 'dense_blocks.denseblock')
+                new_key = new_key.replace('features.transition', 'transition_layers.transition')
+                if 'norm5' in new_key:
+                    new_key = new_key.replace('features.', '')
+                else:
+                    new_key = new_key.replace('features.', 'conv_layer1.')
+                new_name_state_dict[new_key] = value
+            state_dict = new_name_state_dict
             del state_dict['classifier.weight']
             del state_dict['classifier.bias']
-            self.load_state_dict(state_dict, strict=False)
+            self.load_state_dict(state_dict, strict=True)
 
         self.spp1 = SppModule(128)
         self.regression_module1 = RegressionModule(7296)
         self.final_regression_module = RegressionModule(1920)
 
     def forward(self, x):
-        out = self.conv1(x)
+        out = self.conv_layer1(x)
         db1_out = self.dense_blocks.denseblock1(out)
         t1_out = self.transition_layers.transition1(db1_out)
         db2_out = self.dense_blocks.denseblock2(t1_out)
@@ -495,7 +503,7 @@ class SppDenseNet(nn.Module):
         return density, count
 
 
-class DropoutDenseNet(nn.Module):
+class DenseNet(nn.Module):
     r"""Densenet-BC model class, based on
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
 
@@ -511,7 +519,7 @@ class DropoutDenseNet(nn.Module):
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
                  num_init_features=64, bn_size=4, drop_rate=0, num_classes=1000):
 
-        super(DropoutDenseNet, self).__init__()
+        super(DenseNet, self).__init__()
 
         # First convolution
         self.features = nn.Sequential(OrderedDict([
@@ -552,7 +560,7 @@ class DropoutDenseNet(nn.Module):
     def forward(self, x):
         features = self.features(x)
         out = F.relu(features, inplace=True)
-        out = F.dropout(F.avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1))
+        out = F.avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1)
         out = self.classifier(out)
         return out
 
@@ -566,8 +574,7 @@ def densenet201(pretrained=False, **kwargs):
 
     This copied directly from the model zoo removing the count_layer to fix the class_num change bug
     """
-    model = DropoutDenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32),
-                     **kwargs)
+    model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32), **kwargs)
     if pretrained:
         # '.'s are no longer allowed in module names, but previous _DenseLayer
         # has keys 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
