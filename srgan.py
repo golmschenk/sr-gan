@@ -111,7 +111,7 @@ class Experiment(ABC):
         d_lr = self.settings.learning_rate
         g_lr = d_lr
         # betas = (0.9, 0.999)
-        weight_decay = 1e-2
+        weight_decay = self.settings.weight_decay
         self.d_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
         self.g_optimizer = Adam(self.G.parameters(), lr=g_lr)
         self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)

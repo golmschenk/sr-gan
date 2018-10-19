@@ -19,6 +19,7 @@ class Settings:
         self.unlabeled_dataset_size = 50000
         self.validation_dataset_size = 1000
         self.learning_rate = 1e-4
+        self.weight_decay = 0
 
         self.labeled_loss_multiplier = 1e0
         self.unlabeled_loss_multiplier = 1e0
