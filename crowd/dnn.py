@@ -102,6 +102,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         """Evaluates the model on test data."""
         self.model_setup()
         self.load_models()
+        self.gpu_mode()
         self.eval_mode()
         self.settings.dataset_class = UcfQnrfDataset
         test_dataset = self.settings.dataset_class(dataset='test')
