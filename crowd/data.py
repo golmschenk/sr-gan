@@ -2,7 +2,6 @@
 Code for the crowd data dataset.
 """
 import random
-from math import floor
 import scipy.misc
 import torch
 import numpy as np
@@ -487,13 +486,19 @@ class ImageSlidingWindowDataset(Dataset):
     """
     def __init__(self, full_example, image_patch_size=128, window_step_size=32):
         self.full_example = CrowdExample(image=full_example.image)  # We don't need the label in this case.
-        height, width = full_example.label.shape
         self.window_step_size = window_step_size
         self.image_patch_size = image_patch_size
-        vertical_steps = floor(height / self.window_step_size)
-        horizontal_steps = floor(width / self.window_step_size)
-        self.step_shape = np.array([vertical_steps, horizontal_steps])
-        self.length = self.step_shape.prod()
+        half_patch_size = int(self.image_patch_size // 2)
+        self.y_positions = list(range(half_patch_size, self.full_example.image.shape[0] - half_patch_size + 1,
+                                      self.window_step_size))
+        if self.full_example.image.shape[0] - half_patch_size > 0:
+            self.y_positions = list(set(self.y_positions + [self.full_example.image.shape[0] - half_patch_size]))
+        self.x_positions = list(range(half_patch_size, self.full_example.image.shape[1] - half_patch_size + 1,
+                                      self.window_step_size))
+        if self.full_example.image.shape[1] - half_patch_size > 0:
+            self.x_positions = list(set(self.x_positions + [self.full_example.image.shape[1] - half_patch_size]))
+        self.positions_shape = np.array([len(self.y_positions), len(self.x_positions)])
+        self.length = self.positions_shape.prod()
 
     def __getitem__(self, index):
         """
@@ -502,12 +507,13 @@ class ImageSlidingWindowDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size, allow_padded=True)
+        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size,
+                                                          allow_padded=True)  # In case image is smaller than patch.
         test_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                          NumpyArraysToTorchTensors()])
-        vertical_step, horizontal_step = np.unravel_index(index, self.step_shape)
-        y = vertical_step * self.window_step_size
-        x = horizontal_step * self.window_step_size
+        y_index, x_index = np.unravel_index(index, self.positions_shape)
+        y = self.y_positions[y_index]
+        x = self.x_positions[x_index]
         patch = extract_patch_transform(self.full_example, y, x)
         example = test_transform(patch)
         return example.image, x, y
