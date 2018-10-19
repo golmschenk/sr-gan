@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import CrowdExample
-from crowd.models import DenseNetDiscriminator, SppDenseNet
+from crowd.models import DenseNetDiscriminator
 from crowd.srgan import CrowdExperiment
 from crowd.ucf_qnrf_data import UcfQnrfDataset
 from dnn import DnnExperiment

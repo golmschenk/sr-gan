@@ -7,10 +7,9 @@ from collections import OrderedDict
 import torch
 from torch import nn
 from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout
-from torch.nn.functional import leaky_relu, tanh, max_pool2d
-import torch.nn.functional as F
+from torch.nn.functional import leaky_relu, tanh, max_pool2d, dropout, avg_pool2d, relu
 from torch.utils import model_zoo
-from torchvision.models.densenet import model_urls
+import torchvision.models.densenet
 
 from utility import seed_all, gpu
 
@@ -345,9 +344,10 @@ class _DenseLayer(nn.Sequential):
         self.drop_rate = drop_rate
 
     def forward(self, x):
+        """Forward pass."""
         new_features = super(_DenseLayer, self).forward(x)
         if self.drop_rate > 0:
-            new_features = F.dropout(new_features, p=self.drop_rate, training=self.training)
+            new_features = dropout(new_features, p=self.drop_rate, training=self.training)
         return torch.cat([x, new_features], 1)
 
 
@@ -370,6 +370,7 @@ class _Transition(nn.Sequential):
 
 
 class RegressionModule(nn.Module):
+    """A regression module to output both density map and count value with fully connected layers."""
     def __init__(self, in_features):
         super().__init__()
         self.fc = Linear(in_features, 1000)
@@ -377,17 +378,21 @@ class RegressionModule(nn.Module):
         self.fc_count = Linear(1000, 1)
 
     def forward(self, x):
+        """Forward pass."""
         fc_out = leaky_relu(self.fc(x))
         fc_density_out = leaky_relu(self.fc_density(fc_out))
         fc_count = leaky_relu(self.fc_count(fc_out))
         return fc_density_out, fc_count
 
+
 class SppModule(nn.Module):
+    """A basic spatial pyramid pooling module."""
     def __init__(self, in_features):
         super().__init__()
         self.in_features = in_features
 
     def forward(self, x):
+        """Forward pass."""
         p1 = spatial_pyramid_pooling(x, 1).view(-1, 1 * self.in_features)
         p2 = spatial_pyramid_pooling(x, 2).view(-1, 4 * self.in_features)
         p3 = spatial_pyramid_pooling(x, 4).view(-1, 16 * self.in_features)
@@ -455,7 +460,7 @@ class SppDenseNet(nn.Module):
             # to find such keys.
             pattern = re.compile(
                 r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
-            state_dict = model_zoo.load_url(model_urls['densenet201'])
+            state_dict = model_zoo.load_url(torchvision.models.densenet.model_urls['densenet201'])
             for key in list(state_dict.keys()):
                 res = pattern.match(key)
                 if res:
@@ -481,6 +486,7 @@ class SppDenseNet(nn.Module):
         self.final_regression_module = RegressionModule(1920)
 
     def forward(self, x):
+        """Forward pass."""
         out = self.conv_layer1(x)
         db1_out = self.dense_blocks.denseblock1(out)
         t1_out = self.transition_layers.transition1(db1_out)
@@ -490,8 +496,8 @@ class SppDenseNet(nn.Module):
         t3_out = self.transition_layers.transition3(db3_out)
         db4_out = self.dense_blocks.denseblock4(t3_out)
         n5_out = self.norm5(db4_out)
-        n5_relu_out = F.relu(n5_out, inplace=True)
-        final_pool = F.avg_pool2d(n5_relu_out, kernel_size=7, stride=1).view(n5_out.size(0), -1)
+        n5_relu_out = relu(n5_out, inplace=True)
+        final_pool = avg_pool2d(n5_relu_out, kernel_size=7, stride=1).view(n5_out.size(0), -1)
 
         spp1_out = self.spp1(t1_out)
         rm1_density, rm1_count = self.regression_module1(spp1_out)
@@ -558,9 +564,10 @@ class DenseNet(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
+        """Forward pass."""
         features = self.features(x)
-        out = F.relu(features, inplace=True)
-        out = F.avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1)
+        out = relu(features, inplace=True)
+        out = avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1)
         out = self.classifier(out)
         return out
 
@@ -582,7 +589,7 @@ def densenet201(pretrained=False, **kwargs):
         # to find such keys.
         pattern = re.compile(
             r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
-        state_dict = model_zoo.load_url(model_urls['densenet201'])
+        state_dict = model_zoo.load_url(torchvision.models.densenet.model_urls['densenet201'])
         for key in list(state_dict.keys()):
             res = pattern.match(key)
             if res:

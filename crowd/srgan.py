@@ -353,13 +353,13 @@ class CrowdExperiment(Experiment):
                 if y - half_patch_size < 0:
                     y_start_offset = half_patch_size - y
                 y_end_offset = 0
-                if y + half_patch_size >= full_example.label.shape[0]:
+                if y + half_patch_size > full_example.label.shape[0]:
                     y_end_offset = y + half_patch_size - full_example.label.shape[0]
                 x_start_offset = 0
                 if x - half_patch_size < 0:
                     x_start_offset = half_patch_size - x
                 x_end_offset = 0
-                if x + half_patch_size >= full_example.label.shape[1]:
+                if x + half_patch_size > full_example.label.shape[1]:
                     x_end_offset = x + half_patch_size - full_example.label.shape[1]
                 sum_density_label[y - half_patch_size + y_start_offset:y + half_patch_size - y_end_offset,
                                   x - half_patch_size + x_start_offset:x + half_patch_size - x_end_offset
