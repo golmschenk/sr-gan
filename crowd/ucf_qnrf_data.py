@@ -9,9 +9,10 @@ import imageio
 import numpy as np
 import patoolib
 import scipy.io
+import torchvision
 from torch.utils.data import Dataset
 
-from crowd.data import CrowdExample
+from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
 from crowd.label_generation import generate_density_label, problematic_head_labels
 from utility import seed_all
 
@@ -22,24 +23,16 @@ else:
     database_directory = '../{}'.format(dataset_name)
 
 
-class UcfQnrfDataset(Dataset):
+class UcfQnrfFullImageDataset(Dataset):
     """
-    A class for the UCF QNRF crowd dataset.
+    A class for the UCF QNRF full image crowd dataset.
     """
-    def __init__(self, dataset='train', transform=None, seed=None, number_of_examples=None,
-                 fake_dataset_length=False):
+    def __init__(self, dataset='train', seed=None, number_of_examples=None):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
-        self.fake_dataset_length = fake_dataset_length
-        self.transform = transform
-        if self.transform is not None and dataset == 'test':
-            self.file_names.remove('img_0100.npy')  # Image too small for non-test phase transform.
-        if self.fake_dataset_length:
-            self.length = int(1e6)
-        else:
-            self.length = len(self.file_names)
+        self.length = len(self.file_names)
 
     def __getitem__(self, index):
         """
@@ -48,16 +41,68 @@ class UcfQnrfDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        if self.fake_dataset_length:
-            random_index = random.randrange(len(self.file_names))
-            file_name = self.file_names[random_index]
-        else:
-            file_name = self.file_names[index]
+        file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
+        return image, label
+
+    def __len__(self):
+        return self.length
+
+
+class UcfQnrfTransformedDataset(Dataset):
+    """
+    A class for the transformed UCF QNRF crowd dataset.
+    """
+    def __init__(self, dataset='train', image_patch_size=224, seed=None, number_of_examples=None,
+                 middle_transform=None):
+        seed_all(seed)
+        self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
+        self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
+                           if name.endswith('.npy')][:number_of_examples]
+        self.image_patch_size = image_patch_size
+        half_patch_size = int(self.image_patch_size // 2)
+        self.length = 0
+        self.start_indexes = []
+        for file_name in self.file_names:
+            self.start_indexes.append(self.length)
+            image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
+            y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
+            x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
+            image_indexes_length = len(y_positions) * len(x_positions)
+            self.length += image_indexes_length
+        self.middle_transform = middle_transform
+
+    def __getitem__(self, index):
+        """
+        :param index: The index within the entire dataset.
+        :type index: int
+        :return: An example and label from the crowd dataset.
+        :rtype: torch.Tensor, torch.Tensor
+        """
+        file_name_index = np.searchsorted(self.start_indexes, index, side='right') - 1
+        start_index = self.start_indexes[file_name_index]
+        file_name = self.file_names[file_name_index]
+        position_index = index - start_index
+
+        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size,
+                                                          allow_padded=True)  # In case image is smaller than patch.
+        preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
+                                                               NumpyArraysToTorchTensors()])
+        image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
+        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
+        half_patch_size = int(self.image_patch_size // 2)
+        y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
+        x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
+        positions_shape = [len(y_positions), len(x_positions)]
+        y_index, x_index = np.unravel_index(position_index, positions_shape)
+        y = y_positions[y_index]
+        x = x_positions[x_index]
         example = CrowdExample(image=image, label=label)
-        if self.transform:
-            example = self.transform(example)
+        patch = extract_patch_transform(example, y, x)
+        if self.middle_transform:
+            example = self.middle_transform(example)
+        example = preprocess_transform(patch)
         return example.image, example.label
 
     def __len__(self):
@@ -128,12 +173,12 @@ class UcfQnrfCheck:
         """
         print('=' * 50)
         print('UCF QNRF')
-        train_dataset = UcfQnrfDataset('train')
+        train_dataset = UcfQnrfFullImageDataset('train')
         train_label_sums = []
         for image, label in train_dataset:
             train_label_sums.append(label.sum())
         self.print_statistics(train_label_sums, 'train')
-        test_dataset = UcfQnrfDataset('test')
+        test_dataset = UcfQnrfFullImageDataset('test')
         test_label_sums = []
         for image, label in test_dataset:
             test_label_sums.append(label.sum())

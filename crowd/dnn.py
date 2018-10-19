@@ -12,7 +12,7 @@ from crowd import data
 from crowd.data import CrowdExample
 from crowd.models import DenseNetDiscriminator
 from crowd.srgan import CrowdExperiment
-from crowd.ucf_qnrf_data import UcfQnrfDataset
+from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from dnn import DnnExperiment
 from utility import gpu
 
@@ -23,22 +23,14 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         """Sets up the datasets for the application."""
         settings = self.settings
         if settings.crowd_dataset == 'UCF QNRF':
-            self.dataset_class = UcfQnrfDataset
-            patch_extractor = data.ExtractPatchForRandomPosition(self.settings.image_patch_size)
-            train_transform = torchvision.transforms.Compose([patch_extractor,
-                                                              data.RandomHorizontalFlip(),
-                                                              data.NegativeOneToOneNormalizeImage(),
-                                                              data.NumpyArraysToTorchTensors()])
-            validation_transform = torchvision.transforms.Compose([patch_extractor,
-                                                                   data.NegativeOneToOneNormalizeImage(),
-                                                                   data.NumpyArraysToTorchTensors()])
-            self.train_dataset = UcfQnrfDataset(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                number_of_examples=settings.labeled_dataset_size,
-                                                fake_dataset_length=True)
+            self.dataset_class = UcfQnrfFullImageDataset
+            self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                           seed=settings.labeled_dataset_seed,
+                                                           number_of_examples=settings.labeled_dataset_size)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-            self.validation_dataset = UcfQnrfDataset(dataset='test', transform=validation_transform, seed=101)
+            self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
@@ -104,7 +96,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         self.load_models()
         self.gpu_mode()
         self.eval_mode()
-        self.settings.dataset_class = UcfQnrfDataset
+        self.settings.dataset_class = UcfQnrfFullImageDataset
         test_dataset = self.settings.dataset_class(dataset='test')
         if self.settings.test_summary_size is not None:
             indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
