@@ -48,6 +48,7 @@ class Settings:
         self.test_summary_size = None
         self.test_sliding_window_size = 128
         self.image_patch_size = 224
+        self.label_patch_size = 28
 
         # SGAN models only.
         self.number_of_bins = 10

@@ -346,11 +346,10 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
 
 class ExtractPatch:
     """A transform to extract a patch from an example."""
-    def __init__(self, patch_size=128, allow_padded=False):
+    def __init__(self, image_patch_size=128, label_patch_size=32, allow_padded=False):
         self.allow_padded = allow_padded
-        self.patch_size = patch_size
-        self.image_patch_size = self.patch_size
-        self.label_scaled_size = [int(self.patch_size / 4), int(self.patch_size / 4)]
+        self.image_patch_size = image_patch_size
+        self.label_patch_size = label_patch_size
 
     def get_patch_for_position(self, example, y, x):
         """
@@ -430,16 +429,17 @@ class ExtractPatch:
         :return: The patch with the resized label.
         :rtype: CrowdExample
         """
+        label_scaled_size = [self.label_patch_size, self.label_patch_size]
         if patch.label is not None:
             original_label_sum = np.sum(patch.label)
-            label = scipy.misc.imresize(patch.label, self.label_scaled_size, mode='F')
+            label = scipy.misc.imresize(patch.label, label_scaled_size, mode='F')
             unnormalized_label_sum = np.sum(label)
             if unnormalized_label_sum != 0:
                 label = (label / unnormalized_label_sum) * original_label_sum
         else:
             label = None
         if patch.perspective is not None:
-            perspective = scipy.misc.imresize(patch.perspective, self.label_scaled_size, mode='F')
+            perspective = scipy.misc.imresize(patch.perspective, label_scaled_size, mode='F')
         else:
             perspective = None
         return CrowdExample(image=patch.image, label=label, perspective=perspective)

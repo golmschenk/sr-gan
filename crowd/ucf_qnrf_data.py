@@ -54,13 +54,14 @@ class UcfQnrfTransformedDataset(Dataset):
     """
     A class for the transformed UCF QNRF crowd dataset.
     """
-    def __init__(self, dataset='train', image_patch_size=224, seed=None, number_of_examples=None,
+    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=28, seed=None, number_of_examples=None,
                  middle_transform=None):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
         self.image_patch_size = image_patch_size
+        self.label_patch_size = label_patch_size
         half_patch_size = int(self.image_patch_size // 2)
         self.length = 0
         self.start_indexes = []
@@ -85,7 +86,7 @@ class UcfQnrfTransformedDataset(Dataset):
         start_index = self.start_indexes[file_name_index]
         file_name = self.file_names[file_name_index]
         position_index = index_ - start_index
-        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size,
+        extract_patch_transform = ExtractPatchForPosition(self.image_patch_size, self.label_patch_size,
                                                           allow_padded=True)  # In case image is smaller than patch.
         preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                                NumpyArraysToTorchTensors()])

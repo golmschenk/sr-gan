@@ -371,10 +371,10 @@ class _Transition(nn.Sequential):
 
 class RegressionModule(nn.Module):
     """A regression module to output both density map and count value with fully connected layers."""
-    def __init__(self, in_features):
+    def __init__(self, in_features, label_patch_size):
         super().__init__()
         self.fc = Linear(in_features, 1000)
-        self.fc_density = Linear(1000, 56 ** 2)
+        self.fc_density = Linear(1000, label_patch_size ** 2)
         self.fc_count = Linear(1000, 1)
 
     def forward(self, x):
@@ -413,9 +413,11 @@ class SppDenseNet(nn.Module):
         drop_rate (float) - dropout rate after each dense layer
     """
     def __init__(self, growth_rate=32, block_config=(6, 12, 48, 32),
-                 num_init_features=64, bn_size=4, drop_rate=0, pretrained=True):
+                 num_init_features=64, bn_size=4, drop_rate=0, pretrained=True,
+                 label_patch_size=28):
 
         super(SppDenseNet, self).__init__()
+        self.label_patch_size = label_patch_size
 
         self.dense_blocks = nn.ModuleList()
         self.transition_layers = nn.ModuleList()
@@ -482,8 +484,8 @@ class SppDenseNet(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.spp1 = SppModule(128)
-        self.regression_module1 = RegressionModule(7296)
-        self.final_regression_module = RegressionModule(1920)
+        self.regression_module1 = RegressionModule(7296, label_patch_size=self.label_patch_size)
+        self.final_regression_module = RegressionModule(1920, label_patch_size=self.label_patch_size)
 
     def forward(self, x):
         """Forward pass."""
@@ -505,7 +507,7 @@ class SppDenseNet(nn.Module):
         count = rm1_count + final_count
         density = rm1_density + final_density
         count = count.view(-1)
-        density = density.view(-1, 56, 56)
+        density = density.view(-1, self.label_patch_size, self.label_patch_size)
         return density, count
 
 
@@ -604,9 +606,10 @@ def densenet201(pretrained=False, **kwargs):
 
 class DenseNetDiscriminator(Module):
     """The DenseNet as a discriminator."""
-    def __init__(self):
+    def __init__(self, label_patch_size=28):
         seed_all(0)
         super().__init__()
+        self.label_patch_size = label_patch_size
         self.dense_net_module = densenet201(pretrained=True, num_classes=1)
 
     def forward(self, x):
@@ -614,4 +617,4 @@ class DenseNetDiscriminator(Module):
         batch_size = x.shape[0]
         out = self.dense_net_module(x)
         out = out.view(-1)
-        return torch.zeros([batch_size, 56, 56], device=gpu), out
+        return torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu), out
