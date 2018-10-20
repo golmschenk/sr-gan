@@ -3,9 +3,7 @@ Code for running only the DNN version of the crowd application.
 """
 import random
 from collections import defaultdict
-
 import numpy as np
-import torchvision
 from torch.utils.data import DataLoader
 
 from crowd import data
@@ -27,7 +25,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                            seed=settings.labeled_dataset_seed,
                                                            number_of_examples=settings.labeled_dataset_size)
-            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
@@ -46,8 +44,9 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         train_dataset = self.train_dataset
         validation_dataset = self.validation_dataset
 
-        self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error')
-        self.evaluation_epoch(settings, DNN, validation_dataset, dnn_summary_writer, '1 Validation Error')
+        self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error', shuffle=False)
+        self.evaluation_epoch(settings, DNN, validation_dataset, dnn_summary_writer, '1 Validation Error',
+                              shuffle=False)
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities = next(train_iterator)
         dnn_predicted_densities, _ = DNN(images.to(gpu))

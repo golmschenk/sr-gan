@@ -66,7 +66,7 @@ class UcfQnrfTransformedDataset(Dataset):
         self.start_indexes = []
         for file_name in self.file_names:
             self.start_indexes.append(self.length)
-            image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
+            image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
             y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
             x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
             image_indexes_length = len(y_positions) * len(x_positions)
@@ -80,17 +80,17 @@ class UcfQnrfTransformedDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        file_name_index = np.searchsorted(self.start_indexes, index, side='right') - 1
+        index_ = random.randrange(self.length)
+        file_name_index = np.searchsorted(self.start_indexes, index_, side='right') - 1
         start_index = self.start_indexes[file_name_index]
         file_name = self.file_names[file_name_index]
-        position_index = index - start_index
-
+        position_index = index_ - start_index
         extract_patch_transform = ExtractPatchForPosition(self.image_patch_size,
                                                           allow_padded=True)  # In case image is smaller than patch.
         preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                                NumpyArraysToTorchTensors()])
-        image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
+        image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
+        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -99,10 +99,10 @@ class UcfQnrfTransformedDataset(Dataset):
         y = y_positions[y_index]
         x = x_positions[x_index]
         example = CrowdExample(image=image, label=label)
-        patch = extract_patch_transform(example, y, x)
+        example = extract_patch_transform(example, y, x)
         if self.middle_transform:
             example = self.middle_transform(example)
-        example = preprocess_transform(patch)
+        example = preprocess_transform(example)
         return example.image, example.label
 
     def __len__(self):

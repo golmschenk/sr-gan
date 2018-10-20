@@ -144,9 +144,10 @@ class CrowdExperiment(Experiment):
 
         self.test_summaries()
 
-    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
+    def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None,
+                         shuffle=True):
         """Runs the evaluation and summaries for the data in the dataset."""
-        dataset_loader = DataLoader(dataset, batch_size=settings.batch_size, shuffle=True)
+        dataset_loader = DataLoader(dataset, batch_size=settings.batch_size, shuffle=shuffle)
         predicted_counts, densities, predicted_densities = np.array([]), np.array(
             []), np.array([])
         for index, (images, labels) in enumerate(dataset_loader):
@@ -161,7 +162,7 @@ class CrowdExperiment(Experiment):
             if densities.size == 0:
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
-            if index >= 3:
+            if index * self.settings.batch_size >= 100:
                 break
         count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
