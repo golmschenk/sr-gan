@@ -43,7 +43,7 @@ elif application_name == 'crowd':
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.unlabeled_dataset_size = None
-settings_.labeled_dataset_size = [40]
+settings_.labeled_dataset_size = None
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 1000000
