@@ -76,7 +76,6 @@ class DnnExperiment(Experiment, ABC):
         train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
         step_time_start = datetime.datetime.now()
         for step in range(self.settings.steps_to_run):
-            self.adjust_learning_rate(step)
             labeled_examples, labels = next(train_dataset_generator)
             labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
             self.dnn_training_step(labeled_examples, labels, step)
