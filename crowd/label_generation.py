@@ -150,3 +150,55 @@ def make_gaussian(standard_deviation=1.0):
     y_part = (y ** 2) / (2.0 * y_standard_deviation ** 2)
     gaussian_array = np.exp(-(x_part + y_part))
     return gaussian_array
+
+
+def generate_knn_map(head_positions, label_size, number_of_neighbors=1):
+    """
+    Generates a map of the nearest neighbor distances to head positions.
+
+    :param head_positions: The list of head positions.
+    :type head_positions: np.ndarray
+    :param label_size: The size of the label.
+    :type label_size: [int, int]
+    :param number_of_neighbors: The number of neighbors to consider in the calculation.
+    :type number_of_neighbors: int
+    :return: The map of the kNN distances.
+    :rtype: np.ndarray
+    """
+    label_positions = permutations_of_shape_range(label_size)
+    number_of_neighbors = min(number_of_neighbors, len(head_positions))
+    nearest_neighbors_fit = NearestNeighbors(n_neighbors=number_of_neighbors, algorithm='ball_tree').fit(head_positions)
+    neighbor_distances, _ = nearest_neighbors_fit.kneighbors(label_positions)
+    knn_map = neighbor_distances.reshape(label_size)
+    return knn_map
+
+
+def permutations_of_shape_range(shape):
+    """
+    Gives a flat array for all possible positions within an array based on the shape of the array.
+
+    :param shape: The shape to get the positions for.
+    :type shape: list[int]
+    :return: All permutations of the shape positions in order.
+    :rtype: np.ndarray
+    """
+    ranges = [np.arange(side) for side in shape]
+    permutations = cartesian_product(ranges)
+    return permutations
+
+
+def cartesian_product(arrays):
+    """
+    Calculates the cartesian product of a list of arrays.
+
+    :param arrays: The list of arrays.
+    :type arrays: list[np.ndarray]
+    :return: The cartesian product.
+    :rtype: np.ndarray
+    """
+    la = len(arrays)
+    dtype = np.result_type(*arrays)
+    arr = np.empty([la] + [len(a) for a in arrays], dtype=dtype)
+    for i, a in enumerate(np.ix_(*arrays)):
+        arr[i, ...] = a
+    return arr.reshape(la, -1).T
