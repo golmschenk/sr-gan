@@ -44,7 +44,8 @@ class UcfQnrfFullImageDataset(Dataset):
         file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        return image, label
+        knn_map = np.load(os.path.join(self.dataset_directory, 'knn_maps', file_name))
+        return image, label, knn_map
 
     def __len__(self):
         return self.length
@@ -92,6 +93,7 @@ class UcfQnrfTransformedDataset(Dataset):
                                                                NumpyArraysToTorchTensors()])
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
+        knn_map = np.load(os.path.join(self.dataset_directory, 'knn_maps', file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -99,12 +101,12 @@ class UcfQnrfTransformedDataset(Dataset):
         y_index, x_index = np.unravel_index(position_index, positions_shape)
         y = y_positions[y_index]
         x = x_positions[x_index]
-        example = CrowdExample(image=image, label=label)
+        example = CrowdExample(image=image, label=label, knn_map=knn_map)
         example = extract_patch_transform(example, y, x)
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        return example.image, example.label
+        return example.image, example.label, example.knn_map
 
     def __len__(self):
         return self.length

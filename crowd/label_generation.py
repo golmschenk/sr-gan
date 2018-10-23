@@ -165,9 +165,11 @@ def generate_knn_map(head_positions, label_size, number_of_neighbors=1):
     :return: The map of the kNN distances.
     :rtype: np.ndarray
     """
+    y_x_head_positions = head_positions[:, [1, 0]]
     label_positions = permutations_of_shape_range(label_size)
-    number_of_neighbors = min(number_of_neighbors, len(head_positions))
-    nearest_neighbors_fit = NearestNeighbors(n_neighbors=number_of_neighbors, algorithm='ball_tree').fit(head_positions)
+    number_of_neighbors = min(number_of_neighbors, len(y_x_head_positions))
+    nearest_neighbors_fit = NearestNeighbors(n_neighbors=number_of_neighbors,
+                                             algorithm='ball_tree').fit(y_x_head_positions)
     neighbor_distances, _ = nearest_neighbors_fit.kneighbors(label_positions)
     knn_map = neighbor_distances.reshape(label_size)
     return knn_map

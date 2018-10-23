@@ -18,10 +18,12 @@ class CrowdExample:
     patch_center_y: int or None
     patch_center_x: int or None
 
-    def __init__(self, image, label=None, roi=None, perspective=None, patch_center_y=None, patch_center_x=None):
+    def __init__(self, image, label=None, roi=None, perspective=None, patch_center_y=None, patch_center_x=None,
+                 knn_map=None):
         self.image = image
         self.label = label
         self.roi = roi
+        self.knn_map = knn_map
         self.perspective = perspective
         self.patch_center_y = patch_center_y
         self.patch_center_x = patch_center_x
@@ -43,6 +45,8 @@ class NumpyArraysToTorchTensors:
         example.image = torch.tensor(example.image)
         if example.label is not None:
             example.label = torch.tensor(example.label)
+        if example.knn_map is not None:
+            example.knn_map = torch.tensor(example.knn_map)
         if example.roi is not None:
             example.roi = torch.tensor(example.roi.astype(np.float32))
         if example.perspective is not None:
@@ -71,7 +75,8 @@ class Rescale:
         if original_label_sum != 0:
             unnormalized_label_sum = np.sum(example.label)
             example.label = (example.label / unnormalized_label_sum) * original_label_sum
-            example.roi = scipy.misc.imresize(example.roi, self.scaled_size, mode='F') > 0.5
+        example.roi = scipy.misc.imresize(example.roi, self.scaled_size, mode='F') > 0.5
+        example.knn_map = scipy.misc.imresize(example.knn_map, self.scaled_size, mode='F')
         return example
 
 
@@ -90,6 +95,7 @@ class RandomHorizontalFlip:
         if random.choice([True, False]):
             example.image = np.flip(example.image, axis=1).copy()
             example.label = np.flip(example.label, axis=1).copy()
+            example.knn_map = np.flip(example.knn_map, axis=1).copy()
             if example.roi is not None:
                 example.roi = np.flip(example.roi, axis=1).copy()
             if example.perspective is not None:
@@ -154,7 +160,9 @@ class PatchAndRescale:
                                     x - half_patch_size:x + half_patch_size]
         roi_patch = example.roi[y - half_patch_size:y + half_patch_size,
                                 x - half_patch_size:x + half_patch_size]
-        return CrowdExample(image=image_patch, label=label_patch, roi=roi_patch)
+        knn_map = example.knn_map[y - half_patch_size:y + half_patch_size,
+                                  x - half_patch_size:x + half_patch_size]
+        return CrowdExample(image=image_patch, label=label_patch, roi=roi_patch, knn_map=knn_map)
 
     @staticmethod
     def get_patch_size_for_position(example, y, x):
@@ -192,7 +200,8 @@ class PatchAndRescale:
         image = np.pad(example.image, (y_padding, x_padding, z_padding), 'constant')
         label = np.pad(example.label, (y_padding, x_padding), 'constant')
         roi = np.pad(example.roi, (y_padding, x_padding), 'constant', constant_values=False)
-        return CrowdExample(image=image, label=label, roi=roi)
+        knn_map = np.pad(example.knn_map, (y_padding, x_padding), 'constant')
+        return CrowdExample(image=image, label=label, roi=roi, knn_map=knn_map)
 
     def resize_patch(self, patch):
         """
@@ -208,7 +217,8 @@ class PatchAndRescale:
         if unnormalized_label_sum != 0:
             label = (label / unnormalized_label_sum) * original_label_sum
         roi = scipy.misc.imresize(patch.roi, self.label_scaled_size, mode='F') > 0.5
-        return CrowdExample(image=image, label=label, roi=roi)
+        knn_map = scipy.misc.imresize(patch.knn_map, self.label_scaled_size, mode='F')
+        return CrowdExample(image=image, label=label, roi=roi, knn_map=knn_map)
 
 
 class ExtractPatchForPositionAndRescale(PatchAndRescale):
@@ -225,7 +235,7 @@ class ExtractPatchForPositionAndRescale(PatchAndRescale):
         original_patch_size = self.get_patch_size_for_position(example_with_perspective, y, x)
         patch = self.get_patch_for_position(example_with_perspective, y, x)
         roi_image_patch = patch.image * np.expand_dims(patch.roi, axis=-1)
-        patch = CrowdExample(image=roi_image_patch, label=patch.label * patch.roi, roi=patch.roi)
+        patch = CrowdExample(image=roi_image_patch, label=patch.label * patch.roi, roi=patch.roi, knn_map=knn_map)
         example = self.resize_patch(patch)
         return example, original_patch_size
 
@@ -246,7 +256,7 @@ class RandomlySelectPatchAndRescale(PatchAndRescale):
             patch = self.get_patch_for_position(example, y, x)
             if np.any(patch.roi):
                 roi_image_patch = patch.image * np.expand_dims(patch.roi, axis=-1)
-                patch = CrowdExample(image=roi_image_patch, label=patch.label * patch.roi, roi=patch.roi)
+                patch = CrowdExample(image=roi_image_patch, label=patch.label * patch.roi, roi=patch.roi, knn_map=patch.knn_map * patch.roi)
                 example = self.resize_patch(patch)
                 return example
 
@@ -297,7 +307,8 @@ class RandomlySelectPathWithNoPerspectiveRescale(RandomlySelectPatchAndRescale):
         if unnormalized_label_sum != 0:
             label = (label / unnormalized_label_sum) * original_label_sum
         roi = scipy.misc.imresize(patch.roi, self.label_scaled_size, mode='F') > 0.5
-        return CrowdExample(image=patch.image, label=label, roi=roi)
+        knn_map = scipy.misc.imresize(patch.knn_map, self.label_scaled_size, mode='F')
+        return CrowdExample(image=patch.image, label=label, roi=roi, knn_map=knn_map)
 
 
 class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
@@ -306,7 +317,7 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
         original_patch_size = self.get_patch_size_for_position(example_with_perspective, y, x)
         patch = self.get_patch_for_position(example_with_perspective, y, x)
         roi_image_patch = patch.image * np.expand_dims(patch.roi, axis=-1)
-        patch = CrowdExample(image=roi_image_patch, label=patch.label * patch.roi, roi=patch.roi)
+        patch = CrowdExample(image=roi_image_patch, label=patch.label * patch.roi, roi=patch.roi, knn_map=patch.knn_map * patch.roi)
         example = self.resize_patch(patch)
         return example, original_patch_size
 
@@ -341,7 +352,8 @@ class ExtractPatchForPositionNoPerspectiveRescale(PatchAndRescale):
             label = (label / unnormalized_label_sum) * original_label_sum
         roi = scipy.misc.imresize(patch.roi, self.label_scaled_size, mode='F') > 0.5
         perspective = scipy.misc.imresize(patch.perspective, self.label_scaled_size, mode='F')
-        return CrowdExample(image=patch.image, label=label, roi=roi, perspective=perspective)
+        knn_map = scipy.misc.imresize(patch.knn_map, self.label_scaled_size, mode='F')
+        return CrowdExample(image=patch.image, label=label, roi=roi, perspective=perspective, knn_map=knn_map)
 
 
 class ExtractPatch:
@@ -387,12 +399,17 @@ class ExtractPatch:
                                         x - half_patch_size:x + half_patch_size]
         else:
             label_patch = None
+        if example.knn_map is not None:
+            knn_map_patch = example.knn_map[y - half_patch_size:y + half_patch_size,
+                                        x - half_patch_size:x + half_patch_size]
+        else:
+            knn_map_patch = None
         if example.perspective is not None:
             perspective_patch = example.perspective[y - half_patch_size:y + half_patch_size,
                                                     x - half_patch_size:x + half_patch_size]
         else:
             perspective_patch = None
-        return CrowdExample(image=image_patch, label=label_patch, perspective=perspective_patch)
+        return CrowdExample(image=image_patch, label=label_patch, perspective=perspective_patch, knn_map=knn_map_patch)
 
     @staticmethod
     def pad_example(example, y_padding=(0, 0), x_padding=(0, 0)):
@@ -418,7 +435,11 @@ class ExtractPatch:
             perspective = np.pad(example.perspective, (y_padding, x_padding), 'edge')
         else:
             perspective = None
-        return CrowdExample(image=image, label=label, perspective=perspective)
+        if example.knn_map is not None:
+            knn_map = np.pad(example.knn_map, (y_padding, x_padding), 'constant')
+        else:
+            knn_map = None
+        return CrowdExample(image=image, label=label, perspective=perspective, knn_map=knn_map)
 
     def resize_label(self, patch):
         """
@@ -438,11 +459,15 @@ class ExtractPatch:
                 label = (label / unnormalized_label_sum) * original_label_sum
         else:
             label = None
+        if patch.knn_map is not None:
+            knn_map = scipy.misc.imresize(patch.knn_map, label_scaled_size, mode='F')
+        else:
+            knn_map = None
         if patch.perspective is not None:
             perspective = scipy.misc.imresize(patch.perspective, label_scaled_size, mode='F')
         else:
             perspective = None
-        return CrowdExample(image=patch.image, label=label, perspective=perspective)
+        return CrowdExample(image=patch.image, label=label, perspective=perspective, knn_map=knn_map)
 
 
 class ExtractPatchForPosition(ExtractPatch):

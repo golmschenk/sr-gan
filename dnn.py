@@ -37,7 +37,7 @@ class DnnExperiment(Experiment, ABC):
             if latest_dnn_model:
                 dnn_model_path = os.path.join(self.settings.load_model_path, latest_dnn_model)
                 print('DNN model loaded from `{}`.'.format(dnn_model_path))
-                self.DNN.load_state_dict(torch.load(dnn_model_path, map_location))
+                self.DNN.load_state_dict(torch.load(dnn_model_path, map_location), strict=False)
 
     def gpu_mode(self):
         """
@@ -76,9 +76,9 @@ class DnnExperiment(Experiment, ABC):
         train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
         step_time_start = datetime.datetime.now()
         for step in range(self.settings.steps_to_run):
-            labeled_examples, labels = next(train_dataset_generator)
-            labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
-            self.dnn_training_step(labeled_examples, labels, step)
+            labeled_examples, labels, knn_maps = next(train_dataset_generator)
+            labeled_examples, labels, knn_maps = labeled_examples.to(gpu), labels.to(gpu), knn_maps.to(gpu)
+            self.dnn_training_step(labeled_examples, labels, knn_maps, step)
             if self.dnn_summary_writer.is_summary_step() or step == self.settings.steps_to_run - 1:
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
                 step_time_start = datetime.datetime.now()

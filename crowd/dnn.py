@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import CrowdExample
-from crowd.models import DenseNetDiscriminator
+from crowd.models import DenseNetDiscriminator, KnnDenseNet, KnnDenseNet2, KnnDenseNetCat, KnnDenseNetCatBranch
 from crowd.srgan import CrowdExperiment
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from dnn import DnnExperiment
@@ -34,7 +34,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = DenseNetDiscriminator()
+        self.DNN = KnnDenseNetCatBranch()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
@@ -48,16 +48,16 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         self.evaluation_epoch(settings, DNN, validation_dataset, dnn_summary_writer, '1 Validation Error',
                               shuffle=False)
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities = next(train_iterator)
-        dnn_predicted_densities, _ = DNN(images.to(gpu))
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                             dnn_predicted_densities.to('cpu'))
+        images, densities, knn_maps = next(train_iterator)
+        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
+                                                                             predicted_knn_maps.to('cpu')[:, 0, :, :])
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities = next(validation_iterator)
-        dnn_predicted_densities, _ = DNN(images.to(gpu))
-        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                                   dnn_predicted_densities.to('cpu'))
+        images, densities, knn_maps = next(validation_iterator)
+        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
+        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
+                                                                                   predicted_knn_maps.to('cpu')[:, 0, :, :])
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
 
         self.test_summaries()
@@ -72,7 +72,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         network = self.DNN
         totals = defaultdict(lambda: 0)
         for index in indexes:
-            full_image, full_label = test_dataset[index]
+            full_image, full_label, full_knn_map = test_dataset[index]
             full_example = CrowdExample(image=full_image, label=full_label)
             full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
             totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())

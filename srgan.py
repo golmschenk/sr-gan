@@ -231,11 +231,11 @@ class Experiment(ABC):
                 print('G model loaded from `{}`.'.format(g_model_path))
                 self.G.load_state_dict(torch.load(g_model_path, map_location))
 
-    def dnn_training_step(self, examples, labels, step):
+    def dnn_training_step(self, examples, labels, knn_maps, step):
         """Runs an individual round of DNN training."""
         self.dnn_summary_writer.step = step
         self.dnn_optimizer.zero_grad()
-        dnn_loss = self.dnn_loss_calculation(examples, labels)
+        dnn_loss = self.dnn_loss_calculation(examples, labels, knn_maps)
         dnn_loss.backward()
         self.dnn_optimizer.step()
         # Summaries.
@@ -295,14 +295,14 @@ class Experiment(ABC):
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item(), )
 
-    def dnn_loss_calculation(self, labeled_examples, labels):
+    def dnn_loss_calculation(self, labeled_examples, labels, knn_maps):
         """Calculates the DNN loss."""
         predicted_labels = self.DNN(labeled_examples)
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order)
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels, knn_maps, order=self.settings.labeled_loss_order)
         labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
-    def labeled_loss_calculation(self, labeled_examples, labels):
+    def labeled_loss_calculation(self, labeled_examples, labels, knn_maps):
         """Calculates the labeled loss."""
         predicted_labels = self.D(labeled_examples)
         self.labeled_features = self.D.features

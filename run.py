@@ -58,7 +58,7 @@ settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'dn do'
+    trial_name = 'knn cat branch'
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':

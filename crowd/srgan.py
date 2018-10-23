@@ -148,12 +148,13 @@ class CrowdExperiment(Experiment):
                          shuffle=True):
         """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size, shuffle=shuffle)
-        predicted_counts, densities, predicted_densities = np.array([]), np.array(
-            []), np.array([])
-        for index, (images, labels) in enumerate(dataset_loader):
+        predicted_counts, densities, predicted_densities, knn_maps, predicted_knn_maps = np.array([]), np.array(
+            []), np.array([]), np.array([]), np.array([])
+        for index, (images, labels, batch_knn_maps) in enumerate(dataset_loader):
             images, labels = images.to(gpu), labels.to(gpu)
-            batch_predicted_densities, batch_predicted_counts = self.images_to_predicted_labels(network, images)
+            batch_predicted_densities, batch_predicted_counts, batch_predicted_knn_maps = self.images_to_predicted_labels(network, images)
             batch_predicted_densities = batch_predicted_densities.detach().to('cpu').numpy()
+            batch_predicted_knn_maps = batch_predicted_knn_maps.detach().to('cpu').numpy()
             batch_predicted_counts = batch_predicted_counts.detach().to('cpu').numpy()
             predicted_counts = np.concatenate([predicted_counts, batch_predicted_counts])
             if predicted_densities.size == 0:
@@ -162,18 +163,25 @@ class CrowdExperiment(Experiment):
             if densities.size == 0:
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
+            if knn_maps.size == 0:
+                knn_maps = knn_maps.reshape([0, *batch_knn_maps.shape[1:]])
+                knn_maps = np.concatenate([knn_maps, batch_knn_maps])
+            if predicted_knn_maps.size == 0:
+                predicted_knn_maps = predicted_knn_maps.reshape([0, *batch_predicted_knn_maps.shape[1:]])
+                predicted_knn_maps = np.concatenate([predicted_knn_maps, batch_predicted_knn_maps])
             if index * self.settings.batch_size >= 100:
                 break
+        knn_maps = np.expand_dims(knn_maps, axis=1)
         count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
-        density_mae = np.abs(predicted_densities - densities).sum(1).sum(1).mean()
-        summary_writer.add_scalar('{}/Density MAE'.format(summary_name), density_mae)
+        density_mae = np.abs(predicted_knn_maps - knn_maps).sum(2).sum(2).mean()
+        summary_writer.add_scalar('{}/kNN MAE'.format(summary_name), density_mae)
         count_mse = (np.abs(predicted_counts - densities.sum(1).sum(1)) ** 2).mean()
         summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse)
-        density_mse = (np.abs(predicted_densities - densities) ** 2).sum(1).sum(1).mean()
-        summary_writer.add_scalar('{}/Density MSE'.format(summary_name), density_mse)
+        density_mse = (np.abs(predicted_knn_maps - knn_maps) ** 2).sum(2).sum(2).mean()
+        summary_writer.add_scalar('{}/kNN MSE'.format(summary_name), density_mse)
         if comparison_value is not None:
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
         return count_mae
@@ -228,18 +236,19 @@ class CrowdExperiment(Experiment):
             grid_image_list.append(predicted_label_heatmap)
         return torchvision.utils.make_grid(grid_image_list, nrow=number_of_images, normalize=True, range=(0, 1))
 
-    def labeled_loss_function(self, predicted_labels, labels, order=2):
+    def labeled_loss_function(self, predicted_labels, labels, knn_maps, order=2):
         """The loss function for the crowd application."""
         density_labels = labels
-        predicted_density_labels, predicted_count_labels = predicted_labels
-        density_loss = torch.abs(predicted_density_labels - density_labels).pow(order).sum(1).sum(1).mean()
+        knn_maps = knn_maps.unsqueeze(1)
+        predicted_density_labels, predicted_count_labels, predicted_knn_maps = predicted_labels
+        knn_map_loss = torch.abs(predicted_knn_maps - knn_maps).pow(order).sum(1).sum(1).mean()
         count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(order).mean()
-        return count_loss + (density_loss * 10)
+        return count_loss + (knn_map_loss / (self.settings.label_patch_size ** 2))
 
     def images_to_predicted_labels(self, network, images):
         """Runs the code to go from images to a predicted labels. Useful for overriding."""
-        predicted_densities, predicted_counts = network(images)
-        return predicted_densities, predicted_counts
+        predicted_densities, predicted_counts, predicted_knn_maps = network(images)
+        return predicted_densities, predicted_counts, predicted_knn_maps
 
     def test_summaries(self):
         """Evaluates the model on test data during training."""
@@ -331,24 +340,17 @@ class CrowdExperiment(Experiment):
         patch_size = self.settings.image_patch_size
         for batch in full_example_dataloader:
             images = torch.stack([image for image in batch[0]])
-            predicted_labels, predicted_counts = network(images.to(gpu))
+            predicted_labels, predicted_counts, predicted_knn_maps = network(images.to(gpu))
             predicted_labels, predicted_counts = predicted_labels.to('cpu'), predicted_counts.to('cpu')
             for example_index, image in enumerate(batch[0]):
                 x = batch[1][example_index]
                 y = batch[2][example_index]
                 predicted_label = predicted_labels[example_index].detach().numpy()
                 predicted_count = predicted_counts[example_index].detach().numpy()
-                predicted_label_sum = np.sum(predicted_label)
                 predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
-                unnormalized_predicted_label_sum = np.sum(predicted_label)
-                if unnormalized_predicted_label_sum != 0:
-                    one_sum_label = predicted_label / unnormalized_predicted_label_sum
-                    predicted_label = one_sum_label * predicted_label_sum
-                    predicted_count_array = one_sum_label * predicted_count
-                else:
-                    predicted_label = predicted_label
-                    predicted_count_array = np.full(predicted_label.shape,
-                                                    predicted_count / predicted_label.size)
+                predicted_label = predicted_label
+                predicted_count_array = np.full(predicted_label.shape,
+                                                predicted_count / predicted_label.size)
                 half_patch_size = patch_size // 2
                 y_start_offset = 0
                 if y - half_patch_size < 0:

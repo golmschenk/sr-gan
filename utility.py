@@ -8,6 +8,7 @@ import time
 import zipfile
 from urllib.request import urlretrieve
 
+import matplotlib
 import numpy as np
 import torch
 from scipy.stats import rv_continuous
@@ -174,3 +175,21 @@ def download_and_extract_file(directory, download_link, file_name='temporary', p
     with zipfile.ZipFile(os.path.join(directory, file_name), 'r') as zip_file:
         zip_file.extractall(directory, pwd=password)
     os.remove(os.path.join(directory, file_name))
+
+
+def convert_array_to_heatmap(array):
+    mappable = matplotlib.cm.ScalarMappable(cmap='inferno')
+    mappable.set_clim(vmin=array.min(), vmax=array.max())
+    heatmap_array = mappable.to_rgba(array)
+    return heatmap_array
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    knn_map = np.load('/Users/golmschenk/Desktop/img_0628.npy')
+    image = np.load('/Users/golmschenk/Desktop/img_0628 2.npy')
+    knn_heat_map = convert_array_to_heatmap(knn_map)
+    plt.imshow(knn_heat_map)
+    plt.show()
+    plt.imshow(image)
+    plt.show()
