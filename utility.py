@@ -8,6 +8,7 @@ import time
 import zipfile
 from urllib.request import urlretrieve
 
+import imageio
 import matplotlib
 import numpy as np
 import torch
@@ -186,10 +187,21 @@ def convert_array_to_heatmap(array):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    knn_map = np.load('/Users/golmschenk/Desktop/img_0628.npy')
-    image = np.load('/Users/golmschenk/Desktop/img_0628 2.npy')
+    import seaborn as sns
+    sns.set_style('dark')
+
+    label_path = '/Volumes/Hypatia/UCF QNRF/Train/labels/img_0001.npy'
+    knn_path = label_path.replace('labels', 'knn_maps')
+    image_path = label_path.replace('labels', 'images')
+    knn_map = np.load(knn_path)
+    image = np.load(image_path)
+    density_map = np.load(label_path)
     knn_heat_map = convert_array_to_heatmap(knn_map)
-    plt.imshow(knn_heat_map)
-    plt.show()
-    plt.imshow(image)
-    plt.show()
+    density_heat_map = convert_array_to_heatmap(density_map)
+    # plt.imshow(image)
+    # plt.show()
+    # plt.imshow(density_heat_map)
+    # plt.show()
+    # plt.imshow(knn_heat_map)
+    # plt.show()
+    imageio.imwrite('/Users/golmschenk/Desktop/')

@@ -13,7 +13,8 @@ import torchvision
 from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
-from crowd.label_generation import generate_density_label, problematic_head_labels, generate_knn_map
+from crowd.label_generation import generate_density_label, problematic_head_labels, generate_knn_map, \
+    generate_point_density_map
 from utility import seed_all
 
 dataset_name = 'UCF QNRF'
@@ -173,10 +174,10 @@ class UcfQnrfPreprocessing:
         for dataset_name_ in ['Train', 'Test']:
             images_directory = os.path.join(database_directory, dataset_name_, 'images')
             knn_maps_directory = os.path.join(database_directory, dataset_name_, 'knn_maps')
-            counts_directory = os.path.join(database_directory, dataset_name_, 'counts')
+            labels_directory = os.path.join(database_directory, dataset_name_, 'labels')
             os.makedirs(images_directory, exist_ok=True)
             os.makedirs(knn_maps_directory, exist_ok=True)
-            os.makedirs(counts_directory, exist_ok=True)
+            os.makedirs(labels_directory, exist_ok=True)
             for mat_filename in os.listdir(os.path.join(database_directory, dataset_name_)):
                 if not mat_filename.endswith('.mat'):
                     continue
@@ -185,18 +186,20 @@ class UcfQnrfPreprocessing:
                 original_image_path = os.path.join(database_directory, dataset_name_, file_name + '.jpg')
                 image_path = os.path.join(images_directory, file_name + '.npy')
                 knn_map_path = os.path.join(knn_maps_directory, file_name + '.npy')
-                count_path = os.path.join(counts_directory, file_name + '.npy')
+                label_path = os.path.join(labels_directory, file_name + '.npy')
                 image = imageio.imread(original_image_path)
                 if len(image.shape) == 2:
                     image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
                 label_size = image.shape[:2]
                 mat = scipy.io.loadmat(mat_path)
                 head_positions = mat['annPoints']  # x, y ordering.
-                knn_map = generate_knn_map(head_positions, label_size)
+                knn_map = generate_knn_map(head_positions, label_size, upper_bound=112)
                 knn_map = knn_map.astype(np.float16)
+                density_map = generate_point_density_map(head_positions, label_size)
+                density_map = density_map.astype(np.float16)
                 np.save(image_path, image)
                 np.save(knn_map_path, knn_map)
-                np.save(count_path, np.array(len(head_positions)))
+                np.save(label_path, density_map)
         print('Problematic head labels: {}'.format(problematic_head_labels))
 
 
@@ -210,12 +213,12 @@ class UcfQnrfCheck:
         print('UCF QNRF')
         train_dataset = UcfQnrfFullImageDataset('train')
         train_label_sums = []
-        for image, label in train_dataset:
+        for image, label, knn_map in train_dataset:
             train_label_sums.append(label.sum())
         self.print_statistics(train_label_sums, 'train')
         test_dataset = UcfQnrfFullImageDataset('test')
         test_label_sums = []
-        for image, label in test_dataset:
+        for image, label, knn_map in test_dataset:
             test_label_sums.append(label.sum())
         self.print_statistics(test_label_sums, 'test')
         self.print_statistics(train_label_sums + test_label_sums, 'total')

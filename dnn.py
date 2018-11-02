@@ -61,7 +61,7 @@ class DnnExperiment(Experiment, ABC):
         """Prepares the optimizers of the network."""
         d_lr = self.settings.learning_rate
         weight_decay = self.settings.weight_decay
-        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay, betas=(0.99, 0.9999))
 
     def save_models(self, step=None):
         """Saves the network models."""
@@ -76,6 +76,7 @@ class DnnExperiment(Experiment, ABC):
         train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
         step_time_start = datetime.datetime.now()
         for step in range(self.settings.steps_to_run):
+            self.adjust_learning_rate(step)
             labeled_examples, labels, knn_maps = next(train_dataset_generator)
             labeled_examples, labels, knn_maps = labeled_examples.to(gpu), labels.to(gpu), knn_maps.to(gpu)
             self.dnn_training_step(labeled_examples, labels, knn_maps, step)
@@ -89,6 +90,6 @@ class DnnExperiment(Experiment, ABC):
 
     def adjust_learning_rate(self, step):
         """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-        lr = self.settings.learning_rate * (0.1 ** (step // 30000))
+        lr = self.settings.learning_rate * (0.1 ** (step // 300000))
         for param_group in self.dnn_optimizer.param_groups:
             param_group['lr'] = lr

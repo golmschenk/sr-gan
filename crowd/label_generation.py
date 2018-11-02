@@ -152,7 +152,19 @@ def make_gaussian(standard_deviation=1.0):
     return gaussian_array
 
 
-def generate_knn_map(head_positions, label_size, number_of_neighbors=1, bound_upper_by_patch_size=True):
+def generate_point_density_map(head_positions, label_size):
+    density_map = np.zeros(label_size)
+    y_x_head_positions = head_positions[:, [1, 0]]
+    for y, x in y_x_head_positions:
+        try:
+            y, x = int(round(y)), int(round(x))
+            density_map[y, x] += 1
+        except IndexError:
+            print('Head position out of bounds for label.')
+    return density_map
+
+
+def generate_knn_map(head_positions, label_size, number_of_neighbors=1, upper_bound=None):
     """
     Generates a map of the nearest neighbor distances to head positions.
 
@@ -172,9 +184,8 @@ def generate_knn_map(head_positions, label_size, number_of_neighbors=1, bound_up
                                              algorithm='ball_tree').fit(y_x_head_positions)
     neighbor_distances, _ = nearest_neighbors_fit.kneighbors(label_positions)
     knn_map = neighbor_distances.reshape(label_size)
-    if bound_upper_by_patch_size:
-        assert label_size[0] == label_size[1]
-        knn_map = np.clip(knn_map, a_min=None, a_max=label_size[0])
+    if upper_bound is not None:
+        knn_map = np.clip(knn_map, a_min=None, a_max=upper_bound)
     return knn_map
 
 

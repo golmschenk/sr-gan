@@ -176,11 +176,11 @@ class CrowdExperiment(Experiment):
         summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
-        density_mae = np.abs(predicted_knn_maps - knn_maps).sum(2).sum(2).mean()
+        density_mae = np.abs(predicted_knn_maps - knn_maps).mean()
         summary_writer.add_scalar('{}/kNN MAE'.format(summary_name), density_mae)
         count_mse = (np.abs(predicted_counts - densities.sum(1).sum(1)) ** 2).mean()
         summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse)
-        density_mse = (np.abs(predicted_knn_maps - knn_maps) ** 2).sum(2).sum(2).mean()
+        density_mse = (np.abs(predicted_knn_maps - knn_maps) ** 2).mean()
         summary_writer.add_scalar('{}/kNN MSE'.format(summary_name), density_mse)
         if comparison_value is not None:
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
@@ -241,9 +241,9 @@ class CrowdExperiment(Experiment):
         density_labels = labels
         knn_maps = knn_maps.unsqueeze(1)
         predicted_density_labels, predicted_count_labels, predicted_knn_maps = predicted_labels
-        knn_map_loss = torch.abs(predicted_knn_maps - knn_maps).pow(order).sum(1).sum(1).mean()
+        knn_map_loss = torch.abs(predicted_knn_maps - knn_maps).pow(order).mean(1).mean(1).mean(1).mean()
         count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(order).mean()
-        return count_loss + (knn_map_loss / (self.settings.label_patch_size ** 2))
+        return count_loss + knn_map_loss
 
     def images_to_predicted_labels(self, network, images):
         """Runs the code to go from images to a predicted labels. Useful for overriding."""
