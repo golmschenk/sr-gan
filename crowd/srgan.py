@@ -16,8 +16,9 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset
+from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from crowd.world_expo_data import WorldExpoDataset
-from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator
+from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator, KnnDenseNetCat
 from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
 from utility import MixtureModel, gpu
@@ -29,65 +30,80 @@ class CrowdExperiment(Experiment):
     def dataset_setup(self):
         """Sets up the datasets for the application."""
         settings = self.settings
-        if settings.dataset_class is WorldExpoDataset:
-            train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
-                                                              data.RandomHorizontalFlip(),
-                                                              data.NegativeOneToOneNormalizeImage(),
-                                                              data.NumpyArraysToTorchTensors()])
-            validation_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
-                                                                   data.NegativeOneToOneNormalizeImage(),
-                                                                   data.NumpyArraysToTorchTensors()])
-            dataset_path = '../World Expo/'
-            with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
-                cameras_dict = json.load(json_file)
-            self.train_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
-                                                  number_of_cameras=settings.number_of_cameras,
-                                                  number_of_images_per_camera=settings.number_of_images_per_camera,
-                                                  transform=train_transform, seed=settings.labeled_dataset_seed)
-            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+        self.dataset_class = UcfQnrfFullImageDataset
+        self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                       seed=settings.labeled_dataset_seed,
+                                                       number_of_examples=settings.labeled_dataset_size)
+        self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
+                                               pin_memory=self.settings.pin_memory,
+                                               num_workers=settings.number_of_data_workers)
+        self.unlabeled_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                           seed=100,
+                                                           number_of_examples=settings.unlabeled_dataset_size)
+        self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-            # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
-            #                                       transform=train_transform, unlabeled=True,
-            #                                       seed=100)
-            self.unlabeled_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
-                                                      number_of_cameras=settings.number_of_cameras,
-                                                      transform=train_transform, unlabeled=True,
-                                                      seed=settings.labeled_dataset_seed)
-            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
-                                                       shuffle=True, pin_memory=self.settings.pin_memory,
-                                                       num_workers=settings.number_of_data_workers)
-            self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                                       transform=validation_transform, seed=101)
-        elif settings.dataset_class is ShanghaiTechDataset:
-            train_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
-                                                              data.RandomHorizontalFlip(),
-                                                              data.NegativeOneToOneNormalizeImage(),
-                                                              data.NumpyArraysToTorchTensors()])
-            validation_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
-                                                                   data.NegativeOneToOneNormalizeImage(),
-                                                                   data.NumpyArraysToTorchTensors()])
-            self.train_dataset = settings.dataset_class(transform=train_transform, seed=settings.labeled_dataset_seed,
-                                                        number_of_examples=settings.labeled_dataset_size,
-                                                        fake_dataset_length=True)
-            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
-                                                   pin_memory=self.settings.pin_memory,
-                                                   num_workers=settings.number_of_data_workers)
-            self.unlabeled_dataset = settings.dataset_class(transform=train_transform,
-                                                            seed=settings.labeled_dataset_seed,
-                                                            part='part_B', fake_dataset_length=True)
-            self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
-                                                       shuffle=True, pin_memory=self.settings.pin_memory,
-                                                       num_workers=settings.number_of_data_workers)
-            self.validation_dataset = settings.dataset_class(dataset='test', transform=validation_transform, seed=101)
-        else:
-            raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
+        self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
+
+        # if settings.dataset_class is WorldExpoDataset:
+        #     train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
+        #                                                       data.RandomHorizontalFlip(),
+        #                                                       data.NegativeOneToOneNormalizeImage(),
+        #                                                       data.NumpyArraysToTorchTensors()])
+        #     validation_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
+        #                                                            data.NegativeOneToOneNormalizeImage(),
+        #                                                            data.NumpyArraysToTorchTensors()])
+        #     dataset_path = '../World Expo/'
+        #     with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
+        #         cameras_dict = json.load(json_file)
+        #     self.train_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
+        #                                           number_of_cameras=settings.number_of_cameras,
+        #                                           number_of_images_per_camera=settings.number_of_images_per_camera,
+        #                                           transform=train_transform, seed=settings.labeled_dataset_seed)
+        #     self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+        #                                            pin_memory=self.settings.pin_memory,
+        #                                            num_workers=settings.number_of_data_workers)
+        #     # self.unlabeled_dataset = CrowdDataset(dataset_path, camera_names=cameras_dict['validation'],
+        #     #                                       transform=train_transform, unlabeled=True,
+        #     #                                       seed=100)
+        #     self.unlabeled_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
+        #                                               number_of_cameras=settings.number_of_cameras,
+        #                                               transform=train_transform, unlabeled=True,
+        #                                               seed=settings.labeled_dataset_seed)
+        #     self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
+        #                                                shuffle=True, pin_memory=self.settings.pin_memory,
+        #                                                num_workers=settings.number_of_data_workers)
+        #     self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
+        #                                                transform=validation_transform, seed=101)
+        # elif settings.dataset_class is ShanghaiTechDataset:
+        #     train_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
+        #                                                       data.RandomHorizontalFlip(),
+        #                                                       data.NegativeOneToOneNormalizeImage(),
+        #                                                       data.NumpyArraysToTorchTensors()])
+        #     validation_transform = torchvision.transforms.Compose([data.ExtractPatchForRandomPosition(),
+        #                                                            data.NegativeOneToOneNormalizeImage(),
+        #                                                            data.NumpyArraysToTorchTensors()])
+        #     self.train_dataset = settings.dataset_class(transform=train_transform, seed=settings.labeled_dataset_seed,
+        #                                                 number_of_examples=settings.labeled_dataset_size,
+        #                                                 fake_dataset_length=True)
+        #     self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+        #                                            pin_memory=self.settings.pin_memory,
+        #                                            num_workers=settings.number_of_data_workers)
+        #     self.unlabeled_dataset = settings.dataset_class(transform=train_transform,
+        #                                                     seed=settings.labeled_dataset_seed,
+        #                                                     part='part_B', fake_dataset_length=True)
+        #     self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
+        #                                                shuffle=True, pin_memory=self.settings.pin_memory,
+        #                                                num_workers=settings.number_of_data_workers)
+        #     self.validation_dataset = settings.dataset_class(dataset='test', transform=validation_transform, seed=101)
+        # else:
+        #     raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = SpatialPyramidPoolingDiscriminator()
-        self.DNN = SpatialPyramidPoolingDiscriminator()
+        self.D = KnnDenseNetCat()
+        self.DNN = KnnDenseNetCat()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
@@ -101,35 +117,35 @@ class CrowdExperiment(Experiment):
         validation_dataset = self.validation_dataset
 
         # DNN training evaluation.
-        self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error')
+        self.evaluation_epoch(settings, DNN, train_dataset, dnn_summary_writer, '2 Train Error', shuffle=False)
         # DNN validation evaluation.
         dnn_validation_count_mae = self.evaluation_epoch(settings, DNN, validation_dataset, dnn_summary_writer,
-                                                         '1 Validation Error')
+                                                         '1 Validation Error', shuffle=False)
         # GAN training evaluation.
-        self.evaluation_epoch(settings, D, train_dataset, gan_summary_writer, '2 Train Error')
+        self.evaluation_epoch(settings, D, train_dataset, gan_summary_writer, '2 Train Error', shuffle=False)
         # GAN validation evaluation.
         self.evaluation_epoch(settings, D, validation_dataset, gan_summary_writer, '1 Validation Error',
-                              comparison_value=dnn_validation_count_mae)
+                              comparison_value=dnn_validation_count_mae, shuffle=False)
         # Real images.
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities = next(train_iterator)
-        predicted_densities, _ = D(images.to(gpu))
-        real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                         predicted_densities.to('cpu'))
+        images, densities, knn_maps = next(train_iterator)
+        predicted_densities, _, predicted_knn_maps = D(images.to(gpu))
+        real_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
+                                                                         predicted_knn_maps.to('cpu')[:, 1, :, :])
         gan_summary_writer.add_image('Real', real_comparison_image)
-        dnn_predicted_densities, _ = DNN(images.to(gpu))
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                             dnn_predicted_densities.to('cpu'))
+        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
+        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
+                                                                             predicted_knn_maps.to('cpu')[:, 1, :, :])
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities = next(validation_iterator)
-        predicted_densities, _ = D(images.to(gpu))
-        validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                               predicted_densities.to('cpu'))
+        images, densities, knn_maps = next(validation_iterator)
+        predicted_densities, _, predicted_knn_maps = D(images.to(gpu))
+        validation_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
+                                                                               predicted_knn_maps.to('cpu')[:, 1, :, :])
         gan_summary_writer.add_image('Validation', validation_comparison_image)
-        dnn_predicted_densities, _ = DNN(images.to(gpu))
-        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, densities,
-                                                                                   dnn_predicted_densities.to('cpu'))
+        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
+        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
+                                                                                   predicted_knn_maps.to('cpu')[:, 1, :, :])
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
@@ -262,10 +278,11 @@ class CrowdExperiment(Experiment):
         for network in [self.DNN, self.D]:
             totals = defaultdict(lambda: 0)
             for index in indexes:
-                full_image, full_label = test_dataset[index]
+                full_image, full_label, full_knn_maps = test_dataset[index]
                 full_example = CrowdExample(image=full_image, label=full_label)
                 full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
                 totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
+                totals['NAE'] += np.abs(full_predicted_count - full_example.label.sum()) / full_example.label.sum()
                 totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
                 totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
                 totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
@@ -273,6 +290,8 @@ class CrowdExperiment(Experiment):
                 summary_writer = self.dnn_summary_writer
             else:
                 summary_writer = self.gan_summary_writer
+            nae_count = totals['NAE'] / len(indexes)
+            summary_writer.add_scalar('0 Test Error/NAE count', nae_count)
             mae_count = totals['Count error'] / len(indexes)
             summary_writer.add_scalar('0 Test Error/MAE count', mae_count)
             mae_density = totals['Density sum error'] / len(indexes)

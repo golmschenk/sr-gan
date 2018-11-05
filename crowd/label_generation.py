@@ -155,13 +155,14 @@ def make_gaussian(standard_deviation=1.0):
 def generate_point_density_map(head_positions, label_size):
     density_map = np.zeros(label_size)
     y_x_head_positions = head_positions[:, [1, 0]]
+    out_of_bounds_count = 0
     for y, x in y_x_head_positions:
         try:
             y, x = int(round(y)), int(round(x))
             density_map[y, x] += 1
         except IndexError:
-            print('Head position out of bounds for label.')
-    return density_map
+            out_of_bounds_count += 1
+    return density_map, out_of_bounds_count
 
 
 def generate_knn_map(head_positions, label_size, number_of_neighbors=1, upper_bound=None):
@@ -187,6 +188,16 @@ def generate_knn_map(head_positions, label_size, number_of_neighbors=1, upper_bo
     if upper_bound is not None:
         knn_map = np.clip(knn_map, a_min=None, a_max=upper_bound)
     return knn_map
+
+
+def count_out_of_bounds(head_positions, label_size):
+    y_x_head_positions = head_positions[:, [1, 0]]
+    out_of_bounds_count = 0
+    for y, x in y_x_head_positions:
+        if y < 0 or y >= label_size[0] or x < 0 or x >= label_size[1]:
+            out_of_bounds_count += 1
+    return out_of_bounds_count
+
 
 
 def permutations_of_shape_range(shape):

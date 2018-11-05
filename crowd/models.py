@@ -124,7 +124,7 @@ def convolution(c_in, c_out, k_size, stride=2, pad=1, bn=batch_norm):
 
 class DCGenerator(Module):
     """A DCGAN-like generator architecture."""
-    def __init__(self, z_dim=256, image_size=128, conv_dim=64):
+    def __init__(self, z_dim=256, image_size=224, conv_dim=64):
         seed_all(0)
         super().__init__()
         self.fc = transpose_convolution(z_dim, conv_dim * 8, int(image_size / 16), 1, 0, bn=False)
@@ -738,7 +738,7 @@ class KnnModule(nn.Module):
         knn_map = leaky_relu(self.knn_transposed_conv_layer(x))
         hidden = leaky_relu(self.hidden_layer(knn_map))
         count = leaky_relu(self.count_layer(hidden))
-        return knn_map, count
+        return knn_map, count, hidden
 
 
 class KnnDenseNet2(nn.Module):
@@ -940,6 +940,7 @@ class KnnDenseNetCat(nn.Module):
         self.knn_module1 = KnnModule(in_features=128, kernel_size=1, label_patch_size=self.label_patch_size)
         self.knn_module2 = KnnModule(in_features=256, kernel_size=2, label_patch_size=self.label_patch_size)
         self.knn_module3 = KnnModule(in_features=896, kernel_size=4, label_patch_size=self.label_patch_size)
+        self.features = None
 
     def forward(self, x):
         """Forward pass."""
@@ -958,9 +959,10 @@ class KnnDenseNetCat(nn.Module):
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
         final_count = leaky_relu(self.count_layer(final_pool))
-        knn_map1, count1 = self.knn_module1(t1_out)
-        knn_map2, count2 = self.knn_module2(t2_out)
-        knn_map3, count3 = self.knn_module3(t3_out)
+        knn_map1, count1, h1 = self.knn_module1(t1_out)
+        knn_map2, count2, h2 = self.knn_module2(t2_out)
+        knn_map3, count3, h3 = self.knn_module3(t3_out)
+        self.features = torch.cat([h1, h2, h3, final_pool], dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         knn_map = torch.cat([knn_map1, knn_map2, knn_map3], dim=1)

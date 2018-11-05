@@ -190,18 +190,20 @@ if __name__ == '__main__':
     import seaborn as sns
     sns.set_style('dark')
 
-    label_path = '/Volumes/Hypatia/UCF QNRF/Train/labels/img_0001.npy'
+    label_path = '/Users/golmschenk/Desktop/labels/img_0191.npy'
     knn_path = label_path.replace('labels', 'knn_maps')
     image_path = label_path.replace('labels', 'images')
     knn_map = np.load(knn_path)
-    image = np.load(image_path)
-    density_map = np.load(label_path)
+    #image = np.load(image_path)
+    #density_map = np.load(label_path)
     knn_heat_map = convert_array_to_heatmap(knn_map)
-    density_heat_map = convert_array_to_heatmap(density_map)
+    #density_heat_map = convert_array_to_heatmap(density_map)
     # plt.imshow(image)
     # plt.show()
     # plt.imshow(density_heat_map)
     # plt.show()
     # plt.imshow(knn_heat_map)
     # plt.show()
-    imageio.imwrite('/Users/golmschenk/Desktop/')
+    #imageio.imwrite('/Users/golmschenk/Desktop/image.jpg', image)
+    imageio.imwrite('/Users/golmschenk/Desktop/knn_map.jpg', knn_heat_map[:, :, :3])
+    #imageio.imwrite('/Users/golmschenk/Desktop/density.jpg', density_heat_map[:, :, :3])

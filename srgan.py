@@ -89,14 +89,15 @@ class Experiment(ABC):
         unlabeled_dataset_generator = self.infinite_iter(self.unlabeled_dataset_loader)
         step_time_start = datetime.datetime.now()
         for step in range(self.settings.steps_to_run):
+            self.adjust_learning_rate(step)
             # DNN.
-            labeled_examples, labels = next(train_dataset_generator)
-            labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
-            self.dnn_training_step(labeled_examples, labels, step)
+            labeled_examples, labels, knn_maps = next(train_dataset_generator)
+            labeled_examples, labels, knn_maps = labeled_examples.to(gpu), labels.to(gpu), knn_maps.to(gpu)
+            self.dnn_training_step(labeled_examples, labels, knn_maps, step)
             # GAN.
-            unlabeled_examples, _ = next(unlabeled_dataset_generator)
+            unlabeled_examples, _, _ = next(unlabeled_dataset_generator)
             unlabeled_examples = unlabeled_examples.to(gpu)
-            self.gan_training_step(labeled_examples, labels, unlabeled_examples, step)
+            self.gan_training_step(labeled_examples, labels, knn_maps, unlabeled_examples, step)
 
             if self.gan_summary_writer.is_summary_step() or step == self.settings.steps_to_run - 1:
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
@@ -112,9 +113,9 @@ class Experiment(ABC):
         g_lr = d_lr
         # betas = (0.9, 0.999)
         weight_decay = self.settings.weight_decay
-        self.d_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.d_optimizer = Adam(self.D.parameters(), lr=d_lr, weight_decay=weight_decay, betas=(0.99, 0.9999))
         self.g_optimizer = Adam(self.G.parameters(), lr=g_lr)
-        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay)
+        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay, betas=(0.99, 0.9999))
 
     def prepare_summary_writers(self):
         """Prepares the summary writers for TensorBoard."""
@@ -244,12 +245,12 @@ class Experiment(ABC):
             if hasattr(self.DNN, 'features') and self.DNN.features is not None:
                 self.dnn_summary_writer.add_scalar('Feature Norm/Labeled', self.DNN.features.norm(dim=1).mean().item())
 
-    def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
+    def gan_training_step(self, labeled_examples, labels, knn_maps, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
         # Labeled.
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
-        labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
+        labeled_loss = self.labeled_loss_calculation(labeled_examples, labels, knn_maps)
         # Unlabeled.
         unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
         # Fake.
@@ -306,7 +307,7 @@ class Experiment(ABC):
         """Calculates the labeled loss."""
         predicted_labels = self.D(labeled_examples)
         self.labeled_features = self.D.features
-        labeled_loss = self.labeled_loss_function(predicted_labels, labels, order=self.settings.labeled_loss_order)
+        labeled_loss = self.labeled_loss_function(predicted_labels, labels, knn_maps, order=self.settings.labeled_loss_order)
         labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
@@ -386,6 +387,12 @@ class Experiment(ABC):
         while True:
             for examples in dataset:
                 yield examples
+
+    def adjust_learning_rate(self, step):
+        """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+        lr = self.settings.learning_rate * (0.1 ** (step // 300000))
+        for param_group in self.dnn_optimizer.param_groups:
+            param_group['lr'] = lr
 
 
 def unit_vector(vector):

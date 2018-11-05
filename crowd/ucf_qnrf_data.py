@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
 from crowd.label_generation import generate_density_label, problematic_head_labels, generate_knn_map, \
-    generate_point_density_map
+    generate_point_density_map, count_out_of_bounds
 from utility import seed_all
 
 dataset_name = 'UCF QNRF'
@@ -195,8 +195,10 @@ class UcfQnrfPreprocessing:
                 head_positions = mat['annPoints']  # x, y ordering.
                 knn_map = generate_knn_map(head_positions, label_size, upper_bound=112)
                 knn_map = knn_map.astype(np.float16)
-                density_map = generate_point_density_map(head_positions, label_size)
+                density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
                 density_map = density_map.astype(np.float16)
+                if out_of_bounds_count > 0:
+                    print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
                 np.save(image_path, image)
                 np.save(knn_map_path, knn_map)
                 np.save(label_path, density_map)

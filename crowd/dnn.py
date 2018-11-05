@@ -76,10 +76,13 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             full_example = CrowdExample(image=full_image, label=full_label)
             full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
             totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
+            totals['NAE'] += np.abs(full_predicted_count - full_example.label.sum()) / full_example.label.sum()
             totals['Density sum error'] += np.abs(full_predicted_label.sum() - full_example.label.sum())
             totals['SE count'] += (full_predicted_count - full_example.label.sum()) ** 2
             totals['SE density'] += (full_predicted_label.sum() - full_example.label.sum()) ** 2
         summary_writer = self.dnn_summary_writer
+        nae_count = totals['NAE'] / len(indexes)
+        summary_writer.add_scalar('0 Test Error/NAE count', nae_count)
         mae_count = totals['Count error'] / len(indexes)
         summary_writer.add_scalar('0 Test Error/MAE count', mae_count)
         mae_density = totals['Density sum error'] / len(indexes)
