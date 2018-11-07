@@ -19,7 +19,6 @@ from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindow
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator, KnnDenseNetCat
-from crowd.shanghai_tech_data import ShanghaiTechDataset
 from srgan import Experiment
 from utility import MixtureModel, gpu
 

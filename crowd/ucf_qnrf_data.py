@@ -143,7 +143,7 @@ class UcfQnrfPreprocessing:
 
     @staticmethod
     def preprocess():
-        """Preprocesses the database to a format with each label and image being it's own file."""
+        """Preprocesses the database to a format with each label and image being it's own file_."""
         for dataset_name_ in ['Train', 'Test']:
             images_directory = os.path.join(database_directory, dataset_name_, 'images')
             labels_directory = os.path.join(database_directory, dataset_name_, 'labels')
@@ -168,8 +168,7 @@ class UcfQnrfPreprocessing:
                 np.save(label_path, label)
         print('Problematic head labels: {}'.format(problematic_head_labels))
 
-    @staticmethod
-    def knn_preprocess():
+    def knn_preprocess(self):
         """Generate the kNN map version of labels (along with count labels)."""
         for dataset_name_ in ['Train', 'Test']:
             images_directory = os.path.join(database_directory, dataset_name_, 'images')
@@ -192,17 +191,39 @@ class UcfQnrfPreprocessing:
                     image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
                 label_size = image.shape[:2]
                 mat = scipy.io.loadmat(mat_path)
-                head_positions = mat['annPoints']  # x, y ordering.
+                original_head_positions = mat['annPoints']  # x, y ordering (mostly).
+                # Get y, x ordering.
+                head_positions = self.get_y_x_head_positions(original_head_positions, file_name, label_size)
                 knn_map = generate_knn_map(head_positions, label_size, upper_bound=112)
                 knn_map = knn_map.astype(np.float16)
                 density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
                 density_map = density_map.astype(np.float16)
+                if density_map.sum() > 1e6:
+                    print('{} is super huge.'.format(file_name))
                 if out_of_bounds_count > 0:
                     print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
                 np.save(image_path, image)
                 np.save(knn_map_path, knn_map)
                 np.save(label_path, density_map)
-        print('Problematic head labels: {}'.format(problematic_head_labels))
+
+    @staticmethod
+    def get_y_x_head_positions(original_head_positions, file_name, label_size):
+        if file_name == 'img_0087':
+            # Flip y labels.
+            head_position_list = []
+            for original_head_position in original_head_positions:
+                head_position_list.append([label_size[0] - original_head_position[0], original_head_position[1]])
+            head_positions = np.array(head_position_list)
+            return head_positions
+        elif file_name == 'img_0006':
+            # Flip x labels.
+            head_position_list = []
+            for original_head_position in original_head_positions:
+                head_position_list.append([original_head_position[0], label_size[1] - original_head_position[1]])
+            head_positions = np.array(head_position_list)
+            return head_positions
+        else:
+            return original_head_positions[:, [1, 0]]
 
 
 class UcfQnrfCheck:
