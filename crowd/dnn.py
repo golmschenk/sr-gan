@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from crowd import data
 from crowd.data import CrowdExample
 from crowd.models import DenseNetDiscriminator, KnnDenseNet, KnnDenseNet2, KnnDenseNetCat, KnnDenseNetCatBranch
+from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.srgan import CrowdExperiment
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from dnn import DnnExperiment
@@ -29,12 +30,21 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
+        elif settings.crowd_dataset == 'ShanghaiTech':
+            self.dataset_class = ShanghaiTechFullImageDataset
+            self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                                seed=settings.labeled_dataset_seed,
+                                                                number_of_examples=settings.labeled_dataset_size)
+            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
+                                                   pin_memory=self.settings.pin_memory,
+                                                   num_workers=settings.number_of_data_workers)
+            self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101)
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = KnnDenseNetCatBranch()
+        self.DNN = KnnDenseNetCat()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
