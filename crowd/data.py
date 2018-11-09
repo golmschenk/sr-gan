@@ -42,15 +42,15 @@ class NumpyArraysToTorchTensors:
         :rtype: CrowdExample
         """
         example.image = example.image.transpose((2, 0, 1))
-        example.image = torch.tensor(example.image)
+        example.image = torch.tensor(example.image, dtype=torch.float32)
         if example.label is not None:
-            example.label = torch.tensor(example.label)
+            example.label = torch.tensor(example.label, dtype=torch.float32)
         if example.knn_map is not None:
-            example.knn_map = torch.tensor(example.knn_map)
+            example.knn_map = torch.tensor(example.knn_map, dtype=torch.float32)
         if example.roi is not None:
-            example.roi = torch.tensor(example.roi.astype(np.float32))
+            example.roi = torch.tensor(example.roi, dtype=torch.float32)
         if example.perspective is not None:
-            example.perspective = torch.tensor(example.perspective.astype(np.float32))
+            example.perspective = torch.tensor(example.perspective, dtype=torch.float32)
         return example
 
 
