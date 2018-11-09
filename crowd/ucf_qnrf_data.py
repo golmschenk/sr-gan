@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
 from crowd.label_generation import generate_density_label, problematic_head_labels, generate_knn_map, \
-    generate_point_density_map, count_out_of_bounds
+    generate_point_density_map
 from utility import seed_all
 
 dataset_name = 'UCF QNRF'
@@ -56,7 +56,7 @@ class UcfQnrfTransformedDataset(Dataset):
     """
     A class for the transformed UCF QNRF crowd dataset.
     """
-    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=28, seed=None, number_of_examples=None,
+    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, number_of_examples=None,
                  middle_transform=None):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())

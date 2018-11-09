@@ -14,8 +14,9 @@ dataset_head_count = 0
 problematic_head_labels = 0
 
 
-def generate_density_label(head_positions, label_size, perspective=None, include_body=True, ignore_tiny=False,
-                           force_full_image_count_normalize=True, perspective_resizing=True, yx_order=False):
+def generate_density_label(head_positions, label_size, perspective=None, include_body=False, ignore_tiny=False,
+                           force_full_image_count_normalize=True, perspective_resizing=True, yx_order=False,
+                           neighbor_deviation_beta=0.15):
     """
     Generates a density label given the head positions and other meta data.
 
@@ -46,7 +47,10 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     average_neighbor_distances = neighbor_distances[0:].mean(axis=1)
     label = np.zeros(shape=label_size, dtype=np.float32)
     for head_index, head_position in enumerate(head_positions):
-        x, y = head_position.astype(np.uint32)
+        if yx_order:
+            y, x = np.rint(head_position).astype(np.uint32)
+        else:
+            x, y = np.rint(head_position).astype(np.uint32)
         if perspective_resizing:
             if perspective is not None:
                 if 0 <= x < perspective.shape[1]:
@@ -58,7 +62,6 @@ def generate_density_label(head_positions, label_size, perspective=None, include
                 head_standard_deviation = position_perspective * head_standard_deviation_meters
             else:
                 # This is the method used in the MCNN paper (or at least a close approximation).
-                neighbor_deviation_beta = 0.15
                 head_standard_deviation = average_neighbor_distances[head_index] * neighbor_deviation_beta
                 position_perspective = None
         else:
@@ -92,7 +95,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
                      x - off_center_size + x_start_offset:x + off_center_size + 1 - x_end_offset
                      ] += head_gaussian[y_start_offset:head_gaussian.shape[0] - y_end_offset,
                                         x_start_offset:head_gaussian.shape[1] - x_end_offset]
-        if perspective is not None or not include_body:
+        if perspective is not None and include_body:
             body_x = x
             body_y = y + int(position_perspective * body_height_offset_meters)
             body_width_standard_deviation = position_perspective * body_width_standard_deviation_meters

@@ -730,15 +730,19 @@ class KnnModule(nn.Module):
         super().__init__()
         self.knn_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
                                                          kernel_size=kernel_size, stride=kernel_size)
-        self.hidden_layer = Conv2d(in_channels=1, out_channels=label_patch_size, kernel_size=label_patch_size)
-        self.count_layer = Conv2d(in_channels=label_patch_size, out_channels=1, kernel_size=1)
+        self.conv1 = Conv2d(in_channels=1, out_channels=8, kernel_size=2, stride=2)
+        self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
+        self.conv3 = Conv2d(in_channels=16, out_channels=32, kernel_size=2, stride=2)
+        self.count_layer = Conv2d(in_channels=32, out_channels=1, kernel_size=28)
 
     def forward(self, x):
         """Forward pass."""
         knn_map = leaky_relu(self.knn_transposed_conv_layer(x))
-        hidden = leaky_relu(self.hidden_layer(knn_map))
-        count = leaky_relu(self.count_layer(hidden))
-        return knn_map, count, hidden
+        out = leaky_relu(self.conv1(knn_map))
+        out = leaky_relu(self.conv2(out))
+        out = leaky_relu(self.conv3(out))
+        count = leaky_relu(self.count_layer(out))
+        return knn_map, count, out
 
 
 class KnnDenseNet2(nn.Module):
@@ -867,7 +871,7 @@ class KnnDenseNetCat(nn.Module):
     """
     def __init__(self, growth_rate=32, block_config=(6, 12, 48, 32),
                  num_init_features=64, bn_size=4, drop_rate=0, pretrained=True,
-                 label_patch_size=28):
+                 label_patch_size=224):
 
         super().__init__()
         self.label_patch_size = label_patch_size
@@ -937,9 +941,9 @@ class KnnDenseNetCat(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
-        self.knn_module1 = KnnModule(in_features=128, kernel_size=1, label_patch_size=self.label_patch_size)
-        self.knn_module2 = KnnModule(in_features=256, kernel_size=2, label_patch_size=self.label_patch_size)
-        self.knn_module3 = KnnModule(in_features=896, kernel_size=4, label_patch_size=self.label_patch_size)
+        self.knn_module1 = KnnModule(in_features=128, kernel_size=8, label_patch_size=self.label_patch_size)
+        self.knn_module2 = KnnModule(in_features=256, kernel_size=16, label_patch_size=self.label_patch_size)
+        self.knn_module3 = KnnModule(in_features=896, kernel_size=32, label_patch_size=self.label_patch_size)
         self.features = None
 
     def forward(self, x):
@@ -962,7 +966,7 @@ class KnnDenseNetCat(nn.Module):
         knn_map1, count1, h1 = self.knn_module1(t1_out)
         knn_map2, count2, h2 = self.knn_module2(t2_out)
         knn_map3, count3, h3 = self.knn_module3(t3_out)
-        self.features = torch.cat([h1, h2, h3, final_pool], dim=1)
+        # self.features = torch.cat([h1, h2, h3, final_pool], dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         knn_map = torch.cat([knn_map1, knn_map2, knn_map3], dim=1)

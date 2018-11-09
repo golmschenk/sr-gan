@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NumpyArraysToTorchTensors, NegativeOneToOneNormalizeImage
 from crowd.label_generation import generate_density_label, generate_knn_map, generate_point_density_map
-from utility import seed_all
+from utility import seed_all, clean_scientific_notation
 
 if os.path.basename(os.path.normpath(os.path.abspath('..'))) == 'srgan':
     database_directory = '../../ShanghaiTech Dataset'
@@ -24,7 +24,7 @@ else:
 
 
 class ShanghaiTechFullImageDataset(Dataset):
-    def __init__(self, dataset='train', seed=None, part='part_B', number_of_examples=None):
+    def __init__(self, dataset='train', seed=None, part='part_A', number_of_examples=None):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -52,7 +52,7 @@ class ShanghaiTechTransformedDataset(Dataset):
     """
     A class for the transformed UCF QNRF crowd dataset.
     """
-    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=28, seed=None, part='part_B',
+    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, part='part_A',
                  number_of_examples=None, middle_transform=None):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
@@ -162,8 +162,7 @@ class ShanghaiTechPreprocessing:
                     np.save(image_path, image)
                     np.save(label_path, label)
 
-    @staticmethod
-    def knn_preprocess():
+    def knn_preprocess(self):
         """Generate the kNN map version of labels (along with count labels)."""
         for part in ['part_A', 'part_B']:
             for dataset_name_ in ['train_data', 'test_data']:
@@ -189,6 +188,7 @@ class ShanghaiTechPreprocessing:
                     label_size = image.shape[:2]
                     mat = scipy.io.loadmat(mat_path)
                     head_positions = mat['image_info'][0, 0][0][0][0]
+                    head_positions = self.get_y_x_head_positions(head_positions)
                     knn_map = generate_knn_map(head_positions, label_size, upper_bound=112)
                     knn_map = knn_map.astype(np.float16)
                     density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
@@ -198,6 +198,43 @@ class ShanghaiTechPreprocessing:
                     np.save(image_path, image)
                     np.save(knn_map_path, knn_map)
                     np.save(label_path, density_map)
+
+    def density_preprocess(self):
+        """Generate various versions of density labels with different Gaussian spread parameters."""
+        density_kernel_betas = [0.05, 0.1, 0.3, 0.5]
+        for part in ['part_A', 'part_B']:
+            for dataset_name_ in ['train_data', 'test_data']:
+                ground_truth_directory = os.path.join(database_directory, part, dataset_name_, 'ground-truth')
+                images_directory = os.path.join(database_directory, part, dataset_name_, 'images')
+                os.makedirs(images_directory, exist_ok=True)
+                for mat_filename in os.listdir(ground_truth_directory):
+                    if not mat_filename.endswith('.mat'):
+                        continue
+                    file_name = mat_filename[3:-3]
+                    mat_path = os.path.join(ground_truth_directory, mat_filename)
+                    original_image_path = os.path.join(images_directory, file_name + 'jpg')
+                    image = imageio.imread(original_image_path)
+                    if len(image.shape) == 2:
+                        image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
+                    label_size = image.shape[:2]
+                    mat = scipy.io.loadmat(mat_path)
+                    head_positions = mat['image_info'][0, 0][0][0][0]
+                    head_positions = self.get_y_x_head_positions(head_positions)
+                    for density_kernel_beta in density_kernel_betas:
+                        density_directory_name = clean_scientific_notation('density{:e}'.format(density_kernel_beta))
+                        density_directory = os.path.join(database_directory, part, dataset_name_,
+                                                         density_directory_name)
+                        os.makedirs(density_directory, exist_ok=True)
+                        density_path = os.path.join(density_directory, file_name + 'npy')
+                        if os.path.exists(density_path):
+                            continue
+                        density_map = generate_density_label(head_positions, label_size, perspective_resizing=True, yx_order=True, neighbor_deviation_beta=density_kernel_beta)
+                        density_map = density_map.astype(np.float16)
+                        np.save(density_path, density_map)
+
+    @staticmethod
+    def get_y_x_head_positions(original_head_positions):
+        return original_head_positions[:, [1, 0]]
 
 
 class ShanghaiTechCheck:
@@ -240,5 +277,7 @@ class ShanghaiTechCheck:
 if __name__ == '__main__':
     preprocessor = ShanghaiTechPreprocessing()
     # preprocessor.download_and_preprocess()
+    # preprocessor.download()
     preprocessor.knn_preprocess()
+    preprocessor.density_preprocess()
     ShanghaiTechCheck().display_statistics()
