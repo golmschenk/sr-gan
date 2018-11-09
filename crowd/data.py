@@ -450,6 +450,8 @@ class ExtractPatch:
         :return: The patch with the resized label.
         :rtype: CrowdExample
         """
+        if self.label_patch_size == self.image_patch_size:
+            return patch
         label_scaled_size = [self.label_patch_size, self.label_patch_size]
         if patch.label is not None:
             original_label_sum = np.sum(patch.label)
