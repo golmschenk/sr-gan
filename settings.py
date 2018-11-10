@@ -49,6 +49,9 @@ class Settings:
         self.test_sliding_window_size = 128
         self.image_patch_size = 224
         self.label_patch_size = 224
+        self.map_multiplier = 1
+        self.inverse_map = True
+        self.map_directory_name = 'knn_maps'
 
         # SGAN models only.
         self.number_of_bins = 10

@@ -46,19 +46,21 @@ settings_.unlabeled_dataset_size = None
 settings_.labeled_dataset_size = None
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = [0]
-settings_.steps_to_run = 1000000
+settings_.steps_to_run = 300000
 settings_.learning_rate = [1e-4]
 settings_.gradient_penalty_multiplier = [0.1]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-settings_.load_model_path = 'logs/knn cat long crowd dnn leNone ueNone ul1e0 fl1e0 gp1e-1 mo0e0 lr1e-4 gs1 ls0 u2f0.5g2 bs12 l'
+settings_.load_model_path = 'logs/density quick start'
+settings_.inverse_map = True
+settings_.map_directory_name = ['labels', 'density5e-2', 'density1e-1', 'density3e-1', 'density5e-1']
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'knnc st'
+    trial_name = '{} sfss'.format(settings_.map_directory_name)
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':

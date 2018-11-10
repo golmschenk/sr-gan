@@ -24,12 +24,14 @@ else:
 
 
 class ShanghaiTechFullImageDataset(Dataset):
-    def __init__(self, dataset='train', seed=None, part='part_A', number_of_examples=None):
+    def __init__(self, dataset='train', seed=None, part='part_A', number_of_examples=None,
+                 map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
         self.length = len(self.file_names)
+        self.map_directory_name = map_directory_name
 
     def __getitem__(self, index):
         """
@@ -41,7 +43,7 @@ class ShanghaiTechFullImageDataset(Dataset):
         file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        knn_map = np.load(os.path.join(self.dataset_directory, 'knn_maps', file_name))
+        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
         return image, label, knn_map
 
     def __len__(self):
@@ -53,7 +55,7 @@ class ShanghaiTechTransformedDataset(Dataset):
     A class for the transformed UCF QNRF crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, part='part_A',
-                 number_of_examples=None, middle_transform=None):
+                 number_of_examples=None, middle_transform=None, inverse_map=False, map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -71,6 +73,8 @@ class ShanghaiTechTransformedDataset(Dataset):
             image_indexes_length = len(y_positions) * len(x_positions)
             self.length += image_indexes_length
         self.middle_transform = middle_transform
+        self.inverse_map = inverse_map
+        self.map_directory_name = map_directory_name
 
     def __getitem__(self, index):
         """
@@ -90,7 +94,7 @@ class ShanghaiTechTransformedDataset(Dataset):
                                                                NumpyArraysToTorchTensors()])
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
-        knn_map = np.load(os.path.join(self.dataset_directory, 'knn_maps', file_name), mmap_mode='r')
+        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -103,7 +107,10 @@ class ShanghaiTechTransformedDataset(Dataset):
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        return example.image, example.label, example.knn_map
+        map = example.knn_map
+        if self.inverse_map:
+            map = 1 / (map + 1)
+        return example.image, example.label, map
 
     def __len__(self):
         return self.length

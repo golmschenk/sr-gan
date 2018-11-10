@@ -34,11 +34,15 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             self.dataset_class = ShanghaiTechFullImageDataset
             self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                                 seed=settings.labeled_dataset_seed,
-                                                                number_of_examples=settings.labeled_dataset_size)
+                                                                number_of_examples=settings.labeled_dataset_size,
+                                                                inverse_map=settings.inverse_map,
+                                                                map_directory_name=settings.map_directory_name)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-            self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101)
+            self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101,
+                                                                     inverse_map=settings.inverse_map,
+                                                                     map_directory_name=settings.map_directory_name)
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
