@@ -186,6 +186,7 @@ def generate_knn_map(head_positions, label_size, number_of_neighbors=1, upper_bo
                                              algorithm='ball_tree').fit(head_positions)
     neighbor_distances, _ = nearest_neighbors_fit.kneighbors(label_positions)
     knn_map = neighbor_distances.reshape(label_size)
+    # knn_map = knn_map - np.min(knn_map)
     if upper_bound is not None:
         knn_map = np.clip(knn_map, a_min=None, a_max=upper_bound)
     return knn_map

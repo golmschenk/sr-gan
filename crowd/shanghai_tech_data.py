@@ -175,10 +175,8 @@ class ShanghaiTechPreprocessing:
             for dataset_name_ in ['train_data', 'test_data']:
                 ground_truth_directory = os.path.join(database_directory, part, dataset_name_, 'ground-truth')
                 images_directory = os.path.join(database_directory, part, dataset_name_, 'images')
-                knn_maps_directory = os.path.join(database_directory, part, dataset_name_, 'knn_maps')
                 labels_directory = os.path.join(database_directory, part, dataset_name_, 'labels')
                 os.makedirs(images_directory, exist_ok=True)
-                os.makedirs(knn_maps_directory, exist_ok=True)
                 os.makedirs(labels_directory, exist_ok=True)
                 for mat_filename in os.listdir(ground_truth_directory):
                     if not mat_filename.endswith('.mat'):
@@ -188,7 +186,6 @@ class ShanghaiTechPreprocessing:
                     original_image_path = os.path.join(images_directory, file_name + 'jpg')
                     image_path = os.path.join(images_directory, file_name + 'npy')
                     label_path = os.path.join(labels_directory, file_name + 'npy')
-                    knn_map_path = os.path.join(knn_maps_directory, file_name + 'npy')
                     image = imageio.imread(original_image_path)
                     if len(image.shape) == 2:
                         image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
@@ -196,14 +193,19 @@ class ShanghaiTechPreprocessing:
                     mat = scipy.io.loadmat(mat_path)
                     head_positions = mat['image_info'][0, 0][0][0][0]
                     head_positions = self.get_y_x_head_positions(head_positions)
-                    knn_map = generate_knn_map(head_positions, label_size, upper_bound=112)
-                    knn_map = knn_map.astype(np.float16)
+                    for k in [1, 2, 3, 4, 5]:
+                        knn_maps_directory = os.path.join(database_directory, part, dataset_name_,
+                                                          '{}nn_maps'.format(k))
+                        os.makedirs(knn_maps_directory, exist_ok=True)
+                        knn_map_path = os.path.join(knn_maps_directory, file_name + 'npy')
+                        knn_map = generate_knn_map(head_positions, label_size, number_of_neighbors=k, upper_bound=112)
+                        knn_map = knn_map.astype(np.float16)
+                        np.save(knn_map_path, knn_map)
                     density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
                     density_map = density_map.astype(np.float16)
                     if out_of_bounds_count > 0:
                         print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
                     np.save(image_path, image)
-                    np.save(knn_map_path, knn_map)
                     np.save(label_path, density_map)
 
     def density_preprocess(self):
