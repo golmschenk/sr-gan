@@ -185,10 +185,10 @@ def generate_knn_map(head_positions, label_size, number_of_neighbors=1, upper_bo
     nearest_neighbors_fit = NearestNeighbors(n_neighbors=number_of_neighbors,
                                              algorithm='ball_tree').fit(head_positions)
     neighbor_distances, _ = nearest_neighbors_fit.kneighbors(label_positions)
-    knn_map = neighbor_distances.reshape(label_size)
-    # knn_map = knn_map - np.min(knn_map)
     if upper_bound is not None:
-        knn_map = np.clip(knn_map, a_min=None, a_max=upper_bound)
+        neighbor_distances = np.clip(neighbor_distances, a_min=None, a_max=upper_bound)
+    mean_neighbor_distances = neighbor_distances.mean(axis=1)
+    knn_map = mean_neighbor_distances.reshape(label_size)
     return knn_map
 
 
