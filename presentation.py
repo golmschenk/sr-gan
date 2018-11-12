@@ -1,13 +1,17 @@
 """
 Code for preparing presentation stuff.
 """
+import math
 import os
 import re
 import imageio
 import numpy as np
 import shutil
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
+import scipy
 from scipy.stats import norm, uniform
+from scipy.special import gammainc
 import seaborn as sns
 import matplotlib2tikz
 
@@ -119,6 +123,55 @@ def nash_equilibrium_plot():
     plt.close(figure)
 
 
+def generate_single_peak_and_corresponding_loss(sigma=0.1):
+    sns.set_style('darkgrid')
+    figure, axes = plt.subplots(dpi=dpi)
+    x_axis = np.arange(0, 5, 0.001)
+    axes.plot(x_axis, norm(0, sigma).pdf(x_axis), color=sns.color_palette()[0])
+    max = np.max(norm(0, sigma).pdf(x_axis))
+    axes.plot(x_axis, max - norm(0, sigma).pdf(x_axis), color=sns.color_palette()[1])
+    matplotlib2tikz.save(os.path.join('latex', 'single_peak_with_loss.tex'))
+    plt.show()
+    plt.close(figure)
+
+def generate_mixture_peaks(sigmas=None):
+    if sigmas is None:
+        sigmas = [0.2, 0.5, 1, 2, 5]
+    sns.set_style('darkgrid')
+    figure, axes = plt.subplots(dpi=dpi)
+    x_axis = np.arange(0, 2, 0.001)
+    normals = []
+    for sigma in sigmas:
+        normal_ = norm(0, sigma)
+        normals.append(normal_)
+        axes.plot(x_axis, normal_.pdf(x_axis), color=sns.color_palette()[1], alpha=0.5)
+    mixture = MixtureModel(normals)
+    axes.plot(x_axis, mixture.pdf(x_axis), color=sns.color_palette()[0])
+    axes.plot(x_axis, 1/(x_axis + 1), color=sns.color_palette()[2])
+    axes.plot(x_axis, 1/(gammainc(1, (x_axis ** 2)/2)/(2*math.sqrt(2*math.pi)) + 1), color=sns.color_palette()[3])
+    # max = np.max(mixture.pdf(x_axis))
+    # axes.plot(x_axis, max - mixture.pdf(x_axis), color=sns.color_palette()[1])
+    matplotlib2tikz.save(os.path.join('latex', 'single_peak_with_loss.tex'))
+    plt.show()
+    plt.close(figure)
+
+def mae_density():
+    sns.set_style('darkgrid')
+    figure, knn_axes = plt.subplots(dpi=dpi)
+    density_axes = knn_axes.twiny()
+    density_axes.set_xscale('symlog')
+    density_spreads = [1e-1, 3e-1, 5e-1]
+    density_maes = [73.9, 74.6, 77.2]
+    knn_ks = [1]
+    knn_maes = [69.6]
+    density_axes.set_xticks(density_spreads)
+    density_axes.get_xaxis().set_major_formatter(ScalarFormatter())
+    density_axes.plot(density_spreads, density_maes, color=sns.color_palette()[0], marker='o')
+    knn_axes.plot(knn_ks, knn_maes, color=sns.color_palette()[1], marker='o')
+    matplotlib2tikz.save(os.path.join('latex', 'single_peak_with_loss.tex'))
+    plt.show()
+    plt.close(figure)
+
 if __name__ == '__main__':
     plt.switch_backend('module://backend_interagg')
-    nash_equilibrium_plot()
+    mae_density()
