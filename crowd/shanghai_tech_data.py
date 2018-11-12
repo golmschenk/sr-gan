@@ -196,13 +196,17 @@ class ShanghaiTechPreprocessing:
                     for k in [1, 2, 3, 4, 5]:
                         knn_maps_directory = os.path.join(database_directory, part, dataset_name_,
                                                           '{}nn_maps'.format(k))
+                        iknn_maps_directory = os.path.join(database_directory, part, dataset_name_,
+                                                           'i{}nn_maps'.format(k))
                         os.makedirs(knn_maps_directory, exist_ok=True)
+                        os.makedirs(iknn_maps_directory, exist_ok=True)
                         knn_map_path = os.path.join(knn_maps_directory, file_name + 'npy')
+                        iknn_map_path = os.path.join(iknn_maps_directory, file_name + 'npy')
                         knn_map = generate_knn_map(head_positions, label_size, number_of_neighbors=k, upper_bound=112)
-                        knn_map = knn_map.astype(np.float16)
+                        iknn_map = 1 / (knn_map + 1)
+                        np.save(iknn_map_path, iknn_map)
                         np.save(knn_map_path, knn_map)
                     density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
-                    density_map = density_map.astype(np.float16)
                     if out_of_bounds_count > 0:
                         print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
                     np.save(image_path, image)
@@ -235,10 +239,7 @@ class ShanghaiTechPreprocessing:
                                                          density_directory_name)
                         os.makedirs(density_directory, exist_ok=True)
                         density_path = os.path.join(density_directory, file_name + 'npy')
-                        if os.path.exists(density_path):
-                            continue
                         density_map = generate_density_label(head_positions, label_size, perspective_resizing=True, yx_order=True, neighbor_deviation_beta=density_kernel_beta)
-                        density_map = density_map.astype(np.float16)
                         np.save(density_path, density_map)
 
     @staticmethod
@@ -247,40 +248,42 @@ class ShanghaiTechPreprocessing:
 
 
 class ShanghaiTechCheck:
-    """A class for listing statistics about the ShanghaiTech dataset."""
     def display_statistics(self):
         """
         Displays the statistics of the database.
         """
         print('=' * 50)
-        print('part_B')
-        test_dataset = ShanghaiTechFullImageDataset('test')
-        test_labels = np.stack([label for (image, label, knn_map) in test_dataset], axis=0)
-        self.print_statistics('test', test_labels)
+        print('ShanghaiTech')
         train_dataset = ShanghaiTechFullImageDataset('train')
-        train_labels = np.stack([label for (image, label, knn_map) in train_dataset], axis=0)
-        self.print_statistics('train', train_labels)
-        total_dataset_name = 'total'
-        total_labels = np.concatenate([test_labels, train_labels], axis=0)
-        self.print_statistics(total_dataset_name, total_labels)
+        train_label_sums = []
+        for image, label, knn_map in train_dataset:
+            train_label_sums.append(label.sum())
+        self.print_statistics(train_label_sums, 'train')
+        test_dataset = ShanghaiTechFullImageDataset('test')
+        test_label_sums = []
+        for image, label, knn_map in test_dataset:
+            test_label_sums.append(label.sum())
+        self.print_statistics(test_label_sums, 'test')
+        self.print_statistics(train_label_sums + test_label_sums, 'total')
 
     @staticmethod
-    def print_statistics(dataset_name, labels):
+    def print_statistics(label_sums, dataset_name_):
         """
         Prints the statistics for the given images and labels.
 
-        :param dataset_name: The name of the data set being checked.
-        :type dataset_name: str
-        :param labels: The labels of the dataset.
-        :type labels: np.ndarray
+        :param dataset_name_: The name of the data set being checked.
+        :type dataset_name_: str
+        :param label_sums: The sums of the labels of the dataset.
+        :type label_sums: list[float]
         """
         print('-' * 50)
-        print('Dataset: {}'.format(dataset_name))
-        print('Person count: {}'.format(labels.sum()))
-        print('Average count: {}'.format(labels.sum(axis=(1, 2)).mean(axis=0)))
-        print('Median count: {}'.format(np.median(labels.sum(axis=(1, 2)), axis=0)))
-        print('Max single image count: {}'.format(labels.sum(axis=(1, 2)).max(axis=0)))
-        print('Min single image count: {}'.format(labels.sum(axis=(1, 2)).min(axis=0)))
+        print(dataset_name_)
+        label_sums = np.array(label_sums)
+        print('Person count: {}'.format(label_sums.sum()))
+        print('Average count: {}'.format(label_sums.mean(axis=0)))
+        print('Median count: {}'.format(np.median(label_sums, axis=0)))
+        print('Max single image count: {}'.format(label_sums.max(axis=0)))
+        print('Min single image count: {}'.format(label_sums.min(axis=0)))
 
 
 if __name__ == '__main__':
@@ -288,5 +291,5 @@ if __name__ == '__main__':
     # preprocessor.download_and_preprocess()
     # preprocessor.download()
     preprocessor.knn_preprocess()
-    preprocessor.density_preprocess()
+    # preprocessor.density_preprocess()
     ShanghaiTechCheck().display_statistics()
