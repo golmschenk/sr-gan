@@ -50,7 +50,7 @@ class Settings:
         self.image_patch_size = 224
         self.label_patch_size = 224
         self.map_multiplier = 1
-        self.inverse_map = True
+        self.inverse_map = False
         self.map_directory_name = 'knn_maps'
 
         # SGAN models only.

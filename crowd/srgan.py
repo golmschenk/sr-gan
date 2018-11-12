@@ -256,9 +256,9 @@ class CrowdExperiment(Experiment):
         density_labels = labels
         knn_maps = knn_maps.unsqueeze(1)
         predicted_density_labels, predicted_count_labels, predicted_knn_maps = predicted_labels
-        knn_map_loss = torch.abs(predicted_knn_maps - knn_maps).mean(1).sum(1).sum(1).pow(order).mean()
+        knn_map_loss = (torch.abs(predicted_knn_maps - knn_maps) * self.settings.map_multiplier).mean(1).sum(1).sum(1).pow(order).mean()
         count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(order).mean()
-        return count_loss + (knn_map_loss * self.settings.map_multiplier)
+        return count_loss + (knn_map_loss)
 
     def images_to_predicted_labels(self, network, images):
         """Runs the code to go from images to a predicted labels. Useful for overriding."""

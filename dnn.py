@@ -61,7 +61,7 @@ class DnnExperiment(Experiment, ABC):
         """Prepares the optimizers of the network."""
         d_lr = self.settings.learning_rate
         weight_decay = self.settings.weight_decay
-        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay, betas=(0.99, 0.9999))
+        self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay, betas=(0.9, 0.999))
 
     def save_models(self, step=None):
         """Saves the network models."""

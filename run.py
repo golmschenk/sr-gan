@@ -46,21 +46,21 @@ settings_.unlabeled_dataset_size = None
 settings_.labeled_dataset_size = None
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = [0]
-settings_.steps_to_run = 300000
+settings_.steps_to_run = 100000
 settings_.learning_rate = [1e-4]
 settings_.gradient_penalty_multiplier = [0.1]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-settings_.load_model_path = 'logs/density quick start'
-settings_.inverse_map = True
-settings_.map_directory_name = ['labels', 'density5e-2', 'density1e-1', 'density3e-1', 'density5e-1']
+settings_.load_model_path = 'logs/knn quick start'
+settings_.map_directory_name = ['1nn_maps']#, '2nn_maps', '3nn_maps', '4nn_maps', '5nn_maps']
+settings_.map_multiplier = 1 / (224 * 224)
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = '{} sfss'.format(settings_.map_directory_name)
+    trial_name = '{} sfss lb lm'.format(settings_.map_directory_name)
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':

@@ -390,7 +390,7 @@ class Experiment(ABC):
 
     def adjust_learning_rate(self, step):
         """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-        lr = self.settings.learning_rate * (0.1 ** (step // 300000))
+        lr = self.settings.learning_rate * (0.1 ** (step // 100000))
         for param_group in self.dnn_optimizer.param_groups:
             param_group['lr'] = lr
 
