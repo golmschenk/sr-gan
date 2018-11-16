@@ -78,7 +78,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
 
     def test_summaries(self):
         """Evaluates the model on test data during training."""
-        test_dataset = self.dataset_class(dataset='test')
+        test_dataset = self.dataset_class(dataset='test', map_directory_name=self.settings.map_directory_name)
         if self.settings.test_summary_size is not None:
             indexes = random.sample(range(test_dataset.length), self.settings.test_summary_size)
         else:

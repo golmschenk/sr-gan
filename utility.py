@@ -190,30 +190,12 @@ if __name__ == '__main__':
     import seaborn as sns
     sns.set_style('dark')
 
-    for file_ in os.listdir('/Users/golmschenk/Desktop/knn_maps'):
+    for file_ in os.listdir('/Users/golmschenk/Desktop/1nn_maps'):
         if file_.startswith('.'):
             continue
         label_path = '/Users/golmschenk/Desktop/labels/{}'.format(file_)
-        knn_path = label_path.replace('labels', 'knn_maps')
-        image_path = label_path.replace('labels', 'images')
-        knn_map = np.load(knn_path)
-        image = np.load(image_path)
-        # density_map = np.load(label_path)
-        knn_heat_map = convert_array_to_heatmap(knn_map)
-        # density_heat_map = convert_array_to_heatmap(density_map)
-        f = plt.figure()
-        f.suptitle(file_)
-        f.add_subplot(1, 2, 1)
-        plt.imshow(image)
-        f.add_subplot(1, 2, 2)
-        plt.imshow(knn_heat_map)
-        plt.show(block=True)
-        # plt.imshow(image)
-        # plt.show()
-        # plt.imshow(density_heat_map)
-        # plt.show()
-        # plt.imshow(knn_heat_map)
-        # plt.show()
-        imageio.imwrite('/Users/golmschenk/Desktop/image.jpg', image)
-        imageio.imwrite('/Users/golmschenk/Desktop/knn_map.jpg', knn_heat_map[:, :, :3])
-        # imageio.imwrite('/Users/golmschenk/Desktop/density.jpg', density_heat_map[:, :, :3])
+        for type in ['1nn_maps', '2nn_maps', '5nn_maps', 'density3e-1', 'i1nn_maps']:
+            type_path = label_path.replace('labels', '{}'.format(type))
+            type_map = np.load(type_path)
+            type_heat_map = convert_array_to_heatmap(type_map)
+            imageio.imwrite('/Users/golmschenk/Desktop/{}.jpg'.format(type), type_heat_map[:, :, :3])

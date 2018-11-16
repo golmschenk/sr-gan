@@ -95,6 +95,8 @@ class ShanghaiTechTransformedDataset(Dataset):
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
         knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
+        if '1nn' in self.map_directory_name and 'i1nn' not in self.map_directory_name:
+            knn_map = knn_map / 112
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -289,7 +291,7 @@ class ShanghaiTechCheck:
 if __name__ == '__main__':
     preprocessor = ShanghaiTechPreprocessing()
     # preprocessor.download_and_preprocess()
-    # preprocessor.download()
+    preprocessor.download()
     preprocessor.knn_preprocess()
-    # preprocessor.density_preprocess()
+    preprocessor.density_preprocess()
     ShanghaiTechCheck().display_statistics()

@@ -28,7 +28,8 @@ class UcfQnrfFullImageDataset(Dataset):
     """
     A class for the UCF QNRF full image crowd dataset.
     """
-    def __init__(self, dataset='train', seed=None, number_of_examples=None):
+    def __init__(self, dataset='train', seed=None, number_of_examples=None,
+                 map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -45,7 +46,7 @@ class UcfQnrfFullImageDataset(Dataset):
         file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        knn_map = np.load(os.path.join(self.dataset_directory, 'knn_maps', file_name))
+        knn_map = np.load(os.path.join(self.dataset_directory, 'maps', file_name))
         return image, label, knn_map
 
     def __len__(self):
@@ -57,7 +58,8 @@ class UcfQnrfTransformedDataset(Dataset):
     A class for the transformed UCF QNRF crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, number_of_examples=None,
-                 middle_transform=None):
+                 middle_transform=None,
+                 map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -94,7 +96,7 @@ class UcfQnrfTransformedDataset(Dataset):
                                                                NumpyArraysToTorchTensors()])
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
-        knn_map = np.load(os.path.join(self.dataset_directory, 'knn_maps', file_name), mmap_mode='r')
+        knn_map = np.load(os.path.join(self.dataset_directory, 'maps', file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -172,10 +174,10 @@ class UcfQnrfPreprocessing:
         """Generate the kNN map version of labels (along with count labels)."""
         for dataset_name_ in ['Train', 'Test']:
             images_directory = os.path.join(database_directory, dataset_name_, 'images')
-            knn_maps_directory = os.path.join(database_directory, dataset_name_, 'knn_maps')
+            maps_directory = os.path.join(database_directory, dataset_name_, 'maps')
             labels_directory = os.path.join(database_directory, dataset_name_, 'labels')
             os.makedirs(images_directory, exist_ok=True)
-            os.makedirs(knn_maps_directory, exist_ok=True)
+            os.makedirs(maps_directory, exist_ok=True)
             os.makedirs(labels_directory, exist_ok=True)
             for mat_filename in os.listdir(os.path.join(database_directory, dataset_name_)):
                 if not mat_filename.endswith('.mat'):
@@ -184,7 +186,7 @@ class UcfQnrfPreprocessing:
                 mat_path = os.path.join(database_directory, dataset_name_, mat_filename)
                 original_image_path = os.path.join(database_directory, dataset_name_, file_name + '.jpg')
                 image_path = os.path.join(images_directory, file_name + '.npy')
-                knn_map_path = os.path.join(knn_maps_directory, file_name + '.npy')
+                map_path = os.path.join(maps_directory, file_name + '.npy')
                 label_path = os.path.join(labels_directory, file_name + '.npy')
                 image = imageio.imread(original_image_path)
                 if len(image.shape) == 2:
@@ -194,16 +196,15 @@ class UcfQnrfPreprocessing:
                 original_head_positions = mat['annPoints']  # x, y ordering (mostly).
                 # Get y, x ordering.
                 head_positions = self.get_y_x_head_positions(original_head_positions, file_name, label_size)
-                knn_map = generate_knn_map(head_positions, label_size, upper_bound=112)
-                knn_map = knn_map.astype(np.float16)
+                map_ = generate_knn_map(head_positions, label_size, upper_bound=112)
+                map_ = 1 / (map_ + 1)
                 density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
-                density_map = density_map.astype(np.float16)
                 if density_map.sum() > 1e6:
                     print('{} is super huge.'.format(file_name))
                 if out_of_bounds_count > 0:
                     print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
                 np.save(image_path, image)
-                np.save(knn_map_path, knn_map)
+                np.save(map_path, map_)
                 np.save(label_path, density_map)
 
     @staticmethod
@@ -268,6 +269,6 @@ class UcfQnrfCheck:
 
 if __name__ == '__main__':
     preprocessor = UcfQnrfPreprocessing()
-    # preprocessor.download()
+    preprocessor.download()
     preprocessor.knn_preprocess()
     UcfQnrfCheck().display_statistics()
