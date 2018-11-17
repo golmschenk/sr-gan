@@ -251,6 +251,25 @@ class CrowdExperiment(Experiment):
             grid_image_list.append(predicted_label_heatmap)
         return torchvision.utils.make_grid(grid_image_list, nrow=number_of_images, normalize=True, range=(0, 1))
 
+    def create_knn_crowd_images_comparison_grid(self, images, labels, predicted_labels, number_of_images=3):
+        grid_image_list = []
+        for index in range(min(number_of_images, images.size()[0])):
+            grid_image_list.append((images[index].data + 1) / 2)
+            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
+                                                                                           predicted_labels[:, 0, :, :][
+                                                                                               index].data)
+            grid_image_list.append(label_heatmap)
+            grid_image_list.append(predicted_label_heatmap)
+            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
+                                                                                           predicted_labels[:, 1, :, :][
+                                                                                               index].data)
+            grid_image_list.append(predicted_label_heatmap)
+            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
+                                                                                           predicted_labels[:, 2, :, :][
+                                                                                               index].data)
+            grid_image_list.append(predicted_label_heatmap)
+        return torchvision.utils.make_grid(grid_image_list, nrow=5, normalize=True, range=(0, 1))
+
     def labeled_loss_function(self, predicted_labels, labels, knn_maps, order=2):
         """The loss function for the crowd application."""
         density_labels = labels

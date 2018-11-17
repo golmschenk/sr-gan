@@ -155,23 +155,30 @@ def generate_mixture_peaks(sigmas=None):
     plt.show()
     plt.close(figure)
 
-def mae_density():
+def map_comparisons(sigmas=None):
+    if sigmas is None:
+        sigmas = [0.4, 1, 2, 4, 6, 8]
     sns.set_style('darkgrid')
-    figure, knn_axes = plt.subplots(dpi=dpi)
-    density_axes = knn_axes.twiny()
-    density_axes.set_xscale('symlog')
-    density_spreads = [1e-1, 3e-1, 5e-1]
-    density_maes = [73.9, 74.6, 77.2]
-    knn_ks = [1]
-    knn_maes = [69.6]
-    density_axes.set_xticks(density_spreads)
-    density_axes.get_xaxis().set_major_formatter(ScalarFormatter())
-    density_axes.plot(density_spreads, density_maes, color=sns.color_palette()[0], marker='o')
-    knn_axes.plot(knn_ks, knn_maes, color=sns.color_palette()[1], marker='o')
-    matplotlib2tikz.save(os.path.join('latex', 'single_peak_with_loss.tex'))
+    figure, axes = plt.subplots(dpi=dpi)
+    x_axis = np.arange(0, 4, 0.001)
+    normals = []
+    for sigma in sigmas:
+        normal_ = norm(0, sigma)
+        normals.append(normal_)
+        #axes.plot(x_axis, normal_.pdf(x_axis), color=sns.color_palette()[1], alpha=0.5)
+    mixture = MixtureModel(normals)
+    axes.plot(x_axis, mixture.pdf(x_axis) / mixture.pdf(x_axis).max(), color=sns.color_palette()[0])
+    axes.plot(x_axis, normals[0].pdf(x_axis) / (normals[0].pdf(x_axis).max()), color=sns.color_palette()[1])
+
+    axes.plot(x_axis, normals[-1].pdf(x_axis) / (normals[-1].pdf(x_axis).max()), color=sns.color_palette()[1])
+    axes.plot(x_axis, (1 / (x_axis + 1)) / (1 / (x_axis + 1)).max(), color=sns.color_palette()[2])
+    # axes.plot(x_axis, x_axis / (x_axis.max()), color=sns.color_palette()[2])
+    axes.set_ylabel('Map value')
+    axes.set_xlabel('Distance from head position')
+    matplotlib2tikz.save(os.path.join('latex', 'mapcomparisons.tex'))
     plt.show()
     plt.close(figure)
 
 if __name__ == '__main__':
     plt.switch_backend('module://backend_interagg')
-    mae_density()
+    map_comparisons()

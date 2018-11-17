@@ -54,7 +54,7 @@ settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
 settings_.load_model_path = 'logs/iknn quick start'
-settings_.map_directory_name = ['i1nn']
+settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_, shuffle=False)

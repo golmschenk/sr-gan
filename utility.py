@@ -190,11 +190,11 @@ if __name__ == '__main__':
     import seaborn as sns
     sns.set_style('dark')
 
-    for file_ in os.listdir('/Users/golmschenk/Desktop/1nn_maps'):
+    for file_ in os.listdir('/Users/golmschenk/Desktop/i1nn_maps'):
         if file_.startswith('.'):
             continue
         label_path = '/Users/golmschenk/Desktop/labels/{}'.format(file_)
-        for type in ['1nn_maps', '2nn_maps', '5nn_maps', 'density3e-1', 'i1nn_maps']:
+        for type in ['density3e-1']:
             type_path = label_path.replace('labels', '{}'.format(type))
             type_map = np.load(type_path)
             type_heat_map = convert_array_to_heatmap(type_map)

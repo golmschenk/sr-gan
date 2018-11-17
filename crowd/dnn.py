@@ -11,6 +11,7 @@ from crowd.data import CrowdExample
 from crowd.models import DenseNetDiscriminator, KnnDenseNet, KnnDenseNet2, KnnDenseNetCat, KnnDenseNetCatBranch
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.srgan import CrowdExperiment
+from crowd.ucf_cc_50_data import UcfCc50FullImageDataset, UcfCc50TransformedDataset
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from dnn import DnnExperiment
 from utility import gpu
@@ -43,6 +44,21 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101,
                                                                      inverse_map=settings.inverse_map,
                                                                      map_directory_name=settings.map_directory_name)
+        elif settings.crowd_dataset == 'UCF 50':
+            seed = 0
+            self.dataset_class = UcfCc50FullImageDataset
+            self.train_dataset = UcfCc50TransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                                seed=seed,
+                                                                test_start=settings.labeled_dataset_seed * 10,
+                                                                inverse_map=settings.inverse_map,
+                                                                map_directory_name=settings.map_directory_name)
+            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
+                                                   pin_memory=self.settings.pin_memory,
+                                                   num_workers=settings.number_of_data_workers)
+            self.validation_dataset = UcfCc50TransformedDataset(dataset='test', seed=seed,
+                                                                test_start=settings.labeled_dataset_seed * 10,
+                                                                inverse_map=settings.inverse_map,
+                                                                map_directory_name=settings.map_directory_name)
         else:
             raise ValueError('{} is not an understood crowd dataset.'.format(settings.crowd_dataset))
 
@@ -64,14 +80,14 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities, knn_maps = next(train_iterator)
         dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
-                                                                             predicted_knn_maps.to('cpu')[:, 0, :, :])
+        dnn_real_comparison_image = self.create_knn_crowd_images_comparison_grid(images, knn_maps,
+                                                                             predicted_knn_maps.to('cpu'))
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
         images, densities, knn_maps = next(validation_iterator)
         dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
-        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
-                                                                                   predicted_knn_maps.to('cpu')[:, 0, :, :])
+        dnn_validation_comparison_image = self.create_knn_crowd_images_comparison_grid(images, knn_maps,
+                                                                                   predicted_knn_maps.to('cpu'))
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
 
         self.test_summaries()

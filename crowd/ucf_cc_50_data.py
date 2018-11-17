@@ -24,12 +24,17 @@ else:
 
 
 class UcfCc50FullImageDataset(Dataset):
-    def __init__(self, seed=None, number_of_examples=None, start=0,
-                 map_directory_name='knn_maps'):
+    def __init__(self, seed=None, test_start=0, dataset='train', map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory)
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
-                           if name.endswith('.npy')][start:start + number_of_examples]
+                           if name.endswith('.npy')]
+        test_file_names = self.file_names[test_start:test_start + 10]
+        if dataset == 'test':
+            self.file_names = test_file_names
+        else:
+            for file_name in test_file_names:
+                self.file_names.remove(file_name)
         self.length = len(self.file_names)
         self.map_directory_name = map_directory_name
 
@@ -55,12 +60,19 @@ class UcfCc50TransformedDataset(Dataset):
     A class for the transformed UCF-CC-50 crowd dataset.
     """
 
-    def __init__(self, image_patch_size=224, label_patch_size=224, seed=None, start=0,
-                 number_of_examples=None, middle_transform=None, inverse_map=False, map_directory_name='knn_maps'):
+    def __init__(self, image_patch_size=224, label_patch_size=224, seed=None, test_start=0, dataset='train',
+                 middle_transform=None, inverse_map=False, map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory)
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
-                           if name.endswith('.npy')][start:start + number_of_examples]
+                           if name.endswith('.npy')]
+        test_file_names = self.file_names[test_start:test_start + 10]
+        if dataset == 'test':
+            self.file_names = test_file_names
+        else:
+            for file_name in test_file_names:
+                self.file_names.remove(file_name)
+        print('{} images.'.format(len(self.file_names)))
         self.image_patch_size = image_patch_size
         self.label_patch_size = label_patch_size
         half_patch_size = int(self.image_patch_size // 2)
@@ -68,7 +80,7 @@ class UcfCc50TransformedDataset(Dataset):
         self.start_indexes = []
         for file_name in self.file_names:
             self.start_indexes.append(self.length)
-            image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
+            image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
             y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
             x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
             image_indexes_length = len(y_positions) * len(x_positions)
@@ -93,9 +105,9 @@ class UcfCc50TransformedDataset(Dataset):
                                                           allow_padded=True)  # In case image is smaller than patch.
         preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                                NumpyArraysToTorchTensors()])
-        image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
-        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
+        image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
+        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
+        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
         if '1nn' in self.map_directory_name and 'i1nn' not in self.map_directory_name:
             knn_map = knn_map / 112
         half_patch_size = int(self.image_patch_size // 2)
@@ -165,6 +177,7 @@ class UcfCc50Preprocessing:
             if len(image.shape) == 2:
                 image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
             label_size = image.shape[:2]
+            print(label_size)
             mat = scipy.io.loadmat(mat_path)
             head_positions = mat['annPoints']  # x, y ordering.
             head_positions = self.get_y_x_head_positions(head_positions)
@@ -173,13 +186,13 @@ class UcfCc50Preprocessing:
                 iknn_maps_directory = os.path.join(database_directory, 'i{}nn_maps'.format(k))
                 os.makedirs(knn_maps_directory, exist_ok=True)
                 os.makedirs(iknn_maps_directory, exist_ok=True)
-                knn_map_path = os.path.join(knn_maps_directory, file_name + 'npy')
-                iknn_map_path = os.path.join(iknn_maps_directory, file_name + 'npy')
+                knn_map_path = os.path.join(knn_maps_directory, file_name + '.npy')
+                iknn_map_path = os.path.join(iknn_maps_directory, file_name + '.npy')
                 knn_map = generate_knn_map(head_positions, label_size, number_of_neighbors=k, upper_bound=112)
                 iknn_map = 1 / (knn_map + 1)
                 np.save(iknn_map_path, iknn_map)
                 np.save(knn_map_path, knn_map)
-            label = generate_point_density_map(head_positions, label_size)
+            label, _ = generate_point_density_map(head_positions, label_size)
             np.save(image_path, image)
             np.save(label_path, label)
 
@@ -210,7 +223,7 @@ class UcfCc50Check:
 
 
 if __name__ == '__main__':
-    # preprocessor = UcfCc50Preprocessing()
-    # preprocessor.download_and_preprocess()
-    # preprocessor.preprocess()
+    preprocessor = UcfCc50Preprocessing()
+    preprocessor.download_and_preprocess()
+    #preprocessor.preprocess()
     UcfCc50Check().display_statistics()
