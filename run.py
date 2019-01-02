@@ -18,7 +18,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
 application_name = 'crowd'
-method_name = 'dnn'
+method_name = 'srgan'
 
 settings_ = Settings()
 if application_name == 'age':
@@ -33,9 +33,9 @@ elif application_name == 'coef':
     settings_.batch_size = 1000
 elif application_name == 'crowd':
     Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e0]
-    settings_.fake_loss_multiplier = [1e0]
-    settings_.batch_size = 14
+    settings_.unlabeled_loss_multiplier = [1e-1]
+    settings_.fake_loss_multiplier = [1e-1]
+    settings_.batch_size = 8
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'ShanghaiTech'
@@ -43,24 +43,24 @@ elif application_name == 'crowd':
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.unlabeled_dataset_size = None
-settings_.labeled_dataset_size = None
+settings_.labeled_dataset_size = 50
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = [0]
-settings_.steps_to_run = 150000
+settings_.steps_to_run = 50000
 settings_.learning_rate = [1e-4]
-settings_.gradient_penalty_multiplier = [0.1]
+settings_.gradient_penalty_multiplier = [0, 1e-1, 1e1]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-settings_.load_model_path = 'logs/iknn quick start'
+settings_.load_model_path = 'logs/gan_quick_start'
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1
 settings_.local_setup()
-settings_list = convert_to_settings_list(settings_, shuffle=False)
+settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = '{} m{:e} ol ff'.format(settings_.map_directory_name, settings_.map_multiplier)
+    trial_name = 'gp {}'.format(settings_.map_directory_name)
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':
