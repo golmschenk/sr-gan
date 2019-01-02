@@ -966,7 +966,7 @@ class KnnDenseNetCat(nn.Module):
         knn_map1, count1, h1 = self.knn_module1(t1_out)
         knn_map2, count2, h2 = self.knn_module2(t2_out)
         knn_map3, count3, h3 = self.knn_module3(t3_out)
-        # self.features = torch.cat([h1, h2, h3, final_pool], dim=1)
+        self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1), h3.view(batch_size, -1, 1, 1), final_pool], dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         knn_map = torch.cat([knn_map1, knn_map2, knn_map3], dim=1)
