@@ -17,7 +17,7 @@ from utility import seed_all, clean_scientific_notation
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = 'crowd'
+application_name = 'coef'
 method_name = 'srgan'
 
 settings_ = Settings()
@@ -35,7 +35,7 @@ elif application_name == 'crowd':
     Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e-2, 1e0, 1e2]
     settings_.fake_loss_multiplier = [1e-2, 1e0, 1e2]
-    settings_.batch_size = 8
+    settings_.batch_size = 7
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'ShanghaiTech'
@@ -53,7 +53,7 @@ settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-settings_.load_model_path = 'logs/gan_quick_start'
+#settings_.load_model_path = 'logs/gan_quick_start'
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1e-6
 settings_.local_setup()

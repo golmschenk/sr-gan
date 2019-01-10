@@ -1,14 +1,12 @@
 """
 Code for the crowd application.
 """
-import json
 import random
 from collections import defaultdict
 
 import scipy.misc
 import matplotlib
 import numpy as np
-import os
 import torch
 from scipy.stats import norm
 import torchvision
@@ -19,7 +17,7 @@ from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindow
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from crowd.world_expo_data import WorldExpoDataset
-from crowd.models import DCGenerator, SpatialPyramidPoolingDiscriminator, KnnDenseNetCat
+from crowd.models import DCGenerator, KnnDenseNetCat
 from srgan import Experiment
 from utility import MixtureModel, gpu
 
@@ -292,13 +290,13 @@ class CrowdExperiment(Experiment):
             grid_image_list.append(predicted_label_heatmap)
         return torchvision.utils.make_grid(grid_image_list, nrow=5, normalize=True, range=(0, 1))
 
-    def labeled_loss_function(self, predicted_labels, labels, knn_maps, order=2):
+    def labeled_loss_function(self, predicted_labels, labels, order=2):
         """The loss function for the crowd application."""
-        density_labels = labels
-        knn_maps = knn_maps.unsqueeze(1)
+        head_labels, map_labels = labels
+        knn_maps = map_labels.unsqueeze(1)
         predicted_density_labels, predicted_count_labels, predicted_knn_maps = predicted_labels
         knn_map_loss = (torch.abs(predicted_knn_maps - knn_maps)).mean(1).sum(1).sum(1).pow(order).mean()
-        count_loss = torch.abs(predicted_count_labels - density_labels.sum(1).sum(1)).pow(order).mean()
+        count_loss = torch.abs(predicted_count_labels - head_labels.sum(1).sum(1)).pow(order).mean()
         return count_loss + (knn_map_loss * self.settings.map_multiplier)
 
     def images_to_predicted_labels(self, network, images):

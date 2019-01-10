@@ -10,7 +10,7 @@ from srgan import Experiment
 from coefficient.data import ToyDataset
 from coefficient.models import Generator, MLP, observation_count
 from presentation import generate_display_frame
-from utility import gpu, MixtureModel
+from utility import gpu, MixtureModel, standard_image_format_to_tensorboard_image_format
 
 
 class CoefficientExperiment(Experiment):
@@ -85,4 +85,5 @@ class CoefficientExperiment(Experiment):
             distribution_image = generate_display_frame(fake_examples_array, unlabeled_predictions_array,
                                                         validation_predictions_array, dnn_validation_predictions_array,
                                                         train_predictions_array, dnn_train_predictions_array, step)
-            gan_summary_writer.add_image('Distributions', distribution_image, )
+            distribution_image = standard_image_format_to_tensorboard_image_format(distribution_image)
+            gan_summary_writer.add_image('Distributions', distribution_image)
