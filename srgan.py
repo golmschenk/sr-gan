@@ -285,17 +285,17 @@ class Experiment(ABC):
             generator_loss.backward()
             self.g_optimizer.step()
             if self.gan_summary_writer.is_summary_step():
-                self.gan_summary_writer.add_scalar('Generator/Loss', generator_loss.item(), )
+                self.gan_summary_writer.add_scalar('Generator/Loss', generator_loss.item())
         # Summaries.
         if self.gan_summary_writer.is_summary_step():
-            self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item(), )
-            self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item(), )
-            self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item(), )
+            self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
+            self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
+            self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
             if self.labeled_features is not None:
                 self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
-                                                   self.labeled_features.mean(0).norm().item(), )
+                                                   self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
-                                                   self.unlabeled_features.mean(0).norm().item(), )
+                                                   self.unlabeled_features.mean(0).norm().item())
         self.D.apply(set_bn_train)  # Make sure only labeled data is used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels, knn_maps):
