@@ -13,8 +13,8 @@ import torchvision
 from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
-from crowd.label_generation import generate_density_label, problematic_head_labels, generate_knn_map, \
-    generate_point_density_map
+from crowd.label_generation import (generate_density_label, problematic_head_labels, generate_knn_map,
+                                    generate_point_density_map)
 from utility import seed_all
 
 dataset_name = 'UCF QNRF'
@@ -28,13 +28,13 @@ class UcfQnrfFullImageDataset(Dataset):
     """
     A class for the UCF QNRF full image crowd dataset.
     """
-    def __init__(self, dataset='train', seed=None, number_of_examples=None,
-                 map_directory_name='knn_maps'):
+    def __init__(self, dataset='train', seed=None, number_of_examples=None, map_directory_name='i1nn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
                            if name.endswith('.npy')][:number_of_examples]
         self.length = len(self.file_names)
+        self.map_directory_name = map_directory_name
 
     def __getitem__(self, index):
         """
@@ -46,8 +46,8 @@ class UcfQnrfFullImageDataset(Dataset):
         file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        knn_map = np.load(os.path.join(self.dataset_directory, 'maps', file_name))
-        return image, label, knn_map
+        map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
+        return image, label, map_
 
     def __len__(self):
         return self.length
@@ -58,8 +58,7 @@ class UcfQnrfTransformedDataset(Dataset):
     A class for the transformed UCF QNRF crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, number_of_examples=None,
-                 middle_transform=None,
-                 map_directory_name='knn_maps'):
+                 middle_transform=None, map_directory_name='i1nn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -77,6 +76,7 @@ class UcfQnrfTransformedDataset(Dataset):
             image_indexes_length = len(y_positions) * len(x_positions)
             self.length += image_indexes_length
         self.middle_transform = middle_transform
+        self.map_directory_name = map_directory_name
 
     def __getitem__(self, index):
         """
@@ -96,7 +96,7 @@ class UcfQnrfTransformedDataset(Dataset):
                                                                NumpyArraysToTorchTensors()])
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
-        knn_map = np.load(os.path.join(self.dataset_directory, 'maps', file_name), mmap_mode='r')
+        map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -104,12 +104,12 @@ class UcfQnrfTransformedDataset(Dataset):
         y_index, x_index = np.unravel_index(position_index, positions_shape)
         y = y_positions[y_index]
         x = x_positions[x_index]
-        example = CrowdExample(image=image, label=label, knn_map=knn_map)
+        example = CrowdExample(image=image, label=label, map_=map_)
         example = extract_patch_transform(example, y, x)
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        return example.image, example.label, example.knn_map
+        return example.image, example.label, example.map
 
     def __len__(self):
         return self.length
@@ -209,6 +209,7 @@ class UcfQnrfPreprocessing:
 
     @staticmethod
     def get_y_x_head_positions(original_head_positions, file_name, label_size):
+        """Swaps the x's and y's of the head positions. Accounts for files where the labeling is incorrect."""
         if file_name == 'img_0087':
             # Flip y labels.
             head_position_list = []
@@ -237,12 +238,12 @@ class UcfQnrfCheck:
         print('UCF QNRF')
         train_dataset = UcfQnrfFullImageDataset('train')
         train_label_sums = []
-        for image, label, knn_map in train_dataset:
+        for image, label, map_ in train_dataset:
             train_label_sums.append(label.sum())
         self.print_statistics(train_label_sums, 'train')
         test_dataset = UcfQnrfFullImageDataset('test')
         test_label_sums = []
-        for image, label, knn_map in test_dataset:
+        for image, label, map_ in test_dataset:
             test_label_sums.append(label.sum())
         self.print_statistics(test_label_sums, 'test')
         self.print_statistics(train_label_sums + test_label_sums, 'total')

@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import CrowdExample
-from crowd.models import DenseNetDiscriminator, KnnDenseNet, KnnDenseNet2, KnnDenseNetCat, KnnDenseNetCatBranch
+from crowd.models import KnnDenseNetCat
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.srgan import CrowdExperiment
 from crowd.ucf_cc_50_data import UcfCc50FullImageDataset, UcfCc50TransformedDataset
@@ -48,10 +48,10 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             seed = 0
             self.dataset_class = UcfCc50FullImageDataset
             self.train_dataset = UcfCc50TransformedDataset(middle_transform=data.RandomHorizontalFlip(),
-                                                                seed=seed,
-                                                                test_start=settings.labeled_dataset_seed * 10,
-                                                                inverse_map=settings.inverse_map,
-                                                                map_directory_name=settings.map_directory_name)
+                                                           seed=seed,
+                                                           test_start=settings.labeled_dataset_seed * 10,
+                                                           inverse_map=settings.inverse_map,
+                                                           map_directory_name=settings.map_directory_name)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
@@ -78,16 +78,14 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         self.evaluation_epoch(settings, DNN, validation_dataset, dnn_summary_writer, '1 Validation Error',
                               shuffle=False)
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities, knn_maps = next(train_iterator)
-        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
-        dnn_real_comparison_image = self.create_knn_crowd_images_comparison_grid(images, knn_maps,
-                                                                             predicted_knn_maps.to('cpu'))
+        images, densities, maps = next(train_iterator)
+        dnn_predicted_densities, _, predicted_maps = DNN(images.to(gpu))
+        dnn_real_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities, knn_maps = next(validation_iterator)
-        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
-        dnn_validation_comparison_image = self.create_knn_crowd_images_comparison_grid(images, knn_maps,
-                                                                                   predicted_knn_maps.to('cpu'))
+        images, densities, maps = next(validation_iterator)
+        dnn_predicted_densities, _, predicted_maps = DNN(images.to(gpu))
+        dnn_validation_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
 
         self.test_summaries()
@@ -102,7 +100,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         network = self.DNN
         totals = defaultdict(lambda: 0)
         for index in indexes:
-            full_image, full_label, full_knn_map = test_dataset[index]
+            full_image, full_label, full_map = test_dataset[index]
             full_example = CrowdExample(image=full_image, label=full_label)
             full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
             totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())

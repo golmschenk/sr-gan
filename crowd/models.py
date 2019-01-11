@@ -619,6 +619,7 @@ class DenseNetDiscriminator(Module):
         out = out.view(-1)
         return torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu), out
 
+
 class KnnDenseNet(nn.Module):
     r"""A spatial pooling pyramid network based on DenseNet
 
@@ -721,14 +722,15 @@ class KnnDenseNet(nn.Module):
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
         count = leaky_relu(self.count_layer(final_pool)).view(batch_size)
-        knn_map = leaky_relu(self.knn1_layer(t1_out)).view(batch_size, self.label_patch_size, self.label_patch_size)
-        return density, count, knn_map
+        map_ = leaky_relu(self.knn1_layer(t1_out)).view(batch_size, self.label_patch_size, self.label_patch_size)
+        return density, count, map_
 
 
-class KnnModule(nn.Module):
-    def __init__(self, in_features, kernel_size, label_patch_size):
+class MapModule(nn.Module):
+    """A module to upscale to a map and produce a count."""
+    def __init__(self, in_features, kernel_size):
         super().__init__()
-        self.knn_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
+        self.map_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
                                                          kernel_size=kernel_size, stride=kernel_size)
         self.conv1 = Conv2d(in_channels=1, out_channels=8, kernel_size=2, stride=2)
         self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
@@ -737,12 +739,12 @@ class KnnModule(nn.Module):
 
     def forward(self, x):
         """Forward pass."""
-        knn_map = leaky_relu(self.knn_transposed_conv_layer(x))
-        out = leaky_relu(self.conv1(knn_map))
+        map_ = leaky_relu(self.map_transposed_conv_layer(x))
+        out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
         count = leaky_relu(self.count_layer(out))
-        return knn_map, count, out
+        return map_, count, out
 
 
 class KnnDenseNet2(nn.Module):
@@ -828,9 +830,9 @@ class KnnDenseNet2(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
-        self.knn_module1 = KnnModule(in_features=128, kernel_size=1, label_patch_size=self.label_patch_size)
-        self.knn_module2 = KnnModule(in_features=256, kernel_size=2, label_patch_size=self.label_patch_size)
-        self.knn_module3 = KnnModule(in_features=896, kernel_size=4, label_patch_size=self.label_patch_size)
+        self.map_module1 = MapModule(in_features=128, kernel_size=1)
+        self.map_module2 = MapModule(in_features=256, kernel_size=2)
+        self.map_module3 = MapModule(in_features=896, kernel_size=4)
 
     def forward(self, x):
         """Forward pass."""
@@ -849,14 +851,15 @@ class KnnDenseNet2(nn.Module):
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
         final_count = leaky_relu(self.count_layer(final_pool))
-        knn_map1, count1 = self.knn_module1(t1_out)
-        knn_map2, count2 = self.knn_module2(t2_out)
-        knn_map3, count3 = self.knn_module3(t3_out)
+        map1, count1 = self.module1(t1_out)
+        map2, count2 = self.map_module2(t2_out)
+        map3, count3 = self.map_module3(t3_out)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
-        knn_map = knn_map1 + knn_map2 + knn_map3
-        knn_map = knn_map.view(batch_size, self.label_patch_size, self.label_patch_size)
-        return density, count, knn_map
+        map_ = map1 + map2 + map3
+        map_ = map_.view(batch_size, self.label_patch_size, self.label_patch_size)
+        return density, count, map_
+
 
 class KnnDenseNetCat(nn.Module):
     r"""A spatial pooling pyramid network based on DenseNet
@@ -941,9 +944,9 @@ class KnnDenseNetCat(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
-        self.knn_module1 = KnnModule(in_features=128, kernel_size=8, label_patch_size=self.label_patch_size)
-        self.knn_module2 = KnnModule(in_features=256, kernel_size=16, label_patch_size=self.label_patch_size)
-        self.knn_module3 = KnnModule(in_features=896, kernel_size=32, label_patch_size=self.label_patch_size)
+        self.map_module1 = MapModule(in_features=128, kernel_size=8)
+        self.map_module2 = MapModule(in_features=256, kernel_size=16)
+        self.map_module3 = MapModule(in_features=896, kernel_size=32)
         self.features = None
 
     def forward(self, x):
@@ -963,29 +966,32 @@ class KnnDenseNetCat(nn.Module):
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
         final_count = leaky_relu(self.count_layer(final_pool))
-        knn_map1, count1, h1 = self.knn_module1(t1_out)
-        knn_map2, count2, h2 = self.knn_module2(t2_out)
-        knn_map3, count3, h3 = self.knn_module3(t3_out)
-        self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1), h3.view(batch_size, -1, 1, 1), final_pool], dim=1)
+        map1, count1, h1 = self.map_module1(t1_out)
+        map2, count2, h2 = self.map_module2(t2_out)
+        map3, count3, h3 = self.map_module3(t3_out)
+        self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1),
+                                   h3.view(batch_size, -1, 1, 1), final_pool], dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
-        knn_map = torch.cat([knn_map1, knn_map2, knn_map3], dim=1)
-        knn_map = knn_map.view(batch_size, 3, self.label_patch_size, self.label_patch_size)
-        return density, count, knn_map
+        map_ = torch.cat([map1, map2, map3], dim=1)
+        map_ = map_.view(batch_size, 3, self.label_patch_size, self.label_patch_size)
+        return density, count, map_
 
-class DensityModule(nn.Module):
-    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate, label_patch_size):
+
+class DenseMapModule(nn.Module):
+    """A dense block followed by a map module."""
+    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate):
         super().__init__()
         self.dense_block = _DenseBlock(num_layers=num_layers, num_input_features=num_input_features, bn_size=bn_size,
                                        growth_rate=growth_rate, drop_rate=drop_rate)
-        self.knn_module = KnnModule(in_features=num_input_features + 128, kernel_size=1,
-                                    label_patch_size=label_patch_size)
+        self.map_module = MapModule(in_features=num_input_features + 128, kernel_size=1)
 
     def forward(self, x):
         """Forward pass."""
         dense_block_output = self.dense_block(x)
-        knn_map, count = self.knn_module(leaky_relu(dense_block_output))
-        return knn_map, count, dense_block_output
+        map_, count = self.map_module(leaky_relu(dense_block_output))
+        return map_, count, dense_block_output
+
 
 class KnnDenseNetCatBranch(nn.Module):
     r"""A spatial pooling pyramid network based on DenseNet
@@ -1070,13 +1076,11 @@ class KnnDenseNetCatBranch(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
-        self.knn_module1 = KnnModule(in_features=512, kernel_size=1, label_patch_size=self.label_patch_size)
-        self.density_module1 = DensityModule(num_layers=4, num_input_features=513, bn_size=bn_size,
-                                             growth_rate=growth_rate, drop_rate=drop_rate,
-                                             label_patch_size=self.label_patch_size)
-        self.density_module2 = DensityModule(num_layers=4, num_input_features=642, bn_size=bn_size,
-                                             growth_rate=growth_rate, drop_rate=drop_rate,
-                                             label_patch_size=self.label_patch_size)
+        self.map_module1 = MapModule(in_features=512, kernel_size=1)
+        self.density_module1 = DenseMapModule(num_layers=4, num_input_features=513, bn_size=bn_size,
+                                              growth_rate=growth_rate, drop_rate=drop_rate)
+        self.density_module2 = DenseMapModule(num_layers=4, num_input_features=642, bn_size=bn_size,
+                                              growth_rate=growth_rate, drop_rate=drop_rate)
 
     def forward(self, x):
         """Forward pass."""
@@ -1096,14 +1100,14 @@ class KnnDenseNetCatBranch(nn.Module):
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
         final_count = leaky_relu(self.count_layer(final_pool))
 
-        knn_map1, count1 = self.knn_module1(leaky_relu(db2_out))
-        density_module_in1 = torch.cat([knn_map1, db2_out], dim=1)
-        knn_map2, count2, density_module_out1 = self.density_module1(density_module_in1)
-        density_module_in2 = torch.cat([knn_map2, density_module_out1], dim=1)
-        knn_map3, count3, _ = self.density_module2(density_module_in2)
+        map1, count1 = self.map_module1(leaky_relu(db2_out))
+        density_module_in1 = torch.cat([map1, db2_out], dim=1)
+        map2, count2, density_module_out1 = self.density_module1(density_module_in1)
+        density_module_in2 = torch.cat([map2, density_module_out1], dim=1)
+        map3, count3, _ = self.density_module2(density_module_in2)
 
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
-        knn_map = torch.cat([knn_map1, knn_map2, knn_map3], dim=1)
-        knn_map = knn_map.view(batch_size, 3, self.label_patch_size, self.label_patch_size)
-        return density, count, knn_map
+        map_ = torch.cat([map1, map2, map3], dim=1)
+        map_ = map_.view(batch_size, 3, self.label_patch_size, self.label_patch_size)
+        return density, count, map_

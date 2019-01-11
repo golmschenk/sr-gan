@@ -15,8 +15,6 @@ from torch.utils.data import DataLoader
 from crowd import data
 from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
-from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
-from crowd.world_expo_data import WorldExpoDataset
 from crowd.models import DCGenerator, KnnDenseNetCat
 from srgan import Experiment
 from utility import MixtureModel, gpu
@@ -147,24 +145,20 @@ class CrowdExperiment(Experiment):
                               comparison_value=dnn_validation_count_mae, shuffle=False)
         # Real images.
         train_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities, knn_maps = next(train_iterator)
-        predicted_densities, _, predicted_knn_maps = D(images.to(gpu))
-        real_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
-                                                                         predicted_knn_maps.to('cpu')[:, 1, :, :])
+        images, densities, maps = next(train_iterator)
+        predicted_densities, _, predicted_maps = D(images.to(gpu))
+        real_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         gan_summary_writer.add_image('Real', real_comparison_image)
-        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
-        dnn_real_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
-                                                                             predicted_knn_maps.to('cpu')[:, 1, :, :])
+        dnn_predicted_densities, _, predicted_maps = DNN(images.to(gpu))
+        dnn_real_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         dnn_summary_writer.add_image('Real', dnn_real_comparison_image)
         validation_iterator = iter(DataLoader(train_dataset, batch_size=settings.batch_size))
-        images, densities, knn_maps = next(validation_iterator)
-        predicted_densities, _, predicted_knn_maps = D(images.to(gpu))
-        validation_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
-                                                                               predicted_knn_maps.to('cpu')[:, 1, :, :])
+        images, densities, maps = next(validation_iterator)
+        predicted_densities, _, predicted_maps = D(images.to(gpu))
+        validation_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         gan_summary_writer.add_image('Validation', validation_comparison_image)
-        dnn_predicted_densities, _, predicted_knn_maps = DNN(images.to(gpu))
-        dnn_validation_comparison_image = self.create_crowd_images_comparison_grid(images, knn_maps,
-                                                                                   predicted_knn_maps.to('cpu')[:, 1, :, :])
+        dnn_predicted_densities, _, predicted_maps = DNN(images.to(gpu))
+        dnn_validation_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size)
@@ -183,13 +177,14 @@ class CrowdExperiment(Experiment):
                          shuffle=True):
         """Runs the evaluation and summaries for the data in the dataset."""
         dataset_loader = DataLoader(dataset, batch_size=settings.batch_size, shuffle=shuffle)
-        predicted_counts, densities, predicted_densities, knn_maps, predicted_knn_maps = np.array([]), np.array(
+        predicted_counts, densities, predicted_densities, maps, predicted_maps = np.array([]), np.array(
             []), np.array([]), np.array([]), np.array([])
-        for index, (images, labels, batch_knn_maps) in enumerate(dataset_loader):
+        for index, (images, labels, batch_maps) in enumerate(dataset_loader):
             images, labels = images.to(gpu), labels.to(gpu)
-            batch_predicted_densities, batch_predicted_counts, batch_predicted_knn_maps = self.images_to_predicted_labels(network, images)
+            (batch_predicted_densities, batch_predicted_counts, batch_predicted_maps
+             ) = self.images_to_predicted_labels(network, images)
             batch_predicted_densities = batch_predicted_densities.detach().to('cpu').numpy()
-            batch_predicted_knn_maps = batch_predicted_knn_maps.detach().to('cpu').numpy()
+            batch_predicted_maps = batch_predicted_maps.detach().to('cpu').numpy()
             batch_predicted_counts = batch_predicted_counts.detach().to('cpu').numpy()
             predicted_counts = np.concatenate([predicted_counts, batch_predicted_counts])
             if predicted_densities.size == 0:
@@ -198,24 +193,24 @@ class CrowdExperiment(Experiment):
             if densities.size == 0:
                 densities = densities.reshape([0, *labels.shape[1:]])
             densities = np.concatenate([densities, labels])
-            if knn_maps.size == 0:
-                knn_maps = knn_maps.reshape([0, *batch_knn_maps.shape[1:]])
-                knn_maps = np.concatenate([knn_maps, batch_knn_maps])
-            if predicted_knn_maps.size == 0:
-                predicted_knn_maps = predicted_knn_maps.reshape([0, *batch_predicted_knn_maps.shape[1:]])
-                predicted_knn_maps = np.concatenate([predicted_knn_maps, batch_predicted_knn_maps])
+            if maps.size == 0:
+                maps = maps.reshape([0, *batch_maps.shape[1:]])
+                maps = np.concatenate([maps, batch_maps])
+            if predicted_maps.size == 0:
+                predicted_maps = predicted_maps.reshape([0, *batch_predicted_maps.shape[1:]])
+                predicted_maps = np.concatenate([predicted_maps, batch_predicted_maps])
             if index * self.settings.batch_size >= 100:
                 break
-        knn_maps = np.expand_dims(knn_maps, axis=1)
+        maps = np.expand_dims(maps, axis=1)
         count_me = (predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/ME'.format(summary_name), count_me)
         count_mae = np.abs(predicted_counts - densities.sum(1).sum(1)).mean()
         summary_writer.add_scalar('{}/MAE'.format(summary_name), count_mae)
-        density_mae = np.abs(predicted_knn_maps - knn_maps).mean()
+        density_mae = np.abs(predicted_maps - maps).mean()
         summary_writer.add_scalar('{}/kNN MAE'.format(summary_name), density_mae)
         count_mse = (np.abs(predicted_counts - densities.sum(1).sum(1)) ** 2).mean()
         summary_writer.add_scalar('{}/MSE'.format(summary_name), count_mse)
-        density_mse = (np.abs(predicted_knn_maps - knn_maps) ** 2).mean()
+        density_mse = (np.abs(predicted_maps - maps) ** 2).mean()
         summary_writer.add_scalar('{}/kNN MSE'.format(summary_name), density_mse)
         if comparison_value is not None:
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), count_mae / comparison_value)
@@ -247,15 +242,15 @@ class CrowdExperiment(Experiment):
         predicted_label_heatmap_tensor = torch.from_numpy(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         return label_heatmap_tensor, predicted_label_heatmap_tensor
 
-    def create_crowd_images_comparison_grid(self, images, labels, predicted_labels, number_of_images=3):
+    def create_map_comparison_image(self, images, labels, predicted_labels, number_of_images=3):
         """
-        Creates a grid of images from the original images, the true labels, and the predicted labels.
+        Creates a grid of images from the original images, the true maps, and each predicted map.
 
         :param images: The original RGB images.
         :type images: torch.autograd.Variable
-        :param labels: The labels.
+        :param labels: The map labels.
         :type labels: torch.autograd.Variable
-        :param predicted_labels: The predicted labels.
+        :param predicted_labels: The predicted map labels.
         :type predicted_labels: torch.autograd.Variable
         :param number_of_images: The number of (original) images to include in the grid.
         :type number_of_images: int
@@ -263,46 +258,31 @@ class CrowdExperiment(Experiment):
         :rtype: np.ndarray
         """
         grid_image_list = []
-        for index in range(min(number_of_images, images.size()[0])):
-            grid_image_list.append((images[index].data + 1) / 2)
-            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
-                                                                                           predicted_labels[index].data)
-            grid_image_list.append(label_heatmap)
-            grid_image_list.append(predicted_label_heatmap)
-        return torchvision.utils.make_grid(grid_image_list, nrow=number_of_images, normalize=True, range=(0, 1))
-
-    def create_knn_crowd_images_comparison_grid(self, images, labels, predicted_labels, number_of_images=3):
-        grid_image_list = []
-        for index in range(min(number_of_images, images.size()[0])):
-            grid_image_list.append((images[index].data + 1) / 2)
-            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
-                                                                                           predicted_labels[:, 0, :, :][
-                                                                                               index].data)
-            grid_image_list.append(label_heatmap)
-            grid_image_list.append(predicted_label_heatmap)
-            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
-                                                                                           predicted_labels[:, 1, :, :][
-                                                                                               index].data)
-            grid_image_list.append(predicted_label_heatmap)
-            label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(labels[index].data,
-                                                                                           predicted_labels[:, 2, :, :][
-                                                                                               index].data)
-            grid_image_list.append(predicted_label_heatmap)
-        return torchvision.utils.make_grid(grid_image_list, nrow=5, normalize=True, range=(0, 1))
+        for image_index in range(min(number_of_images, images.size()[0])):
+            grid_image_list.append((images[image_index].data + 1) / 2)
+            for predicted_map_index in range(predicted_labels.size()[1]):
+                label_heatmap, predicted_label_heatmap = self.convert_density_maps_to_heatmaps(
+                    labels[image_index].data, predicted_labels[image_index, predicted_map_index].data
+                )
+                if predicted_map_index == 0:
+                    grid_image_list.append(label_heatmap)
+                grid_image_list.append(predicted_label_heatmap)
+        return torchvision.utils.make_grid(grid_image_list, nrow=2 + predicted_labels.size()[1], normalize=True,
+                                           range=(0, 1))
 
     def labeled_loss_function(self, predicted_labels, labels, order=2):
         """The loss function for the crowd application."""
         head_labels, map_labels = labels
-        knn_maps = map_labels.unsqueeze(1)
-        predicted_density_labels, predicted_count_labels, predicted_knn_maps = predicted_labels
-        knn_map_loss = (torch.abs(predicted_knn_maps - knn_maps)).mean(1).sum(1).sum(1).pow(order).mean()
+        maps = map_labels.unsqueeze(1)
+        predicted_density_labels, predicted_count_labels, predicted_maps = predicted_labels
+        map_loss = (torch.abs(predicted_maps - maps)).mean(1).sum(1).sum(1).pow(order).mean()
         count_loss = torch.abs(predicted_count_labels - head_labels.sum(1).sum(1)).pow(order).mean()
-        return count_loss + (knn_map_loss * self.settings.map_multiplier)
+        return count_loss + (map_loss * self.settings.map_multiplier)
 
     def images_to_predicted_labels(self, network, images):
         """Runs the code to go from images to a predicted labels. Useful for overriding."""
-        predicted_densities, predicted_counts, predicted_knn_maps = network(images)
-        return predicted_densities, predicted_counts, predicted_knn_maps
+        predicted_densities, predicted_counts, predicted_maps = network(images)
+        return predicted_densities, predicted_counts, predicted_maps
 
     def test_summaries(self):
         """Evaluates the model on test data during training."""
@@ -316,7 +296,7 @@ class CrowdExperiment(Experiment):
         for network in [self.DNN, self.D]:
             totals = defaultdict(lambda: 0)
             for index in indexes:
-                full_image, full_label, full_knn_maps = test_dataset[index]
+                full_image, full_label, full_maps = test_dataset[index]
                 full_example = CrowdExample(image=full_image, label=full_label)
                 full_predicted_count, full_predicted_label = self.predict_full_example(full_example, network)
                 totals['Count error'] += np.abs(full_predicted_count - full_example.label.sum())
@@ -397,7 +377,7 @@ class CrowdExperiment(Experiment):
         patch_size = self.settings.image_patch_size
         for batch in full_example_dataloader:
             images = torch.stack([image for image in batch[0]])
-            predicted_labels, predicted_counts, predicted_knn_maps = network(images.to(gpu))
+            predicted_labels, predicted_counts, predicted_maps = network(images.to(gpu))
             predicted_labels, predicted_counts = predicted_labels.to('cpu'), predicted_counts.to('cpu')
             for example_index, image in enumerate(batch[0]):
                 x = batch[1][example_index]

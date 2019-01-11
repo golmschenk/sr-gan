@@ -17,7 +17,7 @@ from utility import seed_all, clean_scientific_notation
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = 'coef'
+application_name = 'crowd'
 method_name = 'srgan'
 
 settings_ = Settings()
@@ -53,7 +53,7 @@ settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-#settings_.load_model_path = 'logs/gan_quick_start'
+# settings_.load_model_path = 'logs/gan_quick_start'
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1e-6
 settings_.local_setup()

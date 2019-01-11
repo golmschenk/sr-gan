@@ -24,6 +24,7 @@ else:
 
 
 class ShanghaiTechFullImageDataset(Dataset):
+    """A class for the full image examples of the ShanghaiTech crowd dataset."""
     def __init__(self, dataset='train', seed=None, part='part_A', number_of_examples=None,
                  map_directory_name='knn_maps'):
         seed_all(seed)
@@ -43,8 +44,8 @@ class ShanghaiTechFullImageDataset(Dataset):
         file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
-        return image, label, knn_map
+        map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
+        return image, label, map_
 
     def __len__(self):
         return self.length
@@ -52,7 +53,7 @@ class ShanghaiTechFullImageDataset(Dataset):
 
 class ShanghaiTechTransformedDataset(Dataset):
     """
-    A class for the transformed UCF QNRF crowd dataset.
+    A class for the transformed ShanghaiTech crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, part='part_A',
                  number_of_examples=None, middle_transform=None, inverse_map=False, map_directory_name='knn_maps'):
@@ -104,15 +105,15 @@ class ShanghaiTechTransformedDataset(Dataset):
         y_index, x_index = np.unravel_index(position_index, positions_shape)
         y = y_positions[y_index]
         x = x_positions[x_index]
-        example = CrowdExample(image=image, label=label, knn_map=knn_map)
+        example = CrowdExample(image=image, label=label, map_=knn_map)
         example = extract_patch_transform(example, y, x)
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        map = example.knn_map
+        map_ = example.map
         if self.inverse_map:
-            map = 1 / (map + 1)
-        return example.image, example.label, map
+            map_ = 1 / (map_ + 1)
+        return example.image, example.label, map_
 
     def __len__(self):
         return self.length
@@ -241,15 +242,18 @@ class ShanghaiTechPreprocessing:
                                                          density_directory_name)
                         os.makedirs(density_directory, exist_ok=True)
                         density_path = os.path.join(density_directory, file_name + 'npy')
-                        density_map = generate_density_label(head_positions, label_size, perspective_resizing=True, yx_order=True, neighbor_deviation_beta=density_kernel_beta)
+                        density_map = generate_density_label(head_positions, label_size, perspective_resizing=True,
+                                                             yx_order=True, neighbor_deviation_beta=density_kernel_beta)
                         np.save(density_path, density_map)
 
     @staticmethod
     def get_y_x_head_positions(original_head_positions):
+        """Swaps the x's and y's of the head positions."""
         return original_head_positions[:, [1, 0]]
 
 
 class ShanghaiTechCheck:
+    """Provides a brief analysis of the data after being preprocessed."""
     def display_statistics(self):
         """
         Displays the statistics of the database.
@@ -258,12 +262,12 @@ class ShanghaiTechCheck:
         print('ShanghaiTech')
         train_dataset = ShanghaiTechFullImageDataset('train')
         train_label_sums = []
-        for image, label, knn_map in train_dataset:
+        for image, label, map_ in train_dataset:
             train_label_sums.append(label.sum())
         self.print_statistics(train_label_sums, 'train')
         test_dataset = ShanghaiTechFullImageDataset('test')
         test_label_sums = []
-        for image, label, knn_map in test_dataset:
+        for image, label, map_ in test_dataset:
             test_label_sums.append(label.sum())
         self.print_statistics(test_label_sums, 'test')
         self.print_statistics(train_label_sums + test_label_sums, 'total')

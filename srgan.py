@@ -257,7 +257,7 @@ class Experiment(ABC):
         self.d_optimizer.zero_grad()
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         # Unlabeled.
-        self.D.apply(set_bn_eval)  # Make sure only labeled data is used for batch norm running statistics
+        self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
         # Fake.
         z = torch.tensor(MixtureModel([norm(-self.settings.mean_offset, 1),
@@ -301,7 +301,7 @@ class Experiment(ABC):
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
-        self.D.apply(set_bn_train)  # Make sure only labeled data is used for batch norm running statistics
+        self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
@@ -466,10 +466,15 @@ def feature_covariance_loss(base_features, other_features):
     return (base_corrcoef - other_corrcoef).abs().sum()
 
 
-def set_bn_eval(m):
-    if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
-        m.eval()
+def disable_batch_norm_updates(module):
+    """Turns off updating of batch norm statistics."""
+    # noinspection PyProtectedMember
+    if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+        module.eval()
 
-def set_bn_train(m):
-    if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
-        m.train()
+
+def enable_batch_norm_updates(module):
+    """Turns on updating of batch norm statistics."""
+    # noinspection PyProtectedMember
+    if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+        module.train()

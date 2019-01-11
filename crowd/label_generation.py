@@ -34,6 +34,10 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     :type head_positions: np.ndarray
     :param perspective: The perspective map.
     :type perspective: np.ndarray
+    :param yx_order: Marks whether the image is in yx order or xy order.
+    :type yx_order: bool
+    :param neighbor_deviation_beta: The gaussian spread parameter beta to multiply the nearest neighbor distance by.
+    :type neighbor_deviation_beta: float
     :return: The density labeling.
     :rtype: np.ndarray
     """
@@ -156,6 +160,7 @@ def make_gaussian(standard_deviation=1.0):
 
 
 def generate_point_density_map(head_positions, label_size):
+    """Generates a density map where each persons density is concentrated the exact head position pixel."""
     density_map = np.zeros(label_size)
     out_of_bounds_count = 0
     for y, x in head_positions:
@@ -177,6 +182,8 @@ def generate_knn_map(head_positions, label_size, number_of_neighbors=1, upper_bo
     :type label_size: [int, int]
     :param number_of_neighbors: The number of neighbors to consider in the calculation.
     :type number_of_neighbors: int
+    :param upper_bound: An upper bound on the allowed distance value.
+    :type upper_bound: float
     :return: The map of the kNN distances.
     :rtype: np.ndarray
     """

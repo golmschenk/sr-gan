@@ -13,7 +13,7 @@ import torchvision
 from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
-from crowd.label_generation import generate_density_label, generate_point_density_map, generate_knn_map
+from crowd.label_generation import generate_point_density_map, generate_knn_map
 from utility import seed_all
 
 dataset_name = 'UCF CC 50'
@@ -24,7 +24,8 @@ else:
 
 
 class UcfCc50FullImageDataset(Dataset):
-    def __init__(self, seed=None, test_start=0, dataset='train', map_directory_name='knn_maps'):
+    """A class for the full image examples of the UCF-CC-50 crowd dataset."""
+    def __init__(self, seed=None, test_start=0, dataset='train', map_directory_name='i1nn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory)
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -48,8 +49,8 @@ class UcfCc50FullImageDataset(Dataset):
         file_name = self.file_names[index]
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
-        return image, label, knn_map
+        map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
+        return image, label, map_
 
     def __len__(self):
         return self.length
@@ -61,7 +62,7 @@ class UcfCc50TransformedDataset(Dataset):
     """
 
     def __init__(self, image_patch_size=224, label_patch_size=224, seed=None, test_start=0, dataset='train',
-                 middle_transform=None, inverse_map=False, map_directory_name='knn_maps'):
+                 middle_transform=None, inverse_map=False, map_directory_name='i1nn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory)
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -107,9 +108,9 @@ class UcfCc50TransformedDataset(Dataset):
                                                                NumpyArraysToTorchTensors()])
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
-        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
+        map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
         if '1nn' in self.map_directory_name and 'i1nn' not in self.map_directory_name:
-            knn_map = knn_map / 112
+            map_ = map_ / 112
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -117,15 +118,15 @@ class UcfCc50TransformedDataset(Dataset):
         y_index, x_index = np.unravel_index(position_index, positions_shape)
         y = y_positions[y_index]
         x = x_positions[x_index]
-        example = CrowdExample(image=image, label=label, knn_map=knn_map)
+        example = CrowdExample(image=image, label=label, map_=map_)
         example = extract_patch_transform(example, y, x)
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        map = example.knn_map
+        map_ = example.map
         if self.inverse_map:
-            map = 1 / (map + 1)
-        return example.image, example.label, map
+            map_ = 1 / (map_ + 1)
+        return example.image, example.label, map_
 
     def __len__(self):
         return self.length
@@ -182,11 +183,11 @@ class UcfCc50Preprocessing:
             head_positions = mat['annPoints']  # x, y ordering.
             head_positions = self.get_y_x_head_positions(head_positions)
             for k in [1, 2, 3, 4, 5]:
-                knn_maps_directory = os.path.join(database_directory, '{}nn_maps'.format(k))
+                maps_directory = os.path.join(database_directory, '{}nn_maps'.format(k))
                 iknn_maps_directory = os.path.join(database_directory, 'i{}nn_maps'.format(k))
-                os.makedirs(knn_maps_directory, exist_ok=True)
+                os.makedirs(maps_directory, exist_ok=True)
                 os.makedirs(iknn_maps_directory, exist_ok=True)
-                knn_map_path = os.path.join(knn_maps_directory, file_name + '.npy')
+                knn_map_path = os.path.join(maps_directory, file_name + '.npy')
                 iknn_map_path = os.path.join(iknn_maps_directory, file_name + '.npy')
                 knn_map = generate_knn_map(head_positions, label_size, number_of_neighbors=k, upper_bound=112)
                 iknn_map = 1 / (knn_map + 1)
@@ -198,6 +199,7 @@ class UcfCc50Preprocessing:
 
     @staticmethod
     def get_y_x_head_positions(original_head_positions):
+        """Swaps the x's and y's of the head positions."""
         return original_head_positions[:, [1, 0]]
 
 
@@ -225,5 +227,5 @@ class UcfCc50Check:
 if __name__ == '__main__':
     preprocessor = UcfCc50Preprocessing()
     preprocessor.download_and_preprocess()
-    #preprocessor.preprocess()
+    # preprocessor.preprocess()
     UcfCc50Check().display_statistics()

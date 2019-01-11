@@ -51,7 +51,7 @@ class Settings:
         self.label_patch_size = 224
         self.map_multiplier = 1
         self.inverse_map = False
-        self.map_directory_name = 'knn_maps'
+        self.map_directory_name = 'i1nn_maps'
 
         # SGAN models only.
         self.number_of_bins = 10
@@ -60,7 +60,7 @@ class Settings:
         """Code to override some settings when debugging on the local (low power) machine."""
         if 'Carbon' in platform.node():
             self.labeled_dataset_seed = 0
-            self.batch_size = 10
+            self.batch_size = min(10, self.batch_size)
             self.summary_step_period = 10
             self.labeled_dataset_size = 10
             self.unlabeled_dataset_size = 10

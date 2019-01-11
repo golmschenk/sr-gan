@@ -186,6 +186,7 @@ def download_and_extract_file(directory, download_link, file_name='temporary', p
 
 
 def convert_array_to_heatmap(array):
+    """Converts an array to a heatmap image."""
     mappable = matplotlib.cm.ScalarMappable(cmap='inferno')
     mappable.set_clim(vmin=array.min(), vmax=array.max())
     heatmap_array = mappable.to_rgba(array)
@@ -193,7 +194,6 @@ def convert_array_to_heatmap(array):
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
     import seaborn as sns
     sns.set_style('dark')
 
@@ -201,8 +201,8 @@ if __name__ == '__main__':
         if file_.startswith('.'):
             continue
         label_path = '/Users/golmschenk/Desktop/labels/{}'.format(file_)
-        for type in ['density3e-1']:
-            type_path = label_path.replace('labels', '{}'.format(type))
+        for type_ in ['density3e-1']:
+            type_path = label_path.replace('labels', '{}'.format(type_))
             type_map = np.load(type_path)
             type_heat_map = convert_array_to_heatmap(type_map)
-            imageio.imwrite('/Users/golmschenk/Desktop/{}.jpg'.format(type), type_heat_map[:, :, :3])
+            imageio.imwrite('/Users/golmschenk/Desktop/{}.jpg'.format(type_), type_heat_map[:, :, :3])
