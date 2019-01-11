@@ -7,7 +7,8 @@ from collections import OrderedDict
 import torch
 from torch import nn
 from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout
-from torch.nn.functional import leaky_relu, tanh, max_pool2d, dropout, avg_pool2d, relu
+from torch.nn.functional import leaky_relu, max_pool2d, dropout, avg_pool2d, relu
+from torch import tanh
 from torch.utils import model_zoo
 import torchvision.models.densenet
 
