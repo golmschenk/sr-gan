@@ -149,7 +149,7 @@ def logits_to_bin_values(logits: torch.Tensor, bins: torch.Tensor):
 def standard_image_format_to_tensorboard_image_format(image):
     """Converts a uint8 (H,W,C) image to the TensorBoard 0 to 1 (C,H,W) format."""
     image = image.transpose((2, 0, 1)).astype(np.float)
-    image /= image.max()
+    image /= 255
     return image
 
 
