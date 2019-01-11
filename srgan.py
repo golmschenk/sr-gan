@@ -421,13 +421,14 @@ def feature_distance_loss(base_features, other_features, order=2, base_noise=0, 
     other_mean_features = other_features.mean(0)
     if base_noise:
         base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
-    mean_feature_distance = (base_mean_features - other_mean_features).abs().pow(2).sum().pow(1 / 2)
+    sum_squared_difference = (base_mean_features - other_mean_features).pow(2).sum()
+    if order < 1:
+        order_epsilon = 1e-1
+        sum_squared_difference += order_epsilon
+    mean_feature_distance = sum_squared_difference.pow(1 / 2)
     if scale:
         scale_epsilon = 1e-10
         mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + scale_epsilon)
-    if order < 1:
-        order_epsilon = 1e-2
-        mean_feature_distance += order_epsilon
     return mean_feature_distance.pow(order)
 
 
