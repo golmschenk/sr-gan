@@ -322,8 +322,7 @@ class Experiment(ABC):
         """Calculates the unlabeled loss."""
         _ = self.D(unlabeled_examples)
         self.unlabeled_features = self.D.features
-        unlabeled_loss = feature_distance_loss(self.unlabeled_features, self.labeled_features,
-                                               order=self.settings.unlabeled_loss_order
+        unlabeled_loss = feature_distance_loss(self.unlabeled_features, self.labeled_features
                                                ) * self.settings.unlabeled_loss_multiplier
         return unlabeled_loss
 
@@ -332,7 +331,7 @@ class Experiment(ABC):
         _ = self.D(fake_examples.detach())
         self.fake_features = self.D.features
         fake_loss = feature_distance_loss(self.unlabeled_features, self.fake_features,
-                                          scale=self.settings.normalize_fake_loss, order=self.settings.fake_loss_order
+                                          distance_function=abs_plus_one_log
                                           ).neg() * self.settings.fake_loss_multiplier
         return fake_loss
 
@@ -341,8 +340,7 @@ class Experiment(ABC):
         _ = self.D(interpolates)
         self.interpolates_features = self.D.features
         interpolates_loss = feature_distance_loss(self.unlabeled_features, self.interpolates_features,
-                                                  scale=self.settings.normalize_fake_loss,
-                                                  order=self.settings.fake_loss_order
+                                                  distance_function=abs_plus_one_log
                                                   ).neg() * self.settings.fake_loss_multiplier
         return interpolates_loss
 
@@ -352,8 +350,7 @@ class Experiment(ABC):
         self.fake_features = self.D.features
         _ = self.D(unlabeled_examples)
         detached_unlabeled_features = self.D.features.detach()
-        generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features,
-                                               order=self.settings.generator_loss_order)
+        generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features)
         return generator_loss
 
     @abstractmethod
@@ -415,21 +412,22 @@ def angle_between(vector0, vector1):
     return unit_vector0.dot(unit_vector1).clamp(-1.0 + epsilon, 1.0 - epsilon).acos()
 
 
-def feature_distance_loss(base_features, other_features, order=2, base_noise=0, scale=False):
+def square(tensor):
+    """Squares the tensor value."""
+    return tensor.pow(2)
+
+
+def abs_plus_one_log(tensor):
+    """Takes the absolute value, then adds 1, then takes the log."""
+    return tensor.abs().log1p()
+
+
+def feature_distance_loss(base_features, other_features, distance_function=square):
     """Calculate the loss based on the distance between feature vectors."""
     base_mean_features = base_features.mean(0)
     other_mean_features = other_features.mean(0)
-    if base_noise:
-        base_mean_features += torch.normal(torch.zeros_like(base_mean_features), base_mean_features * base_noise)
-    sum_squared_difference = (base_mean_features - other_mean_features).pow(2).sum()
-    if order < 1:
-        order_epsilon = 1e-1
-        sum_squared_difference += order_epsilon
-    mean_feature_distance = sum_squared_difference.pow(1 / 2)
-    if scale:
-        scale_epsilon = 1e-10
-        mean_feature_distance /= (base_mean_features.norm() + other_mean_features.norm() + scale_epsilon)
-    return mean_feature_distance.pow(order)
+    distance_vector = distance_function(base_mean_features - other_mean_features)
+    return distance_vector.mean()
 
 
 def feature_angle_loss(base_features, other_features, target=0, summary_writer=None):

@@ -60,7 +60,7 @@ def generate_display_frame(fake_examples, unlabeled_predictions, test_prediction
     figure, axes = plt.subplots(dpi=dpi)
     axes.text(0.98, 0.98, 'Step: {}'.format(step), horizontalalignment='right', verticalalignment='top',
               family='monospace', fontsize=10, transform=axes.transAxes)
-    axes.plot(x_axis, MixtureModel([uniform(-1, 2)]).pdf(x_axis), color=sns.color_palette()[0],
+    axes.plot(x_axis, MixtureModel([uniform(-2, 1), uniform(1, 1)]).pdf(x_axis), color=sns.color_palette()[0],
               label='Real Data Distribution')
     try:
         axes = sns.kdeplot(fake_a3[0, :], ax=axes, color=sns.color_palette()[4], bw=bandwidth,
