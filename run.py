@@ -11,6 +11,7 @@ from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
+from srgan import abs_plus_one_square_root, abs_plus_one_log
 from utility import seed_all, clean_scientific_notation
 
 
@@ -57,10 +58,12 @@ settings_.generator_loss_order = 2
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1e-6
 settings_.local_setup()
+settings_.fake_loss_distance = [abs_plus_one_square_root, abs_plus_one_log]
+settings_.regularize_feature_norm = [True, False]
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'new feature matching loss'
+    trial_name = '{}'.format(settings_.fake_loss_distance.__name__)
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == 'crowd' else ''
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
@@ -82,6 +85,7 @@ for settings_ in settings_list:
                                       settings_.generator_loss_order)
     trial_name += ' bs{}'.format(settings_.batch_size)
     trial_name += ' nf' if settings_.normalize_fake_loss else ''
+    trial_name += ' rfn' if settings_.regularize_feature_norm else ''
     trial_name += ' l' if settings_.load_model_path else ''
     settings_.trial_name = clean_scientific_notation(trial_name)
     experiment = Experiment(settings_)

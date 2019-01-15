@@ -5,6 +5,8 @@ import platform
 import random
 from copy import deepcopy
 
+from srgan import abs_plus_one_log
+
 
 class Settings:
     """Represents the settings for a given run of SRGAN."""
@@ -34,6 +36,8 @@ class Settings:
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0
         self.normalize_fake_loss = False
+        self.regularize_feature_norm = False
+        self.fake_loss_distance = abs_plus_one_log
 
         self.load_model_path = None
         self.should_save_models = True

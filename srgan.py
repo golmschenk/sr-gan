@@ -256,9 +256,15 @@ class Experiment(ABC):
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
+        loss = labeled_loss
         # Unlabeled.
         self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
+        loss += unlabeled_loss
+        # Feature regularization loss.
+        if self.settings.regularize_feature_norm:
+            feature_regularization_loss = torch.abs(self.unlabeled_features.mean(0).norm() - 1)
+            loss += feature_regularization_loss
         # Fake.
         z = torch.tensor(MixtureModel([norm(-self.settings.mean_offset, 1),
                                        norm(self.settings.mean_offset, 1)]
@@ -266,6 +272,7 @@ class Experiment(ABC):
                                                   self.G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = self.G(z)
         fake_loss = self.fake_loss_calculation(fake_examples)
+        loss += fake_loss
         # Gradient penalty.
         alpha = torch.rand(2, device=gpu)
         alpha = alpha / alpha.sum(0)
@@ -278,7 +285,7 @@ class Experiment(ABC):
         gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2
                             ).mean() * self.settings.gradient_penalty_multiplier
         # Discriminator update.
-        loss = labeled_loss + unlabeled_loss + fake_loss + gradient_penalty
+        loss += gradient_penalty
         loss.backward()
         self.d_optimizer.step()
         # Generator.
@@ -331,7 +338,7 @@ class Experiment(ABC):
         _ = self.D(fake_examples.detach())
         self.fake_features = self.D.features
         fake_loss = feature_distance_loss(self.unlabeled_features, self.fake_features,
-                                          distance_function=abs_plus_one_log
+                                          distance_function=self.settings.fake_loss_distance
                                           ).neg() * self.settings.fake_loss_multiplier
         return fake_loss
 
@@ -340,7 +347,7 @@ class Experiment(ABC):
         _ = self.D(interpolates)
         self.interpolates_features = self.D.features
         interpolates_loss = feature_distance_loss(self.unlabeled_features, self.interpolates_features,
-                                                  distance_function=abs_plus_one_log
+                                                  distance_function=self.settings.fake_loss_distance
                                                   ).neg() * self.settings.fake_loss_multiplier
         return interpolates_loss
 
@@ -415,6 +422,11 @@ def angle_between(vector0, vector1):
 def square(tensor):
     """Squares the tensor value."""
     return tensor.pow(2)
+
+
+def abs_plus_one_square_root(tensor):
+    """Squares the tensor value."""
+    return (tensor.abs() + 1).sqrt()
 
 
 def abs_plus_one_log(tensor):
