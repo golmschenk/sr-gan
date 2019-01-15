@@ -193,6 +193,16 @@ def convert_array_to_heatmap(array):
     return heatmap_array
 
 
+def abs_plus_one_square_root(tensor):
+    """Squares the tensor value."""
+    return (tensor.abs() + 1).sqrt()
+
+
+def abs_plus_one_log(tensor):
+    """Takes the absolute value, then adds 1, then takes the log."""
+    return tensor.abs().log1p()
+
+
 if __name__ == '__main__':
     import seaborn as sns
     sns.set_style('dark')

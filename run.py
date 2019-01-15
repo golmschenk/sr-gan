@@ -11,9 +11,7 @@ from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
-from srgan import abs_plus_one_square_root, abs_plus_one_log
-from utility import seed_all, clean_scientific_notation
-
+from utility import seed_all, clean_scientific_notation, abs_plus_one_square_root, abs_plus_one_log
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True

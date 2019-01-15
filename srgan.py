@@ -424,16 +424,6 @@ def square(tensor):
     return tensor.pow(2)
 
 
-def abs_plus_one_square_root(tensor):
-    """Squares the tensor value."""
-    return (tensor.abs() + 1).sqrt()
-
-
-def abs_plus_one_log(tensor):
-    """Takes the absolute value, then adds 1, then takes the log."""
-    return tensor.abs().log1p()
-
-
 def feature_distance_loss(base_features, other_features, distance_function=square):
     """Calculate the loss based on the distance between feature vectors."""
     base_mean_features = base_features.mean(0)

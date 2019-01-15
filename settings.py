@@ -5,7 +5,7 @@ import platform
 import random
 from copy import deepcopy
 
-from srgan import abs_plus_one_log
+from utility import abs_plus_one_log
 
 
 class Settings:
