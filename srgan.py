@@ -255,8 +255,9 @@ class Experiment(ABC):
         # Labeled.
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
+        loss = torch.tensor(0, dtype=torch.float)
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
-        loss = labeled_loss
+        loss += labeled_loss
         # Unlabeled.
         self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
