@@ -1,7 +1,6 @@
 """
 Code for the polynomial coefficient data generating models.
 """
-import random
 
 import numpy as np
 from scipy.stats import uniform
@@ -13,7 +12,7 @@ irrelevant_data_multiplier = 5
 
 class ToyDataset(Dataset):
     """The polynomial estimation dataset."""
-    def __init__(self, dataset_size, observation_count, settings, seed=None, shuffle=False):
+    def __init__(self, dataset_size, observation_count, settings, seed=None):
         seed_all(seed)
         self.examples, self.labels = generate_polynomial_examples(dataset_size, observation_count)
         if self.labels.shape[0] < settings.batch_size:
@@ -21,11 +20,8 @@ class ToyDataset(Dataset):
             self.examples = np.repeat(self.examples, repeats, axis=0)
             self.labels = np.repeat(self.labels, repeats, axis=0)
         self.length = self.labels.shape[0]
-        self.shuffle = shuffle
 
     def __getitem__(self, index):
-        if self.shuffle:
-            index = random.randrange(self.length)
         return self.examples[index], self.labels[index]
 
     def __len__(self):
