@@ -347,8 +347,7 @@ class Experiment(ABC):
         """Calculates the interpolate loss for use in the gradient penalty."""
         _ = self.D(interpolates)
         self.interpolates_features = self.D.features
-        interpolates_loss = feature_distance_loss(self.unlabeled_features, self.interpolates_features
-                                                  ) * self.settings.fake_loss_multiplier
+        interpolates_loss = feature_distance_loss(self.unlabeled_features, self.interpolates_features)
         return interpolates_loss
 
     def generator_loss_calculation(self, fake_examples, unlabeled_examples):
