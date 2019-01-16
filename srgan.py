@@ -255,7 +255,7 @@ class Experiment(ABC):
         # Labeled.
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
-        loss = torch.tensor(0, dtype=torch.float)
+        loss = torch.tensor(0, dtype=torch.float, device=gpu)
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         loss += labeled_loss
         # Unlabeled.
