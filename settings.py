@@ -45,6 +45,9 @@ class Settings:
         self.number_of_data_workers = 4
         self.pin_memory = True
 
+        # Coefficient application only.
+        self.hidden_size = 10
+
         # Crowd application only.
         self.crowd_dataset = 'World Expo'
         self.number_of_cameras = 5  # World Expo data only

@@ -11,13 +11,13 @@ observation_count = 10
 
 class Generator(Module):
     """The generator model."""
-    def __init__(self):
+    def __init__(self, hidden_size=10):
         super().__init__()
         self.input_size = 10
-        self.linear1 = Linear(self.input_size, 100)
-        self.linear2 = Linear(100, 100)
-        self.linear3 = Linear(100, 100)
-        self.linear4 = Linear(100, observation_count * irrelevant_data_multiplier)
+        self.linear1 = Linear(self.input_size, hidden_size)
+        self.linear2 = Linear(hidden_size, hidden_size)
+        self.linear3 = Linear(hidden_size, hidden_size)
+        self.linear4 = Linear(hidden_size, observation_count * irrelevant_data_multiplier)
 
     def forward(self, x, add_noise=False):
         """The forward pass of the module."""
@@ -30,13 +30,13 @@ class Generator(Module):
 
 class MLP(Module):
     """The DNN MLP model."""
-    def __init__(self):
+    def __init__(self, hidden_size=10):
         super().__init__()
         seed_all(0)
-        self.linear1 = Linear(observation_count * irrelevant_data_multiplier, 100)
-        self.linear2 = Linear(100, 100)
-        self.linear3 = Linear(100, 100)
-        self.linear4 = Linear(100, 1)
+        self.linear1 = Linear(observation_count * irrelevant_data_multiplier, hidden_size)
+        self.linear2 = Linear(hidden_size, hidden_size)
+        self.linear3 = Linear(hidden_size, hidden_size)
+        self.linear4 = Linear(hidden_size, 1)
         self.features = None
         self.gradient_sum = torch.tensor(0, device=gpu)
 

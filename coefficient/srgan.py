@@ -31,9 +31,9 @@ class CoefficientExperiment(Experiment):
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = MLP()
-        self.D = MLP()
-        self.G = Generator()
+        self.DNN = MLP(self.settings.hidden_size)
+        self.D = MLP(self.settings.hidden_size)
+        self.G = Generator(self.settings.hidden_size)
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
