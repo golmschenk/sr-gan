@@ -5,7 +5,7 @@ import platform
 import random
 from copy import deepcopy
 
-from utility import abs_plus_one_log
+from utility import abs_plus_one_log_neg
 
 
 class Settings:
@@ -37,7 +37,7 @@ class Settings:
         self.labeled_dataset_seed = 0
         self.normalize_fake_loss = False
         self.regularize_feature_norm = False
-        self.fake_loss_distance = abs_plus_one_log
+        self.fake_loss_distance = abs_plus_one_log_neg
 
         self.load_model_path = None
         self.should_save_models = True

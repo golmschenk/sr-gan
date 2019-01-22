@@ -12,7 +12,7 @@ from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
-from utility import seed_all, clean_scientific_notation, abs_plus_one_square_root, abs_plus_one_log
+from utility import seed_all, clean_scientific_notation, abs_plus_one_log_neg
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
@@ -26,11 +26,15 @@ if application_name == 'age':
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 100
+    settings_.unlabeled_dataset_size = 50000
+    settings_.labeled_dataset_size = 100
 elif application_name == 'coef':
     Experiment = {'srgan': CoefficientExperiment, 'sgan': CoefficientSganExperiment, 'drgan': CoefficientDrganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 1000
+    settings_.unlabeled_dataset_size = 50000
+    settings_.labeled_dataset_size = [100]
 elif application_name == 'crowd':
     Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
@@ -40,29 +44,29 @@ elif application_name == 'crowd':
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = 'ShanghaiTech'
     settings_.labeled_loss_order = 2
+    settings_.unlabeled_dataset_size = None
+    settings_.labeled_dataset_size = 50
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
-settings_.unlabeled_dataset_size = 50000
-settings_.labeled_dataset_size = 100
-settings_.summary_step_period = 5000
+settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 500000
 settings_.learning_rate = [1e-4]
-settings_.gradient_penalty_multiplier = [1e0]
+settings_.gradient_penalty_multiplier = [1e8]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-# settings_.load_model_path = 'logs/gan_quick_start'
+# settings_.load_model_path = 'logs/new feature matching loss i1nn_maps crowd le50 ueNone ul1e0 fl1e0 gp0e0 mo0e0 lr1e-4 mm1e-6 gs1 ls0 u2f0.5g2 bs7'
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1e-6
 settings_.local_setup()
-settings_.fake_loss_distance = [abs_plus_one_square_root, abs_plus_one_log]
-settings_.regularize_feature_norm = [True, False]
+settings_.fake_loss_distance = abs_plus_one_log_neg
+settings_.regularize_feature_norm = False
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = '{}'.format(settings_.fake_loss_distance.__name__)
+    trial_name = 'gp0 gp gen loss out {}'.format(settings_.fake_loss_distance.__name__)
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == 'crowd' else ''
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''

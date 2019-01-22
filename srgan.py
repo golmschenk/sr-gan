@@ -275,18 +275,9 @@ class Experiment(ABC):
         fake_loss = self.fake_loss_calculation(fake_examples)
         loss += fake_loss
         # Gradient penalty.
-        alpha = torch.rand(2, device=gpu)
-        alpha = alpha / alpha.sum(0)
-        interpolates = (alpha[0] * unlabeled_examples.detach().requires_grad_() +
-                        alpha[1] * fake_examples.detach().requires_grad_())
-        interpolates_loss = self.interpolate_loss_calculation(interpolates)
-        gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
-                                        grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
-                                        create_graph=True, only_inputs=True)[0]
-        gradient_penalty = ((gradients.view(unlabeled_examples.size(0), -1).norm(dim=1) - 1) ** 2
-                            ).mean() * self.settings.gradient_penalty_multiplier
-        # Discriminator update.
+        gradient_penalty = self.gradient_penalty_calculation(fake_examples, unlabeled_examples)
         loss += gradient_penalty
+        # Discriminator update.
         loss.backward()
         self.d_optimizer.step()
         # Generator.
@@ -304,12 +295,28 @@ class Experiment(ABC):
             self.gan_summary_writer.add_scalar('Discriminator/Labeled Loss', labeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Unlabeled Loss', unlabeled_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
+            self.gan_summary_writer.add_scalar('Discriminator/Gradient Penalty', gradient_penalty.item())
             if self.labeled_features is not None:
                 self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
         self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
+
+    def gradient_penalty_calculation(self, fake_examples, unlabeled_examples):
+        alpha_shape = [1] * len(unlabeled_examples.size())
+        alpha_shape[0] = self.settings.batch_size
+        alpha = torch.rand(alpha_shape, device=gpu)
+        interpolates = (alpha * unlabeled_examples.detach().requires_grad_() +
+                        (1 - alpha) * fake_examples.detach().requires_grad_())
+        interpolates_loss = self.interpolate_loss_calculation(interpolates)
+        gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
+                                        grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
+                                        create_graph=True, only_inputs=True)[0]
+        gradient_norm = gradients.view(unlabeled_examples.size(0), -1).norm(dim=1)
+        norm_excesses = torch.max(gradient_norm - 0, torch.zeros_like(gradient_norm))
+        gradient_penalty = (norm_excesses ** 2).mean() * self.settings.gradient_penalty_multiplier
+        return gradient_penalty
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
@@ -339,8 +346,8 @@ class Experiment(ABC):
         _ = self.D(fake_examples.detach())
         self.fake_features = self.D.features
         fake_loss = feature_distance_loss(self.unlabeled_features, self.fake_features,
-                                          distance_function=self.settings.fake_loss_distance
-                                          ).neg() * self.settings.fake_loss_multiplier
+                                          distance_function=self.settings.fake_loss_distance)
+        fake_loss *= self.settings.fake_loss_multiplier
         return fake_loss
 
     def interpolate_loss_calculation(self, interpolates):
@@ -428,6 +435,13 @@ def feature_distance_loss(base_features, other_features, distance_function=squar
     base_mean_features = base_features.mean(0)
     other_mean_features = other_features.mean(0)
     distance_vector = distance_function(base_mean_features - other_mean_features)
+    return distance_vector.mean()
+
+
+def feature_distance_loss_unmeaned(base_features, other_features, distance_function=square):
+    """Calculate the loss based on the distance between feature vectors."""
+    base_mean_features = base_features.mean(0, keepdim=True)
+    distance_vector = distance_function(base_mean_features - other_features)
     return distance_vector.mean()
 
 

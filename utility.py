@@ -198,9 +198,9 @@ def abs_plus_one_square_root(tensor):
     return (tensor.abs() + 1).sqrt()
 
 
-def abs_plus_one_log(tensor):
-    """Takes the absolute value, then adds 1, then takes the log."""
-    return tensor.abs().log1p()
+def abs_plus_one_log_neg(tensor):
+    """Takes the absolute value, then adds 1, then takes the log, then negates."""
+    return tensor.abs().log1p().neg()
 
 
 if __name__ == '__main__':
