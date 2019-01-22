@@ -29,7 +29,8 @@ if application_name == 'age':
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = 100
 elif application_name == 'coef':
-    Experiment = {'srgan': CoefficientExperiment, 'sgan': CoefficientSganExperiment, 'drgan': CoefficientDrganExperiment}[method_name]
+    Experiment = {'srgan': CoefficientExperiment, 'sgan': CoefficientSganExperiment,
+                  'drgan': CoefficientDrganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 1000
@@ -57,7 +58,7 @@ settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-# settings_.load_model_path = 'logs/new feature matching loss i1nn_maps crowd le50 ueNone ul1e0 fl1e0 gp0e0 mo0e0 lr1e-4 mm1e-6 gs1 ls0 u2f0.5g2 bs7'
+# settings_.load_model_path = 'logs/GAN quick start'
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1e-6
 settings_.local_setup()

@@ -14,6 +14,7 @@ from torch.nn import Module
 from torch.optim import Adam, Optimizer
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torch import Tensor
 
 from settings import Settings
 from utility import SummaryWriter, gpu, make_directory_name_unique, MixtureModel, seed_all
@@ -303,21 +304,6 @@ class Experiment(ABC):
                                                    self.unlabeled_features.mean(0).norm().item())
         self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
 
-    def gradient_penalty_calculation(self, fake_examples, unlabeled_examples):
-        alpha_shape = [1] * len(unlabeled_examples.size())
-        alpha_shape[0] = self.settings.batch_size
-        alpha = torch.rand(alpha_shape, device=gpu)
-        interpolates = (alpha * unlabeled_examples.detach().requires_grad_() +
-                        (1 - alpha) * fake_examples.detach().requires_grad_())
-        interpolates_loss = self.interpolate_loss_calculation(interpolates)
-        gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
-                                        grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
-                                        create_graph=True, only_inputs=True)[0]
-        gradient_norm = gradients.view(unlabeled_examples.size(0), -1).norm(dim=1)
-        norm_excesses = torch.max(gradient_norm - 0, torch.zeros_like(gradient_norm))
-        gradient_penalty = (norm_excesses ** 2).mean() * self.settings.gradient_penalty_multiplier
-        return gradient_penalty
-
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
         predicted_labels = self.DNN(labeled_examples)
@@ -349,6 +335,22 @@ class Experiment(ABC):
                                           distance_function=self.settings.fake_loss_distance)
         fake_loss *= self.settings.fake_loss_multiplier
         return fake_loss
+
+    def gradient_penalty_calculation(self, fake_examples: Tensor, unlabeled_examples: Tensor) -> Tensor:
+        """Calculates the gradient penalty from the given fake and real examples."""
+        alpha_shape = [1] * len(unlabeled_examples.size())
+        alpha_shape[0] = self.settings.batch_size
+        alpha = torch.rand(alpha_shape, device=gpu)
+        interpolates = (alpha * unlabeled_examples.detach().requires_grad_() +
+                        (1 - alpha) * fake_examples.detach().requires_grad_())
+        interpolates_loss = self.interpolate_loss_calculation(interpolates)
+        gradients = torch.autograd.grad(outputs=interpolates_loss, inputs=interpolates,
+                                        grad_outputs=torch.ones_like(interpolates_loss, device=gpu),
+                                        create_graph=True, only_inputs=True)[0]
+        gradient_norm = gradients.view(unlabeled_examples.size(0), -1).norm(dim=1)
+        norm_excesses = torch.max(gradient_norm - 0, torch.zeros_like(gradient_norm))
+        gradient_penalty = (norm_excesses ** 2).mean() * self.settings.gradient_penalty_multiplier
+        return gradient_penalty
 
     def interpolate_loss_calculation(self, interpolates):
         """Calculates the interpolate loss for use in the gradient penalty."""
