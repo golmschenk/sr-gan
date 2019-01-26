@@ -736,7 +736,8 @@ class MapModule(nn.Module):
         self.conv1 = Conv2d(in_channels=1, out_channels=8, kernel_size=2, stride=2)
         self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
         self.conv3 = Conv2d(in_channels=16, out_channels=32, kernel_size=2, stride=2)
-        self.count_layer = Conv2d(in_channels=32, out_channels=1, kernel_size=28)
+        self.linear1 = Conv2d(in_channels=32, out_channels=20, kernel_size=28)
+        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
 
     def forward(self, x):
         """Forward pass."""
@@ -744,6 +745,7 @@ class MapModule(nn.Module):
         out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
+        out = leaky_relu(self.linear1(out))
         count = leaky_relu(self.count_layer(out))
         return map_, count, out
 
@@ -944,7 +946,8 @@ class KnnDenseNetCat(nn.Module):
             del state_dict['classifier.bias']
             self.load_state_dict(state_dict, strict=True)
 
-        self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
+        self.srgan_feature_layer = Conv2d(in_channels=num_features, out_channels=20, kernel_size=1)
+        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
         self.map_module1 = MapModule(in_features=128, kernel_size=8)
         self.map_module2 = MapModule(in_features=256, kernel_size=16)
         self.map_module3 = MapModule(in_features=896, kernel_size=32)
@@ -966,12 +969,13 @@ class KnnDenseNetCat(nn.Module):
         final_pool = avg_pool2d(n5_relu_out, kernel_size=7, stride=1)
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
-        final_count = leaky_relu(self.count_layer(final_pool))
+        srgan_features = leaky_relu(self.srgan_feature_layer(final_pool))
+        final_count = leaky_relu(self.count_layer(srgan_features))
         map1, count1, h1 = self.map_module1(t1_out)
         map2, count2, h2 = self.map_module2(t2_out)
         map3, count3, h3 = self.map_module3(t3_out)
         self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1),
-                                   h3.view(batch_size, -1, 1, 1), final_pool], dim=1)
+                                   h3.view(batch_size, -1, 1, 1), srgan_features], dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         map_ = torch.cat([map1, map2, map3], dim=1)
