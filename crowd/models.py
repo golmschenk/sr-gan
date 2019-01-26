@@ -529,9 +529,10 @@ class DenseNet(nn.Module):
                  num_init_features=64, bn_size=4, drop_rate=0, num_classes=1000):
 
         super(DenseNet, self).__init__()
+        self.features = None
 
         # First convolution
-        self.features = nn.Sequential(OrderedDict([
+        self.dense_layers = nn.Sequential(OrderedDict([
             ('conv0', nn.Conv2d(3, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
@@ -543,15 +544,15 @@ class DenseNet(nn.Module):
         for i, num_layers in enumerate(block_config):
             block = _DenseBlock(num_layers=num_layers, num_input_features=num_features,
                                 bn_size=bn_size, growth_rate=growth_rate, drop_rate=drop_rate)
-            self.features.add_module('denseblock%d' % (i + 1), block)
+            self.dense_layers.add_module('denseblock%d' % (i + 1), block)
             num_features = num_features + num_layers * growth_rate
             if i != len(block_config) - 1:
                 trans = _Transition(num_input_features=num_features, num_output_features=num_features // 2)
-                self.features.add_module('transition%d' % (i + 1), trans)
+                self.dense_layers.add_module('transition%d' % (i + 1), trans)
                 num_features = num_features // 2
 
         # Final batch norm
-        self.features.add_module('norm5', nn.BatchNorm2d(num_features))
+        self.dense_layers.add_module('norm5', nn.BatchNorm2d(num_features))
 
         # Linear layer
         self.classifier = nn.Linear(num_features, num_classes)
@@ -568,9 +569,10 @@ class DenseNet(nn.Module):
 
     def forward(self, x):
         """Forward pass."""
-        features = self.features(x)
+        features = self.dense_layers(x)
         out = relu(features, inplace=True)
         out = avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1)
+        self.features = out
         out = self.classifier(out)
         return out
 
@@ -599,6 +601,11 @@ def densenet201(pretrained=False, **kwargs):
                 new_key = res.group(1) + res.group(2)
                 state_dict[new_key] = state_dict[key]
                 del state_dict[key]
+        new_name_state_dict = OrderedDict()
+        for key, value in state_dict.items():
+            new_key = key.replace('features.denseblock', 'dense_layers.denseblock')
+            new_name_state_dict[new_key] = value
+        state_dict = new_name_state_dict
         del state_dict['classifier.weight']
         del state_dict['classifier.bias']
         model.load_state_dict(state_dict, strict=False)
@@ -607,18 +614,21 @@ def densenet201(pretrained=False, **kwargs):
 
 class DenseNetDiscriminator(Module):
     """The DenseNet as a discriminator."""
-    def __init__(self, label_patch_size=28):
+    def __init__(self, label_patch_size=224):
         seed_all(0)
         super().__init__()
         self.label_patch_size = label_patch_size
+        self.features = None
         self.dense_net_module = densenet201(pretrained=True, num_classes=1)
 
     def forward(self, x):
         """The forward pass of the network."""
         batch_size = x.shape[0]
         out = self.dense_net_module(x)
+        self.features = self.dense_net_module.features
         out = out.view(-1)
-        return torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu), out
+        return (torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu), out,
+                torch.zeros([batch_size, 3, self.label_patch_size, self.label_patch_size], device=gpu))
 
 
 class KnnDenseNet(nn.Module):
