@@ -203,6 +203,21 @@ def abs_plus_one_log_neg(tensor):
     return tensor.abs().log1p().neg()
 
 
+def abs_plus_one_log_mean_neg(tensor):
+    """Takes the absolute value, then adds 1, then takes the log, then mean, then negates."""
+    return tensor.abs().add(1).log().mean().neg()
+
+
+def norm_squared(tensor, axis=1):
+    """Calculates the norm squared along an axis. The default axis is 1 (the feature axis), with 0 being the batch."""
+    return tensor.pow(2).sum(dim=axis)
+
+
+def square_mean(tensor):
+    """Calculates the element-wise square, then the mean of a tensor."""
+    return tensor.pow(2).mean()
+
+
 if __name__ == '__main__':
     import seaborn as sns
     sns.set_style('dark')

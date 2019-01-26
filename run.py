@@ -12,7 +12,7 @@ from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from settings import Settings, convert_to_settings_list
-from utility import seed_all, clean_scientific_notation, abs_plus_one_log_neg
+from utility import seed_all, clean_scientific_notation, abs_plus_one_log_mean_neg
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
@@ -31,15 +31,15 @@ if application_name == 'age':
 elif application_name == 'coef':
     Experiment = {'srgan': CoefficientExperiment, 'sgan': CoefficientSganExperiment,
                   'drgan': CoefficientDrganExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e0]
-    settings_.fake_loss_multiplier = [1e0]
+    settings_.unlabeled_loss_multiplier = [1e-1]
+    settings_.fake_loss_multiplier = [1e-1]
     settings_.batch_size = 1000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [100]
 elif application_name == 'crowd':
     Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e0]
-    settings_.fake_loss_multiplier = [1e0]
+    settings_.unlabeled_loss_multiplier = [1e-1]
+    settings_.fake_loss_multiplier = [1e-1]
     settings_.batch_size = 7
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
@@ -49,11 +49,11 @@ elif application_name == 'crowd':
     settings_.labeled_dataset_size = 50
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
-settings_.summary_step_period = 1000
+settings_.summary_step_period = 3000
 settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 500000
 settings_.learning_rate = [1e-4]
-settings_.gradient_penalty_multiplier = [1e8]
+settings_.gradient_penalty_multiplier = [1e1]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
@@ -62,12 +62,12 @@ settings_.generator_loss_order = 2
 settings_.map_directory_name = ['i1nn_maps']
 settings_.map_multiplier = 1e-6
 settings_.local_setup()
-settings_.fake_loss_distance = abs_plus_one_log_neg
+settings_.fake_loss_distance = abs_plus_one_log_mean_neg
 settings_.regularize_feature_norm = False
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'gp0 gp gen loss out {}'.format(settings_.fake_loss_distance.__name__)
+    trial_name = 'bn sl mean feature norm1 gp {}'.format(settings_.fake_loss_distance.__name__)
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == 'crowd' else ''
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
