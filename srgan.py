@@ -109,7 +109,8 @@ class Experiment(ABC):
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
                 step_time_start = datetime.datetime.now()
                 self.eval_mode()
-                self.validation_summaries(step)
+                with torch.no_grad():
+                    self.validation_summaries(step)
                 self.train_mode()
             self.handle_user_input(step)
 
