@@ -33,7 +33,7 @@ class CoefficientDrganExperiment(CoefficientExperiment):
         labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
-    def unlabeled_loss_calculation(self, unlabeled_examples):
+    def unlabeled_loss_calculation(self, labeled_examples, unlabeled_examples):
         """Calculates the unlabeled loss."""
         _, fake_scores = self.D(unlabeled_examples)
         criterion = BCEWithLogitsLoss()
@@ -41,7 +41,7 @@ class CoefficientDrganExperiment(CoefficientExperiment):
         unlabeled_loss *= self.settings.unlabeled_loss_multiplier
         return unlabeled_loss
 
-    def fake_loss_calculation(self, fake_examples):
+    def fake_loss_calculation(self, unlabeled_examples, fake_examples):
         """Calculates the fake loss."""
         _, fake_scores = self.D(fake_examples)
         criterion = BCEWithLogitsLoss()

@@ -45,6 +45,7 @@ class Experiment(ABC):
         self.unlabeled_features = None
         self.fake_features = None
         self.interpolates_features = None
+        self.gradient_norm = None
 
     def train(self):
         """
@@ -240,6 +241,7 @@ class Experiment(ABC):
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
+        self.DNN.apply(disable_batch_norm_updates)  # No batch norm
         self.dnn_summary_writer.step = step
         self.dnn_optimizer.zero_grad()
         dnn_loss = self.dnn_loss_calculation(examples, labels)
@@ -254,15 +256,18 @@ class Experiment(ABC):
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
         # Labeled.
+        self.D.apply(disable_batch_norm_updates)  # No batch norm
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
         loss = torch.tensor(0, dtype=torch.float, device=gpu)
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
-        loss += labeled_loss
+        #loss += labeled_loss
+        labeled_loss.backward()
         # Unlabeled.
-        self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
-        unlabeled_loss = self.unlabeled_loss_calculation(unlabeled_examples)
-        loss += unlabeled_loss
+        #self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
+        unlabeled_loss = self.unlabeled_loss_calculation(labeled_examples, unlabeled_examples)
+        # loss += unlabeled_loss
+        unlabeled_loss.backward()
         # Feature regularization loss.
         if self.settings.regularize_feature_norm:
             feature_regularization_loss = torch.abs(self.unlabeled_features.mean(0).norm() - 1)
@@ -273,13 +278,15 @@ class Experiment(ABC):
                                       ).rvs(size=[unlabeled_examples.size(0),
                                                   self.G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = self.G(z)
-        fake_loss = self.fake_loss_calculation(fake_examples)
-        loss += fake_loss
+        fake_loss = self.fake_loss_calculation(unlabeled_examples, fake_examples)
+        #loss += fake_loss
+        fake_loss.backward()
         # Gradient penalty.
         gradient_penalty = self.gradient_penalty_calculation(fake_examples, unlabeled_examples)
-        loss += gradient_penalty
+        #loss += gradient_penalty
+        gradient_penalty.backward()
         # Discriminator update.
-        loss.backward()
+        #loss.backward()
         self.d_optimizer.step()
         # Generator.
         if step % self.settings.generator_training_step_period == 0:
@@ -303,7 +310,7 @@ class Experiment(ABC):
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
-        self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
+        #self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
@@ -320,21 +327,27 @@ class Experiment(ABC):
         labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
-    def unlabeled_loss_calculation(self, unlabeled_examples):
+    def unlabeled_loss_calculation(self, labeled_examples: Tensor, unlabeled_examples: Tensor):
         """Calculates the unlabeled loss."""
+        _ = self.D(labeled_examples)
+        self.labeled_features = self.D.features
         _ = self.D(unlabeled_examples)
         self.unlabeled_features = self.D.features
         unlabeled_loss = feature_distance_loss(self.unlabeled_features, self.labeled_features
                                                ) * self.settings.unlabeled_loss_multiplier
+        unlabeled_loss *= self.settings.srgan_loss_multiplier
         return unlabeled_loss
 
-    def fake_loss_calculation(self, fake_examples):
+    def fake_loss_calculation(self, unlabeled_examples: Tensor, fake_examples: Tensor):
         """Calculates the fake loss."""
+        _ = self.D(unlabeled_examples)
+        self.unlabeled_features = self.D.features
         _ = self.D(fake_examples.detach())
         self.fake_features = self.D.features
         fake_loss = feature_distance_loss(self.unlabeled_features, self.fake_features,
                                           distance_function=self.settings.fake_loss_distance)
         fake_loss *= self.settings.fake_loss_multiplier
+        fake_loss *= self.settings.srgan_loss_multiplier
         return fake_loss
 
     def gradient_penalty_calculation(self, fake_examples: Tensor, unlabeled_examples: Tensor) -> Tensor:

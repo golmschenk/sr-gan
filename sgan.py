@@ -31,7 +31,7 @@ class SganExperiment(Experiment, ABC):
         labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
-    def unlabeled_loss_calculation(self, unlabeled_examples):
+    def unlabeled_loss_calculation(self, labeled_exmaples, unlabeled_examples):
         """Calculates the unlabeled loss."""
         predicted_class_logits = self.D(unlabeled_examples)
         unlabeled_binary_logits = logsumexp(predicted_class_logits, dim=1)
@@ -40,7 +40,7 @@ class SganExperiment(Experiment, ABC):
         unlabeled_loss *= self.settings.unlabeled_loss_multiplier
         return unlabeled_loss
 
-    def fake_loss_calculation(self, fake_examples):
+    def fake_loss_calculation(self, unlabeled_examples, fake_examples):
         """Calculates the fake loss."""
         predicted_class_logits = self.D(fake_examples.detach())
         fake_binary_logits = logsumexp(predicted_class_logits, dim=1)
