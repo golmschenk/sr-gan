@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from crowd import data
 from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
-from crowd.models import DCGenerator, KnnDenseNetCat
+from crowd.models import DCGenerator, KnnDenseNetCat, DenseNetDiscriminator
 from srgan import Experiment
 from utility import MixtureModel, gpu
 
@@ -119,8 +119,8 @@ class CrowdExperiment(Experiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = KnnDenseNetCat()
-        self.DNN = KnnDenseNetCat()
+        self.D = DenseNetDiscriminator()
+        self.DNN = DenseNetDiscriminator()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""
@@ -183,6 +183,7 @@ class CrowdExperiment(Experiment):
             images, labels = images.to(gpu), labels.to(gpu)
             (batch_predicted_densities, batch_predicted_counts, batch_predicted_maps
              ) = self.images_to_predicted_labels(network, images)
+            labels = labels.to('cpu')
             batch_predicted_densities = batch_predicted_densities.detach().to('cpu').numpy()
             batch_predicted_maps = batch_predicted_maps.detach().to('cpu').numpy()
             batch_predicted_counts = batch_predicted_counts.detach().to('cpu').numpy()

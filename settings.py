@@ -25,6 +25,7 @@ class Settings:
 
         self.labeled_loss_multiplier = 1e0
         self.unlabeled_loss_multiplier = 1e0
+        self.srgan_loss_multiplier = 1e-1
         self.fake_loss_multiplier = 1e0
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
