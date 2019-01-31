@@ -19,17 +19,18 @@ from scipy.io import loadmat
 from datetime import datetime
 from google_drive_downloader import GoogleDriveDownloader
 
-from utility import to_normalized_range, download_and_extract_file
-
+from utility import to_normalized_range, download_and_extract_file, seed_all
 
 database_directory = '../Steering Angle Database'
 
 
 class SteeringAngleDataset(Dataset):
     """The dataset class for the age estimation application."""
-    def __init__(self, dataset_path, start=None, end=None):
+    def __init__(self, dataset_path, start=None, end=None, seed=None):
+        seed_all(seed)
         self.dataset_path = database_directory
         meta = np.load(os.path.join(self.dataset_path, 'meta.npy'))
+        np.random.shuffle(meta)  # Shuffles only first axis.
         image_names = meta[:, 0]
         angles = meta[:, 1]
         self.image_names = np.array(image_names[start:end])
