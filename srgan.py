@@ -261,12 +261,10 @@ class Experiment(ABC):
         self.d_optimizer.zero_grad()
         loss = torch.tensor(0, dtype=torch.float, device=gpu)
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
-        #loss += labeled_loss
         labeled_loss.backward()
         # Unlabeled.
         #self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(labeled_examples, unlabeled_examples)
-        # loss += unlabeled_loss
         unlabeled_loss.backward()
         # Feature regularization loss.
         if self.settings.regularize_feature_norm:
@@ -279,14 +277,11 @@ class Experiment(ABC):
                                                   self.G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = self.G(z)
         fake_loss = self.fake_loss_calculation(unlabeled_examples, fake_examples)
-        #loss += fake_loss
         fake_loss.backward()
         # Gradient penalty.
         gradient_penalty = self.gradient_penalty_calculation(fake_examples, unlabeled_examples)
-        #loss += gradient_penalty
         gradient_penalty.backward()
         # Discriminator update.
-        #loss.backward()
         self.d_optimizer.step()
         # Generator.
         if step % self.settings.generator_training_step_period == 0:

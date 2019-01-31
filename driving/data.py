@@ -1,25 +1,19 @@
 """
 Code for accessing the data in the database easily.
 """
-import csv
 import os
 import shutil
-import json
-
 import patoolib
 import requests
 import torch
-from urllib.request import urlretrieve
-import tarfile
 import numpy as np
+import pandas as pd
 import imageio
-from skimage import transform, color
+from skimage import transform
+from sklearn.utils import shuffle
 from torch.utils.data import Dataset
-from scipy.io import loadmat
-from datetime import datetime
-from google_drive_downloader import GoogleDriveDownloader
 
-from utility import to_normalized_range, download_and_extract_file, seed_all
+from utility import to_normalized_range, seed_all
 
 database_directory = '../Steering Angle Database'
 
@@ -29,13 +23,14 @@ class SteeringAngleDataset(Dataset):
     def __init__(self, dataset_path, start=None, end=None, seed=None):
         seed_all(seed)
         self.dataset_path = database_directory
-        meta = np.load(os.path.join(self.dataset_path, 'meta.npy'))
-        np.random.shuffle(meta)  # Shuffles only first axis.
-        image_names = meta[:, 0]
-        angles = meta[:, 1]
+        meta = pd.read_pickle(os.path.join(self.dataset_path, 'meta.pkl'))
+        meta = shuffle(meta, random_state=seed)  # Shuffles only first axis.
+        image_names = meta.iloc[:, 0].values
+        angles = meta.iloc[:, 1].values
         self.image_names = np.array(image_names[start:end])
         self.angles = np.array(angles[start:end], dtype=np.float32)
         self.length = self.angles.shape[0]
+        self.image_size = 128
 
     def __len__(self):
         return self.length
@@ -43,6 +38,7 @@ class SteeringAngleDataset(Dataset):
     def __getitem__(self, index):
         image_name = self.image_names[index]
         image = imageio.imread(os.path.join(self.dataset_path, image_name))
+        image = transform.resize(image, (self.image_size, self.image_size), preserve_range=True)
         image = image.transpose((2, 0, 1))
         image = torch.tensor(image.astype(np.float32))
         image = to_normalized_range(image)
@@ -108,16 +104,11 @@ class SteeringAngleDatabaseProcessor:
 
     def preprocess(self):
         """Preprocesses the database to the format needed by the network."""
-        for file_name in os.listdir(database_directory):
-            if file_name.endswith('.jpg'):
-                file_path = os.path.join(database_directory, file_name)
-                image = imageio.imread(file_path).astype(np.uint8)
-                image = transform.resize(image, (self.preprocessed_image_size, self.preprocessed_image_size),
-                                         preserve_range=True)
-                np.save(file_path.replace('.jpg', '.npy'), image)
+        bad_image_list = ['45567.jpg']
         meta_file_path = os.path.join(database_directory, 'data.txt')
-        meta = np.genfromtxt(meta_file_path, delimiter=' ')
-        np.save(os.path.join(database_directory, 'meta.npy'), meta)
+        meta = pd.read_csv(meta_file_path, delimiter=' ', header=None)
+        meta = meta[meta[0] != '45567.jpg']
+        meta.to_pickle(os.path.join(database_directory, 'meta.pkl'))
 
 
 if __name__ == '__main__':
