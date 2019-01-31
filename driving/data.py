@@ -37,9 +37,7 @@ class SteeringAngleDataset(Dataset):
 
     def __getitem__(self, index):
         image_name = self.image_names[index]
-        image = imageio.imread(os.path.join(self.dataset_path, image_name))
-        image = transform.resize(image, (self.image_size, self.image_size), preserve_range=True)
-        image = image.transpose((2, 0, 1))
+        image = np.load(os.path.join(self.dataset_path, image_name.replace('.jpg', '.npy')))
         image = torch.tensor(image.astype(np.float32))
         image = to_normalized_range(image)
         angle = self.angles[index]
@@ -104,13 +102,19 @@ class SteeringAngleDatabaseProcessor:
 
     def preprocess(self):
         """Preprocesses the database to the format needed by the network."""
-        bad_image_list = ['45567.jpg']
         meta_file_path = os.path.join(database_directory, 'data.txt')
         meta = pd.read_csv(meta_file_path, delimiter=' ', header=None)
-        meta = meta[meta[0] != '45567.jpg']
+        meta = meta[meta[0] != '45567.jpg']  # Corrupt image.
         meta.to_pickle(os.path.join(database_directory, 'meta.pkl'))
+        for file_name in meta.iloc[:, 0].values:
+            if file_name.endswith('.jpg'):
+                file_path = os.path.join(database_directory, file_name)
+                image = imageio.imread(file_path).astype(np.uint8)
+                image = transform.resize(image, (self.preprocessed_image_size, self.preprocessed_image_size),
+                                         preserve_range=True)
+                image = image.transpose((2, 0, 1))
+                np.save(file_path.replace('.jpg', '.npy'), image)
 
 
 if __name__ == '__main__':
-    SteeringAngleDatabaseProcessor().download()
-    SteeringAngleDatabaseProcessor().preprocess()
+    SteeringAngleDatabaseProcessor().download_and_preprocess()
