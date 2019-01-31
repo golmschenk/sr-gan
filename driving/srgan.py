@@ -27,7 +27,10 @@ class DrivingExperiment(Experiment):
                                                        end=self.train_dataset.length + settings.validation_dataset_size,
                                                        seed=self.settings.labeled_dataset_seed)
         unlabeled_dataset_start = self.train_dataset.length + self.validation_dataset.length
-        unlabeled_dataset_end = unlabeled_dataset_start + settings.unlabeled_dataset_size
+        if settings.unlabeled_dataset_size is not None:
+            unlabeled_dataset_end = unlabeled_dataset_start + settings.unlabeled_dataset_size
+        else:
+            unlabeled_dataset_end = None
         self.unlabeled_dataset = SteeringAngleDataset(database_directory, start=unlabeled_dataset_start,
                                                       end=unlabeled_dataset_end,
                                                       seed=self.settings.labeled_dataset_seed)
