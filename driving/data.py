@@ -25,39 +25,29 @@ from utility import to_normalized_range, download_and_extract_file
 database_directory = '../Steering Angle Database'
 
 
-class AgeDataset(Dataset):
+class SteeringAngleDataset(Dataset):
     """The dataset class for the age estimation application."""
-    def __init__(self, dataset_path, start=None, end=None, gender_filter=None):
-        if gender_filter is not None:
-            raise NotImplementedError()
-        self.dataset_path = dataset_path
-        with open(os.path.join(self.dataset_path, 'meta.json')) as json_file:
-            json_contents = json.load(json_file)
-        image_names, ages = [], []
-        for entry in json_contents:
-            if isinstance(entry, dict):
-                image_names.append(entry['image_name'])
-                ages.append(entry['age'])
-            else:
-                image_name, age, gender = entry
-                image_names.append(image_name)
-                ages.append(age)
+    def __init__(self, dataset_path, start=None, end=None):
+        self.dataset_path = database_directory
+        meta = np.load(os.path.join(self.dataset_path, 'meta.npy'))
+        image_names = meta[:, 0]
+        angles = meta[:, 1]
         self.image_names = np.array(image_names[start:end])
-        self.ages = np.array(ages[start:end], dtype=np.float32)
-        self.length = self.ages.shape[0]
+        self.angles = np.array(angles[start:end], dtype=np.float32)
+        self.length = self.angles.shape[0]
 
     def __len__(self):
         return self.length
 
-    def __getitem__(self, idx):
-        image_name = self.image_names[idx]
+    def __getitem__(self, index):
+        image_name = self.image_names[index]
         image = imageio.imread(os.path.join(self.dataset_path, image_name))
         image = image.transpose((2, 0, 1))
         image = torch.tensor(image.astype(np.float32))
         image = to_normalized_range(image)
-        age = self.ages[idx]
-        age = torch.tensor(age, dtype=torch.float32)
-        return image, age
+        angle = self.angles[index]
+        angle = torch.tensor(angle, dtype=torch.float32)
+        return image, angle
 
 
 class SteeringAngleDatabaseProcessor:
@@ -85,7 +75,8 @@ class SteeringAngleDatabaseProcessor:
         default_directory_name = 'driving_dataset'
         files = os.listdir(os.path.join(database_directory, default_directory_name))
         for file_ in files:
-            shutil.move(os.path.join(database_directory, default_directory_name, file_), database_directory)
+            if not file_.startswith('.'):
+                shutil.move(os.path.join(database_directory, default_directory_name, file_), database_directory)
         shutil.rmtree(os.path.join(database_directory, default_directory_name))
         os.remove(os.path.join(database_directory, 'temporary'))
 
@@ -114,18 +105,18 @@ class SteeringAngleDatabaseProcessor:
             response = session.get(URL, params=params, stream=True)
         save_response_content(response, destination)
 
-    @staticmethod
-    def preprocess():
+    def preprocess(self):
         """Preprocesses the database to the format needed by the network."""
         for file_name in os.listdir(database_directory):
             if file_name.endswith('.jpg'):
                 file_path = os.path.join(database_directory, file_name)
                 image = imageio.imread(file_path).astype(np.uint8)
+                image = transform.resize(image, (self.preprocessed_image_size, self.preprocessed_image_size),
+                                         preserve_range=True)
                 np.save(file_path.replace('.jpg', '.npy'), image)
         meta_file_path = os.path.join(database_directory, 'data.txt')
         meta = np.genfromtxt(meta_file_path, delimiter=' ')
-        angles = meta[:, 1]
-        np.save(os.path.join(database_directory, 'angles.npy'), angles)
+        np.save(os.path.join(database_directory, 'meta.npy'), meta)
 
 
 if __name__ == '__main__':
