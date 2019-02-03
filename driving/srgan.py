@@ -22,7 +22,7 @@ class DrivingExperiment(Experiment):
                                                   seed=self.settings.labeled_dataset_seed)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                pin_memory=self.settings.pin_memory,
-                                               num_workers=settings.number_of_data_workers)
+                                               num_workers=settings.number_of_data_workers, drop_last=True)
         self.validation_dataset = SteeringAngleDataset(database_directory, start=self.train_dataset.length,
                                                        end=self.train_dataset.length + settings.validation_dataset_size,
                                                        seed=self.settings.labeled_dataset_seed)
@@ -36,7 +36,7 @@ class DrivingExperiment(Experiment):
                                                       seed=self.settings.labeled_dataset_seed)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
-                                                   num_workers=settings.number_of_data_workers)
+                                                   num_workers=settings.number_of_data_workers, drop_last=True)
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
@@ -68,17 +68,19 @@ class DrivingExperiment(Experiment):
         train_dataset_loader = DataLoader(train_dataset, batch_size=settings.batch_size, shuffle=True)
         train_iterator = iter(train_dataset_loader)
         examples, _ = next(train_iterator)
-        images_image = torchvision.utils.make_grid(to_image_range(examples[:9]), nrow=3)
+        images_image = torchvision.utils.make_grid(to_image_range(examples[:9]), normalize=True, range=(0, 255), nrow=3)
         gan_summary_writer.add_image('Real', images_image.numpy())
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
-        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
+        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True,
+                                                        range=(0, 255), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
         z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
-        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), nrow=3)
+        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True,
+                                                        range=(0, 255), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):
