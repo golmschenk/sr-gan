@@ -4,6 +4,7 @@ General settings.
 import platform
 import random
 from copy import deepcopy
+from enum import Enum
 
 from utility import abs_plus_one_log_neg
 
@@ -107,3 +108,17 @@ def convert_to_settings_list(settings, shuffle=True):
         random.seed()
         random.shuffle(settings_list)
     return settings_list
+
+
+class ApplicationName(Enum):
+    coefficient = 0
+    age = 1
+    crowd = 2
+    driving = 3
+
+
+class MethodName(Enum):
+    srgan = 0
+    dnn = 1
+    drgan = 2
+    sgan = 3

@@ -12,41 +12,42 @@ from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from driving.srgan import DrivingExperiment
-from settings import Settings, convert_to_settings_list
+from settings import Settings, convert_to_settings_list, ApplicationName, MethodName
 from utility import seed_all, clean_scientific_notation, abs_plus_one_log_mean_neg
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = 'driving'
-method_name = 'srgan'
+application_name = ApplicationName.driving
+method_name = MethodName.srgan
 
 settings_ = Settings()
-if application_name == 'age':
-    Experiment = {'srgan': AgeExperiment, 'sgan': AgeSganExperiment}[method_name]
+if application_name == ApplicationName.age:
+    Experiment = {MethodName.srgan: AgeExperiment, MethodName.sgan: AgeSganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 100
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = 100
-elif application_name == 'driving':
+elif application_name == ApplicationName.driving:
     Experiment = DrivingExperiment
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
-    settings_.batch_size = 100
+    settings_.batch_size = 850
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = 7200
+    settings_.labeled_dataset_size = 1000
     settings_.validation_dataset_size = 9000
-elif application_name == 'coef':
-    Experiment = {'srgan': CoefficientExperiment, 'sgan': CoefficientSganExperiment,
-                  'drgan': CoefficientDrganExperiment}[method_name]
+elif application_name == ApplicationName.coefficient:
+    Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
+                  MethodName.drgan: CoefficientDrganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 5000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [100]
-elif application_name == 'crowd':
-    Experiment = {'srgan': CrowdExperiment, 'sgan': CrowdSganExperiment, 'dnn': CrowdDnnExperiment}[method_name]
+elif application_name == ApplicationName.crowd:
+    Experiment = {MethodName.srgan: CrowdExperiment, MethodName.sgan: CrowdSganExperiment,
+                  MethodName.dnn: CrowdDnnExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e1]
     settings_.fake_loss_multiplier = [1e1]
     settings_.batch_size = 18
@@ -76,10 +77,10 @@ settings_.regularize_feature_norm = False
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'DN {}'.format(settings_.fake_loss_distance.__name__)
-    trial_name += ' {}'.format(settings_.map_directory_name) if application_name == 'crowd' else ''
+    trial_name = 'drive {}'.format(settings_.fake_loss_distance.__name__)
+    trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
     trial_name += ' {}'.format(application_name)
-    trial_name += ' {}'.format(method_name) if method_name != 'srgan' else ''
+    trial_name += ' {}'.format(method_name) if method_name != MethodName.srgan else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':
         trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
     else:
@@ -90,7 +91,7 @@ for settings_ in settings_list:
     trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
     trial_name += ' mo{:e}'.format(settings_.mean_offset)
     trial_name += ' lr{:e}'.format(settings_.learning_rate)
-    trial_name += ' mm{:e}'.format(settings_.map_multiplier) if application_name == 'crowd' else ''
+    trial_name += ' mm{:e}'.format(settings_.map_multiplier) if application_name == ApplicationName.crowd else ''
     trial_name += ' gs{}'.format(settings_.generator_training_step_period)
     trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
     trial_name += ' u{}f{}g{}'.format(settings_.unlabeled_loss_order,
