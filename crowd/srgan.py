@@ -165,7 +165,7 @@ class CrowdExperiment(Experiment):
         fake_examples = G(z.to(gpu)).to('cpu')
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
-        z = torch.from_numpy(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
+        z = torch.as_tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
                                           ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32))
         fake_examples = G(z.to(gpu)).to('cpu')
         fake_images_image = torchvision.utils.make_grid(fake_examples.data[:9], normalize=True, range=(-1, 1), nrow=3)
@@ -236,11 +236,11 @@ class CrowdExperiment(Experiment):
         patch_size = self.settings.image_patch_size
         resized_label_array = scipy.misc.imresize(label_array, (patch_size, patch_size), mode='F')
         label_heatmap_array = mappable.to_rgba(resized_label_array).astype(np.float32)
-        label_heatmap_tensor = torch.from_numpy(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
+        label_heatmap_tensor = torch.as_tensor(label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         resized_predicted_label_array = scipy.misc.imresize(predicted_label_array, (patch_size,
                                                                                     patch_size), mode='F')
         predicted_label_heatmap_array = mappable.to_rgba(resized_predicted_label_array).astype(np.float32)
-        predicted_label_heatmap_tensor = torch.from_numpy(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
+        predicted_label_heatmap_tensor = torch.as_tensor(predicted_label_heatmap_array[:, :, :3].transpose((2, 0, 1)))
         return label_heatmap_tensor, predicted_label_heatmap_tensor
 
     def create_map_comparison_image(self, images, labels, predicted_labels, number_of_images=3):
