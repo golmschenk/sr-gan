@@ -111,14 +111,14 @@ def convert_to_settings_list(settings, shuffle=True):
 
 
 class ApplicationName(Enum):
-    coefficient = 0
-    age = 1
-    crowd = 2
-    driving = 3
+    coefficient = 'coefficient'
+    age = 'age'
+    crowd = 'crowd'
+    driving = 'driving'
 
 
 class MethodName(Enum):
-    srgan = 0
-    dnn = 1
-    drgan = 2
-    sgan = 3
+    srgan = 'srgan'
+    dnn = 'dnn'
+    drgan = 'drgan'
+    sgan = 'sgan'

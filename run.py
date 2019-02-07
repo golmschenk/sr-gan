@@ -82,8 +82,8 @@ seed_all(0)
 for settings_ in settings_list:
     trial_name = '{}'.format(settings_.fake_loss_distance.__name__)
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
-    trial_name += ' {}'.format(application_name)
-    trial_name += ' {}'.format(method_name) if method_name != MethodName.srgan else ''
+    trial_name += ' {}'.format(application_name.value)
+    trial_name += ' {}'.format(method_name.value) if method_name != MethodName.srgan else ''
     if application_name == 'crowd' and settings_.crowd_dataset == 'World Expo':
         trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
     else:
