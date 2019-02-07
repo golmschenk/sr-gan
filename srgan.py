@@ -411,7 +411,7 @@ class Experiment(ABC):
 
     @staticmethod
     def infinite_iter(dataset):
-        """Create an infinite generator from a dataset. Forces full batch sizes."""
+        """Create an infinite generator from a dataset"""
         while True:
             for examples in dataset:
                 yield examples

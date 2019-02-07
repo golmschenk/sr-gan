@@ -29,14 +29,16 @@ if application_name == ApplicationName.age:
     settings_.batch_size = 100
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = 100
+    settings_.gradient_penalty_multiplier = 1e1
 elif application_name == ApplicationName.driving:
     Experiment = DrivingExperiment
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 850
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = 1000
+    settings_.labeled_dataset_size = 100
     settings_.validation_dataset_size = 9000
+    settings_.gradient_penalty_multiplier = 1e2
 elif application_name == ApplicationName.coefficient:
     Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
                   MethodName.drgan: CoefficientDrganExperiment}[method_name]
@@ -45,6 +47,7 @@ elif application_name == ApplicationName.coefficient:
     settings_.batch_size = 5000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [100]
+    settings_.gradient_penalty_multiplier = 1e1
 elif application_name == ApplicationName.crowd:
     Experiment = {MethodName.srgan: CrowdExperiment, MethodName.sgan: CrowdSganExperiment,
                   MethodName.dnn: CrowdDnnExperiment}[method_name]
@@ -57,13 +60,13 @@ elif application_name == ApplicationName.crowd:
     settings_.labeled_loss_order = 2
     settings_.unlabeled_dataset_size = None
     settings_.labeled_dataset_size = 50
+    settings_.gradient_penalty_multiplier = 1e3
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 100000
 settings_.learning_rate = [1e-4]
-settings_.gradient_penalty_multiplier = [0]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
@@ -77,7 +80,7 @@ settings_.regularize_feature_norm = False
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 for settings_ in settings_list:
-    trial_name = 'drive {}'.format(settings_.fake_loss_distance.__name__)
+    trial_name = '{}'.format(settings_.fake_loss_distance.__name__)
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
     trial_name += ' {}'.format(application_name)
     trial_name += ' {}'.format(method_name) if method_name != MethodName.srgan else ''
