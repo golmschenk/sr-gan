@@ -19,21 +19,24 @@ class DrivingExperiment(Experiment):
         settings = self.settings
         seed_all(settings.labeled_dataset_seed)
         self.train_dataset = SteeringAngleDataset(database_directory, start=0, end=settings.labeled_dataset_size,
-                                                  seed=self.settings.labeled_dataset_seed)
+                                                  seed=self.settings.labeled_dataset_seed,
+                                                  batch_size=settings.batch_size)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                pin_memory=self.settings.pin_memory,
                                                num_workers=settings.number_of_data_workers, drop_last=True)
-        self.validation_dataset = SteeringAngleDataset(database_directory, start=self.train_dataset.length,
+        self.validation_dataset = SteeringAngleDataset(database_directory, start=settings.labeled_dataset_size,
                                                        end=self.train_dataset.length + settings.validation_dataset_size,
-                                                       seed=self.settings.labeled_dataset_seed)
-        unlabeled_dataset_start = self.train_dataset.length + self.validation_dataset.length
+                                                       seed=self.settings.labeled_dataset_seed,
+                                                       batch_size=settings.batch_size)
+        unlabeled_dataset_start = settings.labeled_dataset_size + settings.validation_dataset_size
         if settings.unlabeled_dataset_size is not None:
             unlabeled_dataset_end = unlabeled_dataset_start + settings.unlabeled_dataset_size
         else:
             unlabeled_dataset_end = None
         self.unlabeled_dataset = SteeringAngleDataset(database_directory, start=unlabeled_dataset_start,
                                                       end=unlabeled_dataset_end,
-                                                      seed=self.settings.labeled_dataset_seed)
+                                                      seed=self.settings.labeled_dataset_seed,
+                                                      batch_size=settings.batch_size)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers, drop_last=True)

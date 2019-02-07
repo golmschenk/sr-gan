@@ -1,6 +1,7 @@
 """
 Code for accessing the data in the database easily.
 """
+import math
 import os
 import shutil
 import patoolib
@@ -20,7 +21,7 @@ database_directory = '../Steering Angle Database'
 
 class SteeringAngleDataset(Dataset):
     """The dataset class for the age estimation application."""
-    def __init__(self, dataset_path, start=None, end=None, seed=None):
+    def __init__(self, dataset_path, start=None, end=None, seed=None, batch_size=None):
         seed_all(seed)
         self.dataset_path = database_directory
         meta = pd.read_pickle(os.path.join(self.dataset_path, 'meta.pkl'))
@@ -29,6 +30,11 @@ class SteeringAngleDataset(Dataset):
         angles = meta.iloc[:, 1].values
         self.image_names = np.array(image_names[start:end])
         self.angles = np.array(angles[start:end], dtype=np.float32)
+        # Force full batch sizes
+        if self.image_names.shape[0] < batch_size:
+            repeats = math.ceil(batch_size / self.image_names.shape[0])
+            self.image_names = np.repeat(self.image_names, repeats)
+            self.angles = np.repeat(self.angles, repeats)
         self.length = self.angles.shape[0]
         self.image_size = 128
 
