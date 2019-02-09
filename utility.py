@@ -81,6 +81,12 @@ def load(model_path):
         return torch.load(model_path)
 
 
+def unison_shuffled_copies(a, b):
+    assert len(a) == len(b)
+    p = np.random.permutation(len(a))
+    return a[p], b[p]
+
+
 class MixtureModel(rv_continuous):
     """Creates a combination distribution of multiple scipy.stats model distributions."""
     def __init__(self, submodels, *args, **kwargs):
