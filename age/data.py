@@ -2,6 +2,7 @@
 Code for accessing the data in the database easily.
 """
 import csv
+import math
 import os
 import shutil
 import json
@@ -15,16 +16,16 @@ from torch.utils.data import Dataset
 from scipy.io import loadmat
 from datetime import datetime
 
-from utility import to_normalized_range, download_and_extract_file
+from utility import to_normalized_range, download_and_extract_file, unison_shuffled_copies, seed_all
 
 
 class AgeDataset(Dataset):
     """The dataset class for the age estimation application."""
-    def __init__(self, dataset_path, start=None, end=None, gender_filter=None):
+    def __init__(self, dataset_path, start=None, end=None, gender_filter=None, seed=None, batch_size=None):
         if gender_filter is not None:
             raise NotImplementedError()
         self.dataset_path = dataset_path
-        with open(os.path.join(self.dataset_path, 'meta.json')) as json_file:
+        with open(os.path.abspath(os.path.join(self.dataset_path, 'meta.json'))) as json_file:
             json_contents = json.load(json_file)
         image_names, ages = [], []
         for entry in json_contents:
@@ -35,8 +36,14 @@ class AgeDataset(Dataset):
                 image_name, age, gender = entry
                 image_names.append(image_name)
                 ages.append(age)
+        seed_all(seed)
+        image_names, ages = unison_shuffled_copies(np.array(image_names), np.array(ages))
         self.image_names = np.array(image_names[start:end])
         self.ages = np.array(ages[start:end], dtype=np.float32)
+        if self.image_names.shape[0] < batch_size:
+            repeats = math.ceil(batch_size / self.image_names.shape[0])
+            self.image_names = np.repeat(self.image_names, repeats)
+            self.ages = np.repeat(self.ages, repeats)
         self.length = self.ages.shape[0]
 
     def __len__(self):

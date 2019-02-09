@@ -24,18 +24,21 @@ class AgeExperiment(Experiment):
             dataset_path = '../imdb_wiki_data/imdb_preprocessed_128'
         settings = self.settings
         seed_all(settings.labeled_dataset_seed)
-        self.train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size)
+        self.train_dataset = AgeDataset(dataset_path, start=0, end=settings.labeled_dataset_size,
+                                        seed=settings.labeled_dataset_seed, batch_size=settings.batch_size)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                pin_memory=self.settings.pin_memory,
-                                               num_workers=settings.number_of_data_workers)
-        self.unlabeled_dataset = AgeDataset(dataset_path, start=self.train_dataset.length,
-                                            end=self.train_dataset.length + settings.unlabeled_dataset_size)
+                                               num_workers=settings.number_of_data_workers, drop_last=True)
+        self.unlabeled_dataset = AgeDataset(dataset_path, start=settings.labeled_dataset_size,
+                                            end=settings.labeled_dataset_size + settings.unlabeled_dataset_size,
+                                            seed=settings.labeled_dataset_seed, batch_size=settings.batch_size)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
-                                                   num_workers=settings.number_of_data_workers)
-        train_and_unlabeled_dataset_size = self.train_dataset.length + self.unlabeled_dataset.length
+                                                   num_workers=settings.number_of_data_workers, drop_last=True)
+        train_and_unlabeled_dataset_size = settings.labeled_dataset_size + settings.unlabeled_dataset_size
         self.validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
-                                             end=train_and_unlabeled_dataset_size + settings.validation_dataset_size)
+                                             end=train_and_unlabeled_dataset_size + settings.validation_dataset_size,
+                                             seed=settings.labeled_dataset_seed, batch_size=settings.batch_size)
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""

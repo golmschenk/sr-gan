@@ -4,7 +4,8 @@ https://github.com/sdhnshu/pytorch-model-zoo/blob/master/dcgan/model.py
 Because they had a fairly well written, simple version available.
 """
 import torch.nn as nn
-from torch.nn.functional import leaky_relu, tanh
+from torch.nn.functional import leaky_relu
+from torch import tanh
 
 from utility import seed_all
 
