@@ -7,6 +7,7 @@ import imageio
 import numpy as np
 import shutil
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 from scipy.stats import norm, uniform
 import seaborn as sns
 import matplotlib2tikz
@@ -143,6 +144,28 @@ def map_comparisons(sigmas=None):
     plt.close(figure)
 
 
+def srgan_loss_comparison():
+    sns.set_style('darkgrid')
+    figure, axes = plt.subplots(dpi=dpi)
+    x_axis = np.arange(-10, 10, 0.01)
+
+    l_g = -(np.log(np.abs(x_axis) + 1))
+    l_unlabeled = np.power(x_axis, 2)
+
+    axes.plot(x_axis, (l_g - l_g.min()) / (l_g.max() - l_g.min()), color=sns.color_palette()[4], label='$L_G$')
+    axes.plot(x_axis, (l_unlabeled - l_unlabeled.min()) / (l_unlabeled.max() - l_unlabeled.min()),
+              color=sns.color_palette()[5], label='$L_{fake}$')
+    axes.legend().set_visible(True)
+    axes.legend(loc='right')
+    # axes.get_yaxis().set_ticks([])
+    axes.set_ylabel('Loss')
+    axes.set_xlabel('Feature difference')
+    axes.get_yaxis().set_major_formatter(ticker.NullFormatter())
+    axes.get_yaxis().grid(False)
+    matplotlib2tikz.save(os.path.join('latex', 'srgan-losses.tex'))
+    plt.show()
+    plt.close(figure)
+
 if __name__ == '__main__':
     plt.switch_backend('module://backend_interagg')
-    map_comparisons()
+    srgan_loss_comparison()
