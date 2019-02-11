@@ -79,6 +79,7 @@ settings_.fake_loss_distance = abs_plus_one_log_mean_neg
 settings_.normalize_feature_norm = True
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
+previous_trial_directory = None
 for settings_ in settings_list:
     trial_name = '{}'.format(settings_.fake_loss_distance.__name__)
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
@@ -105,7 +106,10 @@ for settings_ in settings_list:
     trial_name += ' nfn' if settings_.normalize_feature_norm else ''
     trial_name += ' l' if settings_.load_model_path else ''
     settings_.trial_name = clean_scientific_notation(trial_name)
+    if previous_trial_directory and settings_.continue_from_previous_trial:
+        settings_.load_model_path = previous_trial_directory
     experiment = Experiment(settings_)
     experiment.train()
+    previous_trial_directory = experiment.trial_directory
     if experiment.signal_quit:
         break
