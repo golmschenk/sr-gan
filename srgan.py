@@ -130,6 +130,8 @@ class Experiment(ABC):
         self.gan_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'GAN'))
         self.dnn_summary_writer.summary_period = self.settings.summary_step_period
         self.gan_summary_writer.summary_period = self.settings.summary_step_period
+        self.dnn_summary_writer.steps_to_run = self.settings.steps_to_run
+        self.gan_summary_writer.steps_to_run = self.settings.steps_to_run
 
     def handle_user_input(self, step):
         """
