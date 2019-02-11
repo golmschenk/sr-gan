@@ -20,8 +20,8 @@ gpu = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 class SummaryWriter(SummaryWriter_):
     """A custom version of the Tensorboard summary writer class."""
-    def __init__(self, summary_period=1, steps_to_run=-1, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, log_dir=None, comment='', summary_period=1, steps_to_run=-1, **kwargs):
+        super().__init__(log_dir=log_dir, comment=comment, **kwargs)
         self.step = 0
         self.summary_period = summary_period
         self.steps_to_run = steps_to_run
