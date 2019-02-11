@@ -35,9 +35,8 @@ class AgeExperiment(Experiment):
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers, drop_last=True)
-        train_and_unlabeled_dataset_size = settings.labeled_dataset_size + settings.unlabeled_dataset_size
-        self.validation_dataset = AgeDataset(dataset_path, start=train_and_unlabeled_dataset_size,
-                                             end=train_and_unlabeled_dataset_size + settings.validation_dataset_size,
+        self.validation_dataset = AgeDataset(dataset_path, start=-settings.validation_dataset_size,
+                                             end=None,
                                              seed=settings.labeled_dataset_seed, batch_size=settings.batch_size)
 
     def model_setup(self):
