@@ -263,13 +263,9 @@ class Experiment(ABC):
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         labeled_loss.backward()
         # Unlabeled.
-        #self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
+        # self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(labeled_examples, unlabeled_examples)
         unlabeled_loss.backward()
-        # Feature regularization loss.
-        if self.settings.regularize_feature_norm:
-            feature_regularization_loss = torch.abs(self.unlabeled_features.mean(0).norm() - 1)
-            loss += feature_regularization_loss
         # Fake.
         z = torch.tensor(MixtureModel([norm(-self.settings.mean_offset, 1),
                                        norm(self.settings.mean_offset, 1)]
@@ -305,7 +301,7 @@ class Experiment(ABC):
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
-        #self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
+        # self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
@@ -328,8 +324,8 @@ class Experiment(ABC):
         self.labeled_features = self.D.features
         _ = self.D(unlabeled_examples)
         self.unlabeled_features = self.D.features
-        unlabeled_loss = feature_distance_loss(self.unlabeled_features, self.labeled_features
-                                               ) * self.settings.unlabeled_loss_multiplier
+        unlabeled_loss = self.feature_distance_loss(self.unlabeled_features, self.labeled_features)
+        unlabeled_loss *= self.settings.unlabeled_loss_multiplier
         unlabeled_loss *= self.settings.srgan_loss_multiplier
         return unlabeled_loss
 
@@ -339,8 +335,8 @@ class Experiment(ABC):
         self.unlabeled_features = self.D.features
         _ = self.D(fake_examples.detach())
         self.fake_features = self.D.features
-        fake_loss = feature_distance_loss(self.unlabeled_features, self.fake_features,
-                                          distance_function=self.settings.fake_loss_distance)
+        fake_loss = self.feature_distance_loss(self.unlabeled_features, self.fake_features,
+                                               distance_function=self.settings.fake_loss_distance)
         fake_loss *= self.settings.fake_loss_multiplier
         fake_loss *= self.settings.srgan_loss_multiplier
         return fake_loss
@@ -374,7 +370,7 @@ class Experiment(ABC):
         self.fake_features = self.D.features
         _ = self.D(unlabeled_examples)
         detached_unlabeled_features = self.D.features.detach()
-        generator_loss = feature_distance_loss(detached_unlabeled_features, self.fake_features)
+        generator_loss = self.feature_distance_loss(detached_unlabeled_features, self.fake_features)
         return generator_loss
 
     @abstractmethod
@@ -422,6 +418,17 @@ class Experiment(ABC):
         for param_group in self.dnn_optimizer.param_groups:
             param_group['lr'] = lr
 
+    def feature_distance_loss(self, base_features, other_features, distance_function=square_mean):
+        """Calculate the loss based on the distance between feature vectors."""
+        base_mean_features = base_features.mean(0)
+        other_mean_features = other_features.mean(0)
+        if self.settings.normalize_feature_norm:
+            epsilon = 1e-5
+            base_mean_features = base_mean_features / (base_mean_features.norm() + epsilon)
+            other_mean_features = other_features / (other_mean_features.norm() + epsilon)
+        distance_vector = distance_function(base_mean_features - other_mean_features)
+        return distance_vector
+
 
 def unit_vector(vector):
     """Gets the unit vector version of a vector."""
@@ -439,14 +446,6 @@ def angle_between(vector0, vector1):
 def square(tensor):
     """Squares the tensor value."""
     return tensor.pow(2)
-
-
-def feature_distance_loss(base_features, other_features, distance_function=square_mean):
-    """Calculate the loss based on the distance between feature vectors."""
-    base_mean_features = base_features.mean(0)
-    other_mean_features = other_features.mean(0)
-    distance_vector = distance_function(base_mean_features - other_mean_features)
-    return distance_vector
 
 
 def feature_distance_loss_unmeaned(base_features, other_features, distance_function=square):

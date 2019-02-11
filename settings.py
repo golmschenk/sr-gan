@@ -38,7 +38,7 @@ class Settings:
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0
         self.normalize_fake_loss = False
-        self.regularize_feature_norm = False
+        self.normalize_feature_norm = False
         self.fake_loss_distance = abs_plus_one_log_neg
 
         self.load_model_path = None
