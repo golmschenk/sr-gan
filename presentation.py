@@ -145,6 +145,7 @@ def map_comparisons(sigmas=None):
 
 
 def srgan_loss_comparison():
+    """Creates a plot which shows the theoretical loss curves for feature vector distances."""
     sns.set_style('darkgrid')
     figure, axes = plt.subplots(dpi=dpi)
     x_axis = np.arange(-10, 10, 0.01)
@@ -165,6 +166,7 @@ def srgan_loss_comparison():
     matplotlib2tikz.save(os.path.join('latex', 'srgan-losses.tex'))
     plt.show()
     plt.close(figure)
+
 
 if __name__ == '__main__':
     plt.switch_backend('module://backend_interagg')

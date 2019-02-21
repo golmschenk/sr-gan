@@ -23,6 +23,7 @@ dnn_color = sns.color_palette()[2]
 gan_color = sns.color_palette()[3]
 dggan_color = sns.color_palette()[4]
 
+
 class Display:
     """
     A class for creating the display elements in latex

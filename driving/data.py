@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import imageio
 from skimage import transform
-from sklearn.utils import shuffle
+import sklearn.utils
 from torch.utils.data import Dataset
 
 from utility import to_normalized_range, seed_all
@@ -21,11 +21,11 @@ database_directory = '../Steering Angle Database'
 
 class SteeringAngleDataset(Dataset):
     """The dataset class for the age estimation application."""
-    def __init__(self, dataset_path, start=None, end=None, seed=None, batch_size=None):
+    def __init__(self, start=None, end=None, seed=None, batch_size=None):
         seed_all(seed)
         self.dataset_path = database_directory
         meta = pd.read_pickle(os.path.join(self.dataset_path, 'meta.pkl'))
-        meta = shuffle(meta, random_state=seed)  # Shuffles only first axis.
+        meta = sklearn.utils.shuffle(meta, random_state=seed)  # Shuffles only first axis.
         image_names = meta.iloc[:, 0].values
         angles = meta.iloc[:, 1].values
         self.image_names = np.array(image_names[start:end])
@@ -70,6 +70,7 @@ class SteeringAngleDatabaseProcessor:
         if os.path.exists(database_directory):
             shutil.rmtree(database_directory)
         os.makedirs(database_directory)
+        # noinspection SpellCheckingInspection
         SteeringAngleDatabaseProcessor.download_file_from_google_drive('0B-KJCaaF7elleG1RbzVPZWV4Tlk',
                                                                        os.path.join(database_directory, 'temporary'))
         patoolib.extract_archive(os.path.join(database_directory, 'temporary'), outdir=database_directory)
@@ -84,12 +85,15 @@ class SteeringAngleDatabaseProcessor:
     @staticmethod
     def download_file_from_google_drive(id_, destination):
         """Google drive file downloader taken from here: https://stackoverflow.com/a/39225039/1191087"""
+
+        # noinspection PyMissingOrEmptyDocstring
         def get_confirm_token(response_):
             for key, value in response_.cookies.items():
                 if key.startswith('download_warning'):
                     return value
             return None
 
+        # noinspection PyMissingOrEmptyDocstring
         def save_response_content(response_, destination_):
             CHUNK_SIZE = 32768
             with open(destination_, "wb") as f:

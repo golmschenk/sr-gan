@@ -31,7 +31,7 @@ class SganExperiment(Experiment, ABC):
         labeled_loss *= self.settings.labeled_loss_multiplier
         return labeled_loss
 
-    def unlabeled_loss_calculation(self, labeled_exmaples, unlabeled_examples):
+    def unlabeled_loss_calculation(self, labeled_examples, unlabeled_examples):
         """Calculates the unlabeled loss."""
         predicted_class_logits = self.D(unlabeled_examples)
         unlabeled_binary_logits = logsumexp(predicted_class_logits, dim=1)

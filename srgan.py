@@ -261,7 +261,6 @@ class Experiment(ABC):
         self.D.apply(disable_batch_norm_updates)  # No batch norm
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
-        loss = torch.tensor(0, dtype=torch.float, device=gpu)
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         labeled_loss.backward()
         # Unlabeled.
@@ -303,7 +302,7 @@ class Experiment(ABC):
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
-        # self.D.apply(enable_batch_norm_updates)  # Make sure only labeled data is used for batch norm running statistics
+        # self.D.apply(enable_batch_norm_updates)  # Only labeled data used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""

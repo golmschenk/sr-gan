@@ -109,6 +109,7 @@ def convert_to_settings_list(settings, shuffle=True):
 
 
 class ApplicationName(Enum):
+    """An enum to select the application of the code to run."""
     coefficient = 'coefficient'
     age = 'age'
     crowd = 'crowd'
@@ -116,6 +117,7 @@ class ApplicationName(Enum):
 
 
 class MethodName(Enum):
+    """An enum to select the method of the code to run."""
     srgan = 'srgan'
     dnn = 'dnn'
     dggan = 'dggan'

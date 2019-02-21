@@ -80,6 +80,7 @@ def load(model_path):
 
 
 def unison_shuffled_copies(a, b):
+    """Shuffles two numpy arrays together."""
     assert len(a) == len(b)
     p = np.random.permutation(len(a))
     return a[p], b[p]

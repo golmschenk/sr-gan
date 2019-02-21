@@ -79,12 +79,14 @@ class AgeExperiment(Experiment):
         # Generated images.
         z = torch.randn(settings.batch_size, G.input_size).to(gpu)
         fake_examples = G(z).to('cpu')
-        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True, range=(0, 255), nrow=3)
+        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True,
+                                                        range=(0, 255), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
         z = torch.as_tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
-                                          ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
+                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
-        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True, range=(0, 255), nrow=3)
+        fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True,
+                                                        range=(0, 255), nrow=3)
         gan_summary_writer.add_image('Fake/Offset', fake_images_image.numpy())
 
     def evaluation_epoch(self, settings, network, dataset, summary_writer, summary_name, comparison_value=None):

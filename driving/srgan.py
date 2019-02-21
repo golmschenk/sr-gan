@@ -6,7 +6,7 @@ from scipy.stats import norm
 from torch.utils.data import DataLoader
 
 from driving.models import Generator, Discriminator
-from driving.data import database_directory, SteeringAngleDataset
+from driving.data import SteeringAngleDataset
 from srgan import Experiment
 from utility import seed_all, gpu, MixtureModel, to_image_range
 
@@ -18,14 +18,13 @@ class DrivingExperiment(Experiment):
         """Sets up the datasets for the application."""
         settings = self.settings
         seed_all(settings.labeled_dataset_seed)
-        self.train_dataset = SteeringAngleDataset(database_directory, start=0, end=settings.labeled_dataset_size,
+        self.train_dataset = SteeringAngleDataset(start=0, end=settings.labeled_dataset_size,
                                                   seed=self.settings.labeled_dataset_seed,
                                                   batch_size=settings.batch_size)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
                                                pin_memory=self.settings.pin_memory,
                                                num_workers=settings.number_of_data_workers, drop_last=True)
-        self.validation_dataset = SteeringAngleDataset(database_directory, start=-settings.validation_dataset_size,
-                                                       end=None,
+        self.validation_dataset = SteeringAngleDataset(start=-settings.validation_dataset_size, end=None,
                                                        seed=self.settings.labeled_dataset_seed,
                                                        batch_size=settings.batch_size)
         unlabeled_dataset_start = settings.labeled_dataset_size + settings.validation_dataset_size
@@ -33,8 +32,7 @@ class DrivingExperiment(Experiment):
             unlabeled_dataset_end = unlabeled_dataset_start + settings.unlabeled_dataset_size
         else:
             unlabeled_dataset_end = -settings.validation_dataset_size
-        self.unlabeled_dataset = SteeringAngleDataset(database_directory, start=unlabeled_dataset_start,
-                                                      end=unlabeled_dataset_end,
+        self.unlabeled_dataset = SteeringAngleDataset(start=unlabeled_dataset_start, end=unlabeled_dataset_end,
                                                       seed=self.settings.labeled_dataset_seed,
                                                       batch_size=settings.batch_size)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size, shuffle=True,
@@ -80,7 +78,7 @@ class DrivingExperiment(Experiment):
                                                         range=(0, 255), nrow=3)
         gan_summary_writer.add_image('Fake/Standard', fake_images_image.numpy())
         z = torch.as_tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]
-                                          ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
+                                         ).rvs(size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z).to('cpu')
         fake_images_image = torchvision.utils.make_grid(to_image_range(fake_examples.data[:9]), normalize=True,
                                                         range=(0, 255), nrow=3)
@@ -105,7 +103,8 @@ class DrivingExperiment(Experiment):
             summary_writer.add_scalar('{}/Ratio MAE GAN DNN'.format(summary_name), mae / comparison_value)
         return mae
 
-    def images_to_predicted_angles(self, network, images):
+    @staticmethod
+    def images_to_predicted_angles(network, images):
         """Runs the code to go from images to a predicted angle. Useful for overriding in subclasses."""
         predicted_ages = network(images)
         return predicted_ages
