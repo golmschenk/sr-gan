@@ -16,6 +16,7 @@ from crowd import data
 from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.models import DCGenerator, KnnDenseNetCat, DenseNetDiscriminator
+from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from srgan import Experiment
 from utility import MixtureModel, gpu
 
@@ -26,41 +27,41 @@ class CrowdExperiment(Experiment):
     def dataset_setup(self):
         """Sets up the datasets for the application."""
         settings = self.settings
-        # self.dataset_class = UcfQnrfFullImageDataset
-        # self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
-        #                                                seed=settings.labeled_dataset_seed,
-        #                                                number_of_examples=settings.labeled_dataset_size)
-        # self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
-        #                                        pin_memory=self.settings.pin_memory,
-        #                                        num_workers=settings.number_of_data_workers)
-        # self.unlabeled_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
-        #                                                    seed=100,
-        #                                                    number_of_examples=settings.unlabeled_dataset_size)
-        # self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
-        #                                            pin_memory=self.settings.pin_memory,
-        #                                            num_workers=settings.number_of_data_workers)
-        # self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
-
-        self.dataset_class = ShanghaiTechFullImageDataset
-        self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
-                                                            seed=settings.labeled_dataset_seed,
-                                                            number_of_examples=settings.labeled_dataset_size,
-                                                            inverse_map=settings.inverse_map,
-                                                            map_directory_name=settings.map_directory_name)
+        self.dataset_class = UcfQnrfFullImageDataset
+        self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                       seed=settings.labeled_dataset_seed,
+                                                       number_of_examples=settings.labeled_dataset_size)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                pin_memory=self.settings.pin_memory,
                                                num_workers=settings.number_of_data_workers)
-        self.unlabeled_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
-                                                                seed=100,
-                                                                number_of_examples=settings.unlabeled_dataset_size,
-                                                                inverse_map=settings.inverse_map,
-                                                                map_directory_name=settings.map_directory_name)
-        self.unlabeled_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
+        self.unlabeled_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                           seed=100,
+                                                           number_of_examples=settings.unlabeled_dataset_size)
+        self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-        self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101,
-                                                                 inverse_map=settings.inverse_map,
-                                                                 map_directory_name=settings.map_directory_name)
+        self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
+
+        # self.dataset_class = ShanghaiTechFullImageDataset
+        # self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+        #                                                     seed=settings.labeled_dataset_seed,
+        #                                                     number_of_examples=settings.labeled_dataset_size,
+        #                                                     inverse_map=settings.inverse_map,
+        #                                                     map_directory_name=settings.map_directory_name)
+        # self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
+        #                                        pin_memory=self.settings.pin_memory,
+        #                                        num_workers=settings.number_of_data_workers)
+        # self.unlabeled_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+        #                                                         seed=100,
+        #                                                         number_of_examples=settings.unlabeled_dataset_size,
+        #                                                         inverse_map=settings.inverse_map,
+        #                                                         map_directory_name=settings.map_directory_name)
+        # self.unlabeled_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
+        #                                            pin_memory=self.settings.pin_memory,
+        #                                            num_workers=settings.number_of_data_workers)
+        # self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101,
+        #                                                          inverse_map=settings.inverse_map,
+        #                                                          map_directory_name=settings.map_directory_name)
 
         # if settings.dataset_class is WorldExpoDataset:
         #     train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),

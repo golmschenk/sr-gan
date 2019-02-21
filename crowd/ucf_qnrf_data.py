@@ -28,7 +28,7 @@ class UcfQnrfFullImageDataset(Dataset):
     """
     A class for the UCF QNRF full image crowd dataset.
     """
-    def __init__(self, dataset='train', seed=None, number_of_examples=None, map_directory_name='i1nn_maps'):
+    def __init__(self, dataset='train', seed=None, number_of_examples=None, map_directory_name='maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -58,7 +58,7 @@ class UcfQnrfTransformedDataset(Dataset):
     A class for the transformed UCF QNRF crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, number_of_examples=None,
-                 middle_transform=None, map_directory_name='i1nn_maps'):
+                 middle_transform=None, map_directory_name='maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -203,9 +203,9 @@ class UcfQnrfPreprocessing:
                     print('{} is super huge.'.format(file_name))
                 if out_of_bounds_count > 0:
                     print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
-                np.save(image_path, image)
-                np.save(map_path, map_)
-                np.save(label_path, density_map)
+                np.save(image_path, image.astype(np.float16))
+                np.save(map_path, map_.astype(np.float16))
+                np.save(label_path, density_map.astype(np.float16))
 
     @staticmethod
     def get_y_x_head_positions(original_head_positions, file_name, label_size):
