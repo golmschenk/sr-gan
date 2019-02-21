@@ -32,9 +32,6 @@ class Settings:
         self.gradient_penalty_multiplier = 1e1
         self.mean_offset = 1e0
         self.labeled_loss_order = 2
-        self.fake_loss_order = 2
-        self.unlabeled_loss_order = 2
-        self.generator_loss_order = 2
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0
         self.normalize_fake_loss = False

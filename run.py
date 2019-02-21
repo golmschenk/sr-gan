@@ -70,9 +70,6 @@ settings_.labeled_dataset_seed = [0]
 settings_.steps_to_run = 50000
 settings_.learning_rate = [1e-4]
 settings_.mean_offset = [0]
-settings_.unlabeled_loss_order = 2
-settings_.fake_loss_order = 0.5
-settings_.generator_loss_order = 2
 # settings_.load_model_path = 'logs/GAN pretrained'
 settings_.fake_loss_distance = abs_plus_one_sqrt_mean_neg
 settings_.local_setup()
@@ -97,9 +94,6 @@ for settings_ in settings_list:
     trial_name += ' mm{:e}'.format(settings_.map_multiplier) if application_name == ApplicationName.crowd else ''
     trial_name += ' gs{}'.format(settings_.generator_training_step_period)
     trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
-    trial_name += ' u{}f{}g{}'.format(settings_.unlabeled_loss_order,
-                                      settings_.fake_loss_order,
-                                      settings_.generator_loss_order)
     trial_name += ' bs{}'.format(settings_.batch_size)
     trial_name += ' nf' if settings_.normalize_fake_loss else ''
     trial_name += ' nfn' if settings_.normalize_feature_norm else ''
