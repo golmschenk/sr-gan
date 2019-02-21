@@ -13,12 +13,12 @@ from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from driving.srgan import DrivingExperiment
 from settings import Settings, convert_to_settings_list, ApplicationName, MethodName
-from utility import seed_all, clean_scientific_notation, abs_plus_one_log_mean_neg
+from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = ApplicationName.coefficient
+application_name = ApplicationName.crowd
 method_name = MethodName.srgan
 
 settings_ = Settings()
@@ -26,24 +26,24 @@ if application_name == ApplicationName.age:
     Experiment = {MethodName.srgan: AgeExperiment, MethodName.sgan: AgeSganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e2]
     settings_.fake_loss_multiplier = [1e1]
-    settings_.batch_size = 800
+    settings_.batch_size = 600
     settings_.unlabeled_dataset_size = 50000
-    settings_.labeled_dataset_size = [100]
-    settings_.gradient_penalty_multiplier = 1e1
+    settings_.labeled_dataset_size = [5000]
+    settings_.gradient_penalty_multiplier = 1e2
 elif application_name == ApplicationName.driving:
     Experiment = DrivingExperiment
     settings_.unlabeled_loss_multiplier = [1e2]
     settings_.fake_loss_multiplier = [1e1]
     settings_.batch_size = 600
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = [100]
+    settings_.labeled_dataset_size = [7200, 4000]
     settings_.validation_dataset_size = 9000
     settings_.gradient_penalty_multiplier = 1e2
 elif application_name == ApplicationName.coefficient:
     Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
                   MethodName.drgan: CoefficientDrganExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e-1]
-    settings_.fake_loss_multiplier = [1e-1]
+    settings_.unlabeled_loss_multiplier = [1e0]
+    settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 5000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [500]
@@ -51,32 +51,31 @@ elif application_name == ApplicationName.coefficient:
 elif application_name == ApplicationName.crowd:
     Experiment = {MethodName.srgan: CrowdExperiment, MethodName.sgan: CrowdSganExperiment,
                   MethodName.dnn: CrowdDnnExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e1]
-    settings_.fake_loss_multiplier = [1e1]
+    settings_.unlabeled_loss_multiplier = [1e3]
+    settings_.fake_loss_multiplier = [1e2]
     settings_.batch_size = 18
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
-    settings_.crowd_dataset = 'ShanghaiTech'
+    settings_.crowd_dataset = 'UCF QNRF'
     settings_.labeled_loss_order = 2
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = 50
-    settings_.gradient_penalty_multiplier = 1e3
-    settings_.map_directory_name = ['i1nn_maps']
+    settings_.labeled_dataset_size = [50, 100, 200, 400]
+    settings_.gradient_penalty_multiplier = 1e2
+    settings_.map_directory_name = ['maps']
     settings_.map_multiplier = 0
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = [0]
-settings_.steps_to_run = 100000
+settings_.steps_to_run = 50000
 settings_.learning_rate = [1e-4]
 settings_.mean_offset = [0]
 settings_.unlabeled_loss_order = 2
 settings_.fake_loss_order = 0.5
 settings_.generator_loss_order = 2
-# settings_.load_model_path = 'logs/GAN quick start'
+# settings_.load_model_path = 'logs/GAN pretrained'
+settings_.fake_loss_distance = abs_plus_one_sqrt_mean_neg
 settings_.local_setup()
-settings_.fake_loss_distance = abs_plus_one_log_mean_neg
-settings_.normalize_feature_norm = True
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 previous_trial_directory = None
