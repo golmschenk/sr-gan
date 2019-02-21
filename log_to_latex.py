@@ -19,9 +19,9 @@ import seaborn as sns
 
 latex_document_directory = 'logs'
 sns.set()
-dnn_color = sns.color_palette()[3]
-gan_color = sns.color_palette()[2]
-
+dnn_color = sns.color_palette()[2]
+gan_color = sns.color_palette()[3]
+dggan_color = sns.color_palette()[4]
 
 class Display:
     """
@@ -226,7 +226,8 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
                                                      match_hyper_parameter_regex=r' le(\d+) ',
                                                      hyper_parameter_type='int',
                                                      experiment_name='age', linthreshx=0.1,
-                                                     x_axis_scale='symlog'):
+                                                     x_axis_scale='symlog',
+                                                     number_of_elements_to_average=3):
     """Plots DNN vs GAN errors based on a hyperparameter."""
     alpha = 0.2
     logs = Log.create_all_in_directory(logs_directory, exclude_if_no_final_model_exists=True)
@@ -245,7 +246,7 @@ def plot_dnn_vs_gan_average_error_by_hyper_parameter(logs_directory, y_axis_labe
         elif hyper_parameter_type == 'float':
             match_hyper_parameter = float(match_hyper_parameter)
         model_type = re.search(r'/(DNN|GAN)/', log.event_file_name).group(1)
-        last_errors = log.scalars_data_frame.iloc[-3:]['1_Validation_Error/MAE'].tolist()
+        last_errors = log.scalars_data_frame.iloc[-number_of_elements_to_average:]['1_Validation_Error/MAE'].tolist()
         error = np.nanmean(last_errors)
         if model_type == 'GAN':
             gan_results[match_hyper_parameter].append(error)
