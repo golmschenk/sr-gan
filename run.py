@@ -5,7 +5,7 @@ import torch
 
 from age.sgan import AgeSganExperiment
 from age.srgan import AgeExperiment
-from coefficient.drgan import CoefficientDrganExperiment
+from coefficient.dggan import CoefficientDgganExperiment
 from coefficient.sgan import CoefficientSganExperiment
 from coefficient.srgan import CoefficientExperiment
 from crowd.dnn import CrowdDnnExperiment
@@ -41,7 +41,7 @@ elif application_name == ApplicationName.driving:
     settings_.gradient_penalty_multiplier = 1e2
 elif application_name == ApplicationName.coefficient:
     Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
-                  MethodName.drgan: CoefficientDrganExperiment}[method_name]
+                  MethodName.dggan: CoefficientDgganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e0]
     settings_.fake_loss_multiplier = [1e0]
     settings_.batch_size = 5000

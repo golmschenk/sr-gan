@@ -50,7 +50,7 @@ class MLP(Module):
         return x.squeeze()
 
 
-class DrganMLP(Module):
+class DgganMLP(Module):
     """The DNN MLP model."""
     def __init__(self, hidden_size=10):
         super().__init__()

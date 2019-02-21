@@ -6,17 +6,17 @@ from scipy.stats import norm, wasserstein_distance
 
 from presentation import generate_display_frame
 from utility import standard_image_format_to_tensorboard_image_format, gpu, MixtureModel
-from coefficient.models import DrganMLP, Generator
+from coefficient.models import DgganMLP, Generator
 from coefficient.srgan import CoefficientExperiment
 
 
-class CoefficientDrganExperiment(CoefficientExperiment):
+class CoefficientDgganExperiment(CoefficientExperiment):
     """A class for an experiment of a dual goal regression GAN."""
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = DrganMLP(self.settings.hidden_size)
-        self.D = DrganMLP(self.settings.hidden_size)
+        self.DNN = DgganMLP(self.settings.hidden_size)
+        self.D = DgganMLP(self.settings.hidden_size)
         self.G = Generator(self.settings.hidden_size)
 
     def dnn_loss_calculation(self, labeled_examples, labels):

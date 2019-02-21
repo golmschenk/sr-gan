@@ -121,5 +121,5 @@ class ApplicationName(Enum):
 class MethodName(Enum):
     srgan = 'srgan'
     dnn = 'dnn'
-    drgan = 'drgan'
+    dggan = 'dggan'
     sgan = 'sgan'
