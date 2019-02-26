@@ -314,6 +314,21 @@ def plot_coefficient_dnn_vs_gan_error_over_training(single_log_directory):
     plt.close(figure)
 
 
+def average_values_of_trials(logs_directory, value_name, include_filter=None, exclude_filter=None):
+    """Returns the average values during training steps for a set of trials matching the conditions."""
+    logs = Log.create_all_in_directory(logs_directory, exclude_if_no_final_model_exists=True)
+    trials_values_list = []
+    for log in logs:
+        if include_filter is not None and not re.search(include_filter, log.event_file_name):
+            continue
+        if exclude_filter is not None and re.search(exclude_filter, log.event_file_name):
+            continue
+        single_trial_values = log.scalars_data_frame.iloc[:][value_name]
+        trials_values_list.append(single_trial_values)
+    average_values = np.mean(trials_values_list, axis=0)
+    return average_values
+
+
 if __name__ == '__main__':
     plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Desktop/le2ue',
                                                      y_axis_label='MAE (years)',
