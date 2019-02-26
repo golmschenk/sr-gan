@@ -218,6 +218,16 @@ def abs_plus_one_sqrt_mean_neg(tensor):
     return tensor.abs().add(1).sqrt().mean().neg()
 
 
+def abs_mean_neg(tensor):
+    """Takes the absolute value, then mean, then negates."""
+    return tensor.abs().mean().neg()
+
+
+def abs_mean(tensor):
+    """Takes the absolute value, then mean."""
+    return tensor.abs().mean().neg()
+
+
 def norm_squared(tensor, axis=1):
     """Calculates the norm squared along an axis. The default axis is 1 (the feature axis), with 0 being the batch."""
     return tensor.pow(2).sum(dim=axis)
