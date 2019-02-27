@@ -77,13 +77,19 @@ class DnnExperiment(Experiment, ABC):
         step_time_start = datetime.datetime.now()
         for step in range(self.settings.steps_to_run):
             self.adjust_learning_rate(step)
-            labeled_examples, labels, maps = next(train_dataset_generator)
-            labeled_examples, labels, maps = labeled_examples.to(gpu), labels.to(gpu), maps.to(gpu)
+            samples = next(train_dataset_generator)
+            if len(samples) == 2:
+                labeled_examples, labels = samples
+                labeled_examples, labels = labeled_examples.to(gpu), labels.to(gpu)
+            else:
+                labeled_examples, primary_labels, secondary_labels = samples
+                labeled_examples, labels = labeled_examples.to(gpu), (primary_labels.to(gpu), secondary_labels.to(gpu))
             self.dnn_training_step(labeled_examples, labels, step)
             if self.dnn_summary_writer.is_summary_step() or step == self.settings.steps_to_run - 1:
                 print('\rStep {}, {}...'.format(step, datetime.datetime.now() - step_time_start), end='')
                 step_time_start = datetime.datetime.now()
                 self.eval_mode()
-                self.validation_summaries(step)
+                with torch.no_grad():
+                    self.validation_summaries(step)
                 self.train_mode()
             self.handle_user_input(step)

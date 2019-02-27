@@ -338,7 +338,7 @@ def get_summary_steps_in_first_log(logs_directory, include_filter=None, exclude_
             continue
         if exclude_filter is not None and re.search(exclude_filter, log.event_file_name):
             continue
-        steps = log.scalars_data_frame.iloc[:]['step']
+        steps = log.scalars_data_frame.index.values
         break
     return steps
 

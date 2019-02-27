@@ -26,8 +26,9 @@ class Settings:
 
         self.labeled_loss_multiplier = 1e0
         self.unlabeled_loss_multiplier = 1e0
-        self.srgan_loss_multiplier = 1e-1
         self.fake_loss_multiplier = 1e0
+        self.srgan_loss_multiplier = 1e0
+        self.dggan_loss_multiplier = 1e1
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
         self.mean_offset = 1e0
@@ -56,7 +57,7 @@ class Settings:
         self.test_sliding_window_size = 128
         self.image_patch_size = 224
         self.label_patch_size = 224
-        self.map_multiplier = 1
+        self.map_multiplier = 1e-6
         self.inverse_map = False
         self.map_directory_name = 'i1nn_maps'
 
