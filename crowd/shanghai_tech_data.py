@@ -196,7 +196,7 @@ class ShanghaiTechPreprocessing:
                     mat = scipy.io.loadmat(mat_path)
                     head_positions = mat['image_info'][0, 0][0][0][0]
                     head_positions = self.get_y_x_head_positions(head_positions)
-                    for k in [1, 2, 3, 4, 5]:
+                    for k in [1, 2, 3, 4, 5, 6]:
                         knn_maps_directory = os.path.join(database_directory, part, dataset_name_,
                                                           '{}nn_maps'.format(k))
                         iknn_maps_directory = os.path.join(database_directory, part, dataset_name_,
@@ -207,13 +207,13 @@ class ShanghaiTechPreprocessing:
                         iknn_map_path = os.path.join(iknn_maps_directory, file_name + 'npy')
                         knn_map = generate_knn_map(head_positions, label_size, number_of_neighbors=k, upper_bound=112)
                         iknn_map = 1 / (knn_map + 1)
-                        np.save(iknn_map_path, iknn_map)
-                        np.save(knn_map_path, knn_map)
+                        np.save(iknn_map_path, iknn_map.astype(np.float16))
+                        np.save(knn_map_path, knn_map.astype(np.float16))
                     density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
                     if out_of_bounds_count > 0:
                         print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
                     np.save(image_path, image)
-                    np.save(label_path, density_map)
+                    np.save(label_path, density_map.astype(np.float16))
 
     def density_preprocess(self):
         """Generate various versions of density labels with different Gaussian spread parameters."""
@@ -244,7 +244,7 @@ class ShanghaiTechPreprocessing:
                         density_path = os.path.join(density_directory, file_name + 'npy')
                         density_map = generate_density_label(head_positions, label_size, perspective_resizing=True,
                                                              yx_order=True, neighbor_deviation_beta=density_kernel_beta)
-                        np.save(density_path, density_map)
+                        np.save(density_path, density_map.astype(np.float16))
 
     @staticmethod
     def get_y_x_head_positions(original_head_positions):
