@@ -233,6 +233,11 @@ def norm_squared(tensor, axis=1):
     return tensor.pow(2).sum(dim=axis)
 
 
+def norm(tensor):
+    """Calculates the norm."""
+    return tensor.pow(2).sum().pow(0.5)
+
+
 def square_mean(tensor):
     """Calculates the element-wise square, then the mean of a tensor."""
     return tensor.pow(2).mean()
