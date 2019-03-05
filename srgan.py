@@ -64,26 +64,27 @@ class Experiment(ABC):
 
         self.dataset_setup()
         self.model_setup()
+        self.prepare_optimizers()
         self.load_models()
         self.gpu_mode()
         self.train_mode()
-        self.prepare_optimizers()
 
         self.training_loop()
 
         print('Completed {}'.format(self.trial_directory))
         if self.settings.should_save_models:
-            self.save_models()
+            self.save_models(step=self.settings.steps_to_run)
 
-    def save_models(self, step=None):
+    def save_models(self, step):
         """Saves the network models."""
-        if step is not None:
-            suffix = '_{}'.format(step)
-        else:
-            suffix = ''
-        torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model{}.pth'.format(suffix)))
-        torch.save(self.D.state_dict(), os.path.join(self.trial_directory, 'D_model{}.pth'.format(suffix)))
-        torch.save(self.G.state_dict(), os.path.join(self.trial_directory, 'G_model{}.pth'.format(suffix)))
+        model = {'DNN': self.DNN.state_dict(),
+                 'dnn_optimizer': self.dnn_optimizer,
+                 'D': self.D.state_dict(),
+                 'd_optimizer': self.d_optimizer,
+                 'G': self.G.state_dict(),
+                 'g_optimizer': self.g_optimizer,
+                 'step': step}
+        torch.save(model, f'model_{step}')
 
     def training_loop(self):
         """Runs the main training loop."""
@@ -196,11 +197,11 @@ class Experiment(ABC):
         """
         if model_path1 is None:
             return model_path2
-        elif model_path1.group(2) is None:
+        elif model_path1.group(1) is None:
             return model_path1
-        elif model_path2.group(2) is None:
+        elif model_path2.group(1) is None:
             return model_path2
-        elif int(model_path1.group(2)) > int(model_path2.group(2)):
+        elif int(model_path1.group(1)) > int(model_path2.group(1)):
             return model_path1
         else:
             return model_path2
@@ -208,38 +209,27 @@ class Experiment(ABC):
     def load_models(self):
         """Loads existing models if they exist at `self.settings.load_model_path`."""
         if self.settings.load_model_path:
-            latest_dnn_model = None
-            latest_d_model = None
-            latest_g_model = None
+            latest_model = None
             model_path_file_names = os.listdir(self.settings.load_model_path)
             for file_name in model_path_file_names:
-                match = re.search(r'(DNN|D|G)_model_?(\d+)?\.pth', file_name)
+                match = re.search(r'model_?(\d+)?\.pth', file_name)
                 if match:
-                    if match.group(1) == 'DNN':
-                        latest_dnn_model = self.compare_model_path_for_latest(latest_dnn_model, match)
-                    elif match.group(1) == 'D':
-                        latest_d_model = self.compare_model_path_for_latest(latest_d_model, match)
-                    elif match.group(1) == 'G':
-                        latest_g_model = self.compare_model_path_for_latest(latest_g_model, match)
-            latest_dnn_model = None if latest_dnn_model is None else latest_dnn_model.group(0)
-            latest_d_model = None if latest_d_model is None else latest_d_model.group(0)
-            latest_g_model = None if latest_g_model is None else latest_g_model.group(0)
+                    latest_model = self.compare_model_path_for_latest(latest_model, match)
+            latest_model = None if latest_model is None else latest_model.group(0)
             if not torch.cuda.is_available():
                 map_location = 'cpu'
             else:
                 map_location = None
-            if latest_dnn_model:
-                dnn_model_path = os.path.join(self.settings.load_model_path, latest_dnn_model)
-                print('DNN model loaded from `{}`.'.format(dnn_model_path))
-                self.DNN.load_state_dict(torch.load(dnn_model_path, map_location))
-            if latest_d_model:
-                d_model_path = os.path.join(self.settings.load_model_path, latest_d_model)
-                print('D model loaded from `{}`.'.format(d_model_path))
-                self.D.load_state_dict(torch.load(d_model_path, map_location))
-            if latest_g_model:
-                g_model_path = os.path.join(self.settings.load_model_path, latest_g_model)
-                print('G model loaded from `{}`.'.format(g_model_path))
-                self.G.load_state_dict(torch.load(g_model_path, map_location))
+            if latest_model:
+                model_path = os.path.join(self.settings.load_model_path, latest_model)
+                loaded_model = torch.load(model_path, map_location)
+                self.DNN.load_state_dict(loaded_model['DNN'])
+                self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
+                self.D.load_state_dict(loaded_model['D'])
+                self.d_optimizer.load_state_dict(loaded_model['d_optimizer'])
+                self.G.load_state_dict(loaded_model['G'])
+                self.g_optimizer.load_state_dict(loaded_model['g_optimizer'])
+                print('Model loaded from `{}`.'.format(model_path))
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
