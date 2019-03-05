@@ -74,6 +74,7 @@ settings_.map_multiplier = 1
 settings_.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
 settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
 settings_.matching_distance_function = square_mean
+settings_.continue_existing_experiments = True
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_, shuffle=False)
 seed_all(0)

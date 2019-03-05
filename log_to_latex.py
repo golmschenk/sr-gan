@@ -344,11 +344,18 @@ def get_summary_steps_in_first_log(logs_directory, include_filter=None, exclude_
 
 
 if __name__ == '__main__':
-    plot_dnn_vs_gan_average_error_by_hyper_parameter('/Users/golmschenk/Desktop/le2ue',
-                                                     y_axis_label='MAE (years)',
-                                                     x_axis_label='Labeled Dataset Size',
-                                                     match_hyper_parameter_regex=r' le(\d+) ',
-                                                     hyper_parameter_type='float',
-                                                     exclude_filter=None,  # r' mo1e0 ',
-                                                     experiment_name='age-le2ue',
-                                                     x_axis_scale='log')
+    logs_directory_ = '/Users/golmschenk/Desktop/logs'
+    value_name_ = '1_Validation_Error/MAE'
+    steps_ = get_summary_steps_in_first_log(logs_directory_)
+    log_values = average_values_of_trials(logs_directory_, value_name_, include_filter='abs_plus_one_log_mean_neg')
+    sqrt_values = average_values_of_trials(logs_directory_, value_name_, include_filter='abs_plus_one_sqrt_mean_neg')
+    linear_values = average_values_of_trials(logs_directory_, value_name_, include_filter='abs_mean_neg')
+    figure, axes = plt.subplots()
+    axes.set_yscale('log')
+    axes.plot(steps_, log_values, color=sns.color_palette()[5], label='Replace log')
+    axes.plot(steps_, sqrt_values, color=sns.color_palette()[6], label='Replace sqrt')
+    axes.plot(steps_, linear_values, color=sns.color_palette()[7], label='Replace linear')
+    axes.legend().set_visible(True)
+    matplotlib2tikz.save(os.path.join('latex', 'loss-function-comparison.tex'))
+    plt.show()
+    plt.close(figure)

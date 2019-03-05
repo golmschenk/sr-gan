@@ -46,6 +46,7 @@ class Settings:
         self.number_of_data_workers = 4
         self.pin_memory = True
         self.continue_from_previous_trial = False
+        self.continue_existing_experiments = False
 
         # Coefficient application only.
         self.hidden_size = 10

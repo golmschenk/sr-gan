@@ -40,6 +40,7 @@ class Experiment(ABC):
         self.G: Module = None
         self.g_optimizer: Optimizer = None
         self.signal_quit = False
+        self.starting_step = 0
 
         self.labeled_features = None
         self.unlabeled_features = None
@@ -53,10 +54,11 @@ class Experiment(ABC):
         """
         self.trial_directory = os.path.join(self.settings.logs_directory, self.settings.trial_name)
         if (self.settings.skip_completed_experiment and os.path.exists(self.trial_directory) and
-                '/check' not in self.trial_directory):
+                '/check' not in self.trial_directory and not self.settings.continue_existing_experiments):
             print('`{}` experiment already exists. Skipping...'.format(self.trial_directory))
             return
-        self.trial_directory = make_directory_name_unique(self.trial_directory)
+        if not self.settings.continue_existing_experiments:
+            self.trial_directory = make_directory_name_unique(self.trial_directory)
         print(self.trial_directory)
         os.makedirs(os.path.join(self.trial_directory, self.settings.temporary_directory))
         self.prepare_summary_writers()
@@ -65,6 +67,9 @@ class Experiment(ABC):
         self.dataset_setup()
         self.model_setup()
         self.prepare_optimizers()
+        if self.settings.continue_existing_experiments:
+            assert self.settings.load_model_path is None
+            self.settings.load_model_path = self.trial_directory
         self.load_models()
         self.gpu_mode()
         self.train_mode()
@@ -91,7 +96,7 @@ class Experiment(ABC):
         train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
         unlabeled_dataset_generator = self.infinite_iter(self.unlabeled_dataset_loader)
         step_time_start = datetime.datetime.now()
-        for step in range(self.settings.steps_to_run):
+        for step in range(self.starting_step, self.settings.steps_to_run):
             self.adjust_learning_rate(step)
             # DNN.
             samples = next(train_dataset_generator)
@@ -230,6 +235,8 @@ class Experiment(ABC):
                 self.G.load_state_dict(loaded_model['G'])
                 self.g_optimizer.load_state_dict(loaded_model['g_optimizer'])
                 print('Model loaded from `{}`.'.format(model_path))
+                if self.settings.continue_existing_experiments:
+                    self.starting_step = loaded_model['step'] + 1
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""

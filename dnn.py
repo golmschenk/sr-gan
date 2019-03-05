@@ -70,12 +70,14 @@ class DnnExperiment(Experiment, ABC):
                 self.DNN.load_state_dict(loaded_model['DNN'])
                 self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
                 print('Model loaded from `{}`.'.format(model_path))
+                if self.settings.continue_existing_experiments:
+                    self.starting_step = loaded_model['step'] + 1
 
     def training_loop(self):
         """Runs the main training loop."""
         train_dataset_generator = self.infinite_iter(self.train_dataset_loader)
         step_time_start = datetime.datetime.now()
-        for step in range(self.settings.steps_to_run):
+        for step in range(self.starting_step, self.settings.steps_to_run):
             self.adjust_learning_rate(step)
             samples = next(train_dataset_generator)
             if len(samples) == 2:
