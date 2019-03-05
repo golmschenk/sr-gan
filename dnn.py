@@ -19,26 +19,6 @@ class DnnExperiment(Experiment, ABC):
         self.dnn_summary_writer = SummaryWriter(os.path.join(self.trial_directory, 'DNN'))
         self.dnn_summary_writer.summary_period = self.settings.summary_step_period
 
-    def load_models(self):
-        """Loads existing models if they exist at `self.settings.load_model_path`."""
-        if self.settings.load_model_path:
-            latest_dnn_model = None
-            model_path_file_names = os.listdir(self.settings.load_model_path)
-            for file_name in model_path_file_names:
-                match = re.search(r'(DNN|D|G)_model_?(\d+)?\.pth', file_name)
-                if match:
-                    if match.group(1) == 'DNN':
-                        latest_dnn_model = self.compare_model_path_for_latest(latest_dnn_model, match)
-            latest_dnn_model = None if latest_dnn_model is None else latest_dnn_model.group(0)
-            if not torch.cuda.is_available():
-                map_location = 'cpu'
-            else:
-                map_location = None
-            if latest_dnn_model:
-                dnn_model_path = os.path.join(self.settings.load_model_path, latest_dnn_model)
-                print('DNN model loaded from `{}`.'.format(dnn_model_path))
-                self.DNN.load_state_dict(torch.load(dnn_model_path, map_location), strict=False)
-
     def gpu_mode(self):
         """
         Moves the networks to the GPU (if available).
@@ -63,13 +43,33 @@ class DnnExperiment(Experiment, ABC):
         weight_decay = self.settings.weight_decay
         self.dnn_optimizer = Adam(self.DNN.parameters(), lr=d_lr, weight_decay=weight_decay, betas=(0.9, 0.999))
 
-    def save_models(self, step=None):
+    def save_models(self, step):
         """Saves the network models."""
-        if step is not None:
-            suffix = '_{}'.format(step)
-        else:
-            suffix = ''
-        torch.save(self.DNN.state_dict(), os.path.join(self.trial_directory, 'DNN_model{}.pth'.format(suffix)))
+        model = {'DNN': self.DNN.state_dict(),
+                 'dnn_optimizer': self.dnn_optimizer,
+                 'step': step}
+        torch.save(model, f'model_{step}')
+
+    def load_models(self):
+        """Loads existing models if they exist at `self.settings.load_model_path`."""
+        if self.settings.load_model_path:
+            latest_model = None
+            model_path_file_names = os.listdir(self.settings.load_model_path)
+            for file_name in model_path_file_names:
+                match = re.search(r'model_?(\d+)?\.pth', file_name)
+                if match:
+                    latest_model = self.compare_model_path_for_latest(latest_model, match)
+            latest_model = None if latest_model is None else latest_model.group(0)
+            if not torch.cuda.is_available():
+                map_location = 'cpu'
+            else:
+                map_location = None
+            if latest_model:
+                model_path = os.path.join(self.settings.load_model_path, latest_model)
+                loaded_model = torch.load(model_path, map_location)
+                self.DNN.load_state_dict(loaded_model['DNN'])
+                self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
+                print('Model loaded from `{}`.'.format(model_path))
 
     def training_loop(self):
         """Runs the main training loop."""
