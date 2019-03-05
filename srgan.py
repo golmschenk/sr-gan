@@ -243,7 +243,7 @@ class Experiment(ABC):
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
-        self.DNN.apply(disable_batch_norm_updates)  # No batch norm
+        # self.DNN.apply(disable_batch_norm_updates)  # No batch norm
         self.dnn_summary_writer.step = step
         self.dnn_optimizer.zero_grad()
         dnn_loss = self.dnn_loss_calculation(examples, labels)
@@ -258,13 +258,13 @@ class Experiment(ABC):
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
         # Labeled.
-        self.D.apply(disable_batch_norm_updates)  # No batch norm
+        # self.D.apply(disable_batch_norm_updates)  # No batch norm
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         labeled_loss.backward()
         # Unlabeled.
-        # self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
+        self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(labeled_examples, unlabeled_examples)
         unlabeled_loss.backward()
         # Fake.
@@ -302,7 +302,7 @@ class Experiment(ABC):
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
-        # self.D.apply(enable_batch_norm_updates)  # Only labeled data used for batch norm running statistics
+        self.D.apply(enable_batch_norm_updates)  # Only labeled data used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
@@ -337,7 +337,7 @@ class Experiment(ABC):
         _ = self.D(fake_examples.detach())
         self.fake_features = self.D.features
         fake_loss = self.feature_distance_loss(self.unlabeled_features, self.fake_features,
-                                               distance_function=self.settings.fake_loss_distance)
+                                               distance_function=self.settings.contrasting_distance_function)
         fake_loss *= self.settings.fake_loss_multiplier
         fake_loss *= self.settings.srgan_loss_multiplier
         return fake_loss
@@ -419,8 +419,10 @@ class Experiment(ABC):
         for param_group in self.dnn_optimizer.param_groups:
             param_group['lr'] = lr
 
-    def feature_distance_loss(self, base_features, other_features, distance_function=square_mean):
+    def feature_distance_loss(self, base_features, other_features, distance_function=None):
         """Calculate the loss based on the distance between feature vectors."""
+        if distance_function is None:
+            distance_function = self.settings.matching_distance_function
         base_mean_features = base_features.mean(0)
         other_mean_features = other_features.mean(0)
         if self.settings.normalize_feature_norm:

@@ -6,7 +6,7 @@ import random
 from copy import deepcopy
 from enum import Enum
 
-from utility import abs_plus_one_log_neg
+from utility import abs_plus_one_log_neg, square_mean
 
 
 class Settings:
@@ -37,7 +37,8 @@ class Settings:
         self.labeled_dataset_seed = 0
         self.normalize_fake_loss = False
         self.normalize_feature_norm = False
-        self.fake_loss_distance = abs_plus_one_log_neg
+        self.contrasting_distance_function = abs_plus_one_log_neg
+        self.matching_distance_function = square_mean
 
         self.load_model_path = None
         self.should_save_models = True

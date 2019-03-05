@@ -13,7 +13,7 @@ from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from driving.srgan import DrivingExperiment
 from settings import Settings, convert_to_settings_list, ApplicationName, MethodName
-from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg
+from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg, square_mean
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
@@ -42,8 +42,8 @@ elif application_name == ApplicationName.driving:
 elif application_name == ApplicationName.coefficient:
     Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
                   MethodName.dggan: CoefficientDgganExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e0]
-    settings_.fake_loss_multiplier = [1e0]
+    settings_.unlabeled_loss_multiplier = [1e-1, 1e0, 1e1]
+    settings_.fake_loss_multiplier = [1e-1, 1e0, 1e1]
     settings_.batch_size = 5000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [500]
@@ -67,17 +67,19 @@ else:
     raise ValueError('{} is not an available application.'.format(application_name))
 settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = 0
-settings_.steps_to_run = 100000
+settings_.steps_to_run = 200000
 settings_.learning_rate = [1e-4]
 settings_.mean_offset = [0]
-# settings_.load_model_path = 'logs/GAN pretrained'
-settings_.fake_loss_distance = abs_plus_one_sqrt_mean_neg
+settings_.map_multiplier = 1
+settings_.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
+settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
+settings_.matching_distance_function = square_mean
 settings_.local_setup()
-settings_list = convert_to_settings_list(settings_, shuffle=True)
+settings_list = convert_to_settings_list(settings_, shuffle=False)
 seed_all(0)
 previous_trial_directory = None
 for settings_ in settings_list:
-    trial_name = 'k comparison {}'.format(settings_.fake_loss_distance.__name__)
+    trial_name = 'k comparison'
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
     trial_name += f' {settings_.crowd_dataset}' if application_name == ApplicationName.crowd else ''
     trial_name += ' {}'.format(application_name.value)
