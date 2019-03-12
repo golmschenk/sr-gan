@@ -60,7 +60,7 @@ class Experiment(ABC):
         if not self.settings.continue_existing_experiments:
             self.trial_directory = make_directory_name_unique(self.trial_directory)
         print(self.trial_directory)
-        os.makedirs(os.path.join(self.trial_directory, self.settings.temporary_directory))
+        os.makedirs(os.path.join(self.trial_directory, self.settings.temporary_directory), exist_ok=True)
         self.prepare_summary_writers()
         seed_all(0)
 
@@ -83,13 +83,13 @@ class Experiment(ABC):
     def save_models(self, step):
         """Saves the network models."""
         model = {'DNN': self.DNN.state_dict(),
-                 'dnn_optimizer': self.dnn_optimizer,
+                 'dnn_optimizer': self.dnn_optimizer.state_dict(),
                  'D': self.D.state_dict(),
-                 'd_optimizer': self.d_optimizer,
+                 'd_optimizer': self.d_optimizer.state_dict(),
                  'G': self.G.state_dict(),
-                 'g_optimizer': self.g_optimizer,
+                 'g_optimizer': self.g_optimizer.state_dict(),
                  'step': step}
-        torch.save(model, f'model_{step}')
+        torch.save(model, os.path.join(self.trial_directory, f'model_{step}.pth'))
 
     def training_loop(self):
         """Runs the main training loop."""
@@ -230,13 +230,23 @@ class Experiment(ABC):
                 loaded_model = torch.load(model_path, map_location)
                 self.DNN.load_state_dict(loaded_model['DNN'])
                 self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
+                self.optimizer_to_gpu(self.dnn_optimizer)
                 self.D.load_state_dict(loaded_model['D'])
                 self.d_optimizer.load_state_dict(loaded_model['d_optimizer'])
+                self.optimizer_to_gpu(self.d_optimizer)
                 self.G.load_state_dict(loaded_model['G'])
                 self.g_optimizer.load_state_dict(loaded_model['g_optimizer'])
+                self.optimizer_to_gpu(self.g_optimizer)
                 print('Model loaded from `{}`.'.format(model_path))
                 if self.settings.continue_existing_experiments:
                     self.starting_step = loaded_model['step'] + 1
+                    print(f'Continuing from step {self.starting_step}')
+
+    def optimizer_to_gpu(self, optimizer):
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if torch.is_tensor(v):
+                    state[k] = v.cuda()
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""

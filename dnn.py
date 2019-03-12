@@ -46,9 +46,9 @@ class DnnExperiment(Experiment, ABC):
     def save_models(self, step):
         """Saves the network models."""
         model = {'DNN': self.DNN.state_dict(),
-                 'dnn_optimizer': self.dnn_optimizer,
+                 'dnn_optimizer': self.dnn_optimizer.state_dict(),
                  'step': step}
-        torch.save(model, f'model_{step}')
+        torch.save(model, os.path.join(self.trial_directory, f'model_{step}.pth'))
 
     def load_models(self):
         """Loads existing models if they exist at `self.settings.load_model_path`."""
@@ -69,9 +69,11 @@ class DnnExperiment(Experiment, ABC):
                 loaded_model = torch.load(model_path, map_location)
                 self.DNN.load_state_dict(loaded_model['DNN'])
                 self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
+                self.optimizer_to_gpu(self.dnn_optimizer)
                 print('Model loaded from `{}`.'.format(model_path))
                 if self.settings.continue_existing_experiments:
                     self.starting_step = loaded_model['step'] + 1
+                    print(f'Continuing from step {self.starting_step}')
 
     def training_loop(self):
         """Runs the main training loop."""
