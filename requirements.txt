@@ -1,0 +1,14 @@
+requests
+seaborn
+pandas
+matplotlib2tikz
+matplotlib
+tensorflow
+tensorboardX
+scikit-learn
+patool
+mtcnn
+scikit-image
+torch
+torchvision
+imageio
