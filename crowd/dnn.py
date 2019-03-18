@@ -64,7 +64,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
-        self.DNN = KnnDenseNetCat()
+        self.DNN = KnnDenseNetCat(label_patch_size=self.settings.label_patch_size)
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""

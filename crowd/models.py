@@ -739,15 +739,16 @@ class KnnDenseNet(nn.Module):
 
 class MapModule(nn.Module):
     """A module to upscale to a map and produce a count."""
-    def __init__(self, in_features, kernel_size):
+    def __init__(self, in_features, input_size, label_size):
         super().__init__()
+        kernel_size = label_size // input_size
         self.map_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
                                                          kernel_size=kernel_size, stride=kernel_size)
         self.conv1 = Conv2d(in_channels=1, out_channels=8, kernel_size=2, stride=2)
         self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
         self.conv3 = Conv2d(in_channels=16, out_channels=32, kernel_size=2, stride=2)
-        self.linear1 = Conv2d(in_channels=32, out_channels=20, kernel_size=28)
-        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
+        count_layer_kernel_size = label_size // (2 ** 3)
+        self.count_layer = Conv2d(in_channels=32, out_channels=1, kernel_size=count_layer_kernel_size)
 
     def forward(self, x):
         """Forward pass."""
@@ -755,7 +756,6 @@ class MapModule(nn.Module):
         out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
-        out = leaky_relu(self.linear1(out))
         count = leaky_relu(self.count_layer(out))
         return map_, count, out
 
@@ -843,9 +843,9 @@ class KnnDenseNet2(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
-        self.map_module1 = MapModule(in_features=128, kernel_size=1)
-        self.map_module2 = MapModule(in_features=256, kernel_size=2)
-        self.map_module3 = MapModule(in_features=896, kernel_size=4)
+        self.map_module1 = MapModule(in_features=128, input_size=28, label_size=label_patch_size)
+        self.map_module2 = MapModule(in_features=256, input_size=14, label_size=label_patch_size)
+        self.map_module3 = MapModule(in_features=896, input_size=7, label_size=label_patch_size)
 
     def forward(self, x):
         """Forward pass."""
@@ -956,11 +956,10 @@ class KnnDenseNetCat(nn.Module):
             del state_dict['classifier.bias']
             self.load_state_dict(state_dict, strict=True)
 
-        self.srgan_feature_layer = Conv2d(in_channels=num_features, out_channels=20, kernel_size=1)
-        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
-        self.map_module1 = MapModule(in_features=128, kernel_size=8)
-        self.map_module2 = MapModule(in_features=256, kernel_size=16)
-        self.map_module3 = MapModule(in_features=896, kernel_size=32)
+        self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
+        self.map_module1 = MapModule(in_features=128, input_size=28, label_size=label_patch_size)
+        self.map_module2 = MapModule(in_features=256, input_size=14, label_size=label_patch_size)
+        self.map_module3 = MapModule(in_features=896, input_size=7, label_size=label_patch_size)
         self.features = None
 
     def forward(self, x):
@@ -979,13 +978,10 @@ class KnnDenseNetCat(nn.Module):
         final_pool = avg_pool2d(n5_relu_out, kernel_size=7, stride=1)
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
-        srgan_features = leaky_relu(self.srgan_feature_layer(final_pool))
-        final_count = leaky_relu(self.count_layer(srgan_features))
+        final_count = leaky_relu(self.count_layer(final_pool))
         map1, count1, h1 = self.map_module1(t1_out)
         map2, count2, h2 = self.map_module2(t2_out)
         map3, count3, h3 = self.map_module3(t3_out)
-        self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1),
-                                   h3.view(batch_size, -1, 1, 1), srgan_features], dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         map_ = torch.cat([map1, map2, map3], dim=1)
@@ -995,11 +991,11 @@ class KnnDenseNetCat(nn.Module):
 
 class DenseMapModule(nn.Module):
     """A dense block followed by a map module."""
-    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate):
+    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate, label_patch_size):
         super().__init__()
         self.dense_block = _DenseBlock(num_layers=num_layers, num_input_features=num_input_features, bn_size=bn_size,
                                        growth_rate=growth_rate, drop_rate=drop_rate)
-        self.map_module = MapModule(in_features=num_input_features + 128, kernel_size=1)
+        self.map_module = MapModule(in_features=num_input_features + 128, input_size=28, label_size=label_patch_size)
 
     def forward(self, x):
         """Forward pass."""
@@ -1091,11 +1087,13 @@ class KnnDenseNetCatBranch(nn.Module):
             self.load_state_dict(state_dict, strict=True)
 
         self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
-        self.map_module1 = MapModule(in_features=512, kernel_size=1)
+        self.map_module1 = MapModule(in_features=512, input_size=28, label_size=label_patch_size)
         self.density_module1 = DenseMapModule(num_layers=4, num_input_features=513, bn_size=bn_size,
-                                              growth_rate=growth_rate, drop_rate=drop_rate)
+                                              growth_rate=growth_rate, drop_rate=drop_rate,
+                                              label_patch_size=label_patch_size)
         self.density_module2 = DenseMapModule(num_layers=4, num_input_features=642, bn_size=bn_size,
-                                              growth_rate=growth_rate, drop_rate=drop_rate)
+                                              growth_rate=growth_rate, drop_rate=drop_rate,
+                                              label_patch_size=label_patch_size)
 
     def forward(self, x):
         """Forward pass."""
