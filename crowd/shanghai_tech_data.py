@@ -56,7 +56,7 @@ class ShanghaiTechTransformedDataset(Dataset):
     A class for the transformed ShanghaiTech crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, part='part_A',
-                 number_of_examples=None, middle_transform=None, inverse_map=False, map_directory_name='knn_maps'):
+                 number_of_examples=None, middle_transform=None, map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, part, '{}_data'.format(dataset))
         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
@@ -74,7 +74,6 @@ class ShanghaiTechTransformedDataset(Dataset):
             image_indexes_length = len(y_positions) * len(x_positions)
             self.length += image_indexes_length
         self.middle_transform = middle_transform
-        self.inverse_map = inverse_map
         self.map_directory_name = map_directory_name
 
     def __getitem__(self, index):
@@ -95,9 +94,7 @@ class ShanghaiTechTransformedDataset(Dataset):
                                                                NumpyArraysToTorchTensors()])
         image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
         label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
-        knn_map = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
-        if '1nn' in self.map_directory_name and 'i1nn' not in self.map_directory_name:
-            knn_map = knn_map / 112
+        map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
@@ -105,15 +102,12 @@ class ShanghaiTechTransformedDataset(Dataset):
         y_index, x_index = np.unravel_index(position_index, positions_shape)
         y = y_positions[y_index]
         x = x_positions[x_index]
-        example = CrowdExample(image=image, label=label, map_=knn_map)
+        example = CrowdExample(image=image, label=label, map_=map_)
         example = extract_patch_transform(example, y, x)
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        map_ = example.map
-        if self.inverse_map:
-            map_ = 1 / (map_ + 1)
-        return example.image, example.label, map_
+        return example.image, example.label, example.map_
 
     def __len__(self):
         return self.length

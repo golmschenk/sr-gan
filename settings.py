@@ -60,7 +60,6 @@ class Settings:
         self.image_patch_size = 224
         self.label_patch_size = 224
         self.map_multiplier = 1e-6
-        self.inverse_map = False
         self.map_directory_name = 'i1nn_maps'
 
         # SGAN models only.

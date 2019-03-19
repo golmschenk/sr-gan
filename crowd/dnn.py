@@ -36,7 +36,6 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                                 seed=settings.labeled_dataset_seed,
                                                                 number_of_examples=settings.labeled_dataset_size,
-                                                                inverse_map=settings.inverse_map,
                                                                 map_directory_name=settings.map_directory_name,
                                                                 image_patch_size=self.settings.image_patch_size,
                                                                 label_patch_size=self.settings.label_patch_size)
@@ -44,7 +43,6 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101,
-                                                                     inverse_map=settings.inverse_map,
                                                                      map_directory_name=settings.map_directory_name,
                                                                      image_patch_size=self.settings.image_patch_size,
                                                                      label_patch_size=self.settings.label_patch_size)
