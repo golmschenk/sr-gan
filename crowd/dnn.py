@@ -89,10 +89,6 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         dnn_predicted_densities, _, predicted_maps = DNN(images.to(gpu))
         dnn_validation_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
-        dnn_summary_writer.add_scalar('Count Percentage/map0', DNN.count_percentages[0])
-        dnn_summary_writer.add_scalar('Count Percentage/map1', DNN.count_percentages[1])
-        dnn_summary_writer.add_scalar('Count Percentage/map2', DNN.count_percentages[2])
-        dnn_summary_writer.add_scalar('Count Percentage/final count', DNN.count_percentages[3])
 
         self.test_summaries()
 
