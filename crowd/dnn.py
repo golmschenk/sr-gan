@@ -37,13 +37,17 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
                                                                 seed=settings.labeled_dataset_seed,
                                                                 number_of_examples=settings.labeled_dataset_size,
                                                                 inverse_map=settings.inverse_map,
-                                                                map_directory_name=settings.map_directory_name)
+                                                                map_directory_name=settings.map_directory_name,
+                                                                image_patch_size=self.settings.image_patch_size,
+                                                                label_patch_size=self.settings.label_patch_size)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.validation_dataset = ShanghaiTechTransformedDataset(dataset='test', seed=101,
                                                                      inverse_map=settings.inverse_map,
-                                                                     map_directory_name=settings.map_directory_name)
+                                                                     map_directory_name=settings.map_directory_name,
+                                                                     image_patch_size=self.settings.image_patch_size,
+                                                                     label_patch_size=self.settings.label_patch_size)
         elif settings.crowd_dataset == 'UCF 50':
             seed = 0
             self.dataset_class = UcfCc50FullImageDataset
@@ -87,6 +91,10 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         dnn_predicted_densities, _, predicted_maps = DNN(images.to(gpu))
         dnn_validation_comparison_image = self.create_map_comparison_image(images, maps, predicted_maps.to('cpu'))
         dnn_summary_writer.add_image('Validation', dnn_validation_comparison_image)
+        dnn_summary_writer.add_scalar('Count Percentage/map0', DNN.count_percentages[0])
+        dnn_summary_writer.add_scalar('Count Percentage/map1', DNN.count_percentages[1])
+        dnn_summary_writer.add_scalar('Count Percentage/map2', DNN.count_percentages[2])
+        dnn_summary_writer.add_scalar('Count Percentage/final count', DNN.count_percentages[3])
 
         self.test_summaries()
 
