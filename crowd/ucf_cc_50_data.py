@@ -227,5 +227,3 @@ class UcfCc50Check:
 if __name__ == '__main__':
     preprocessor = UcfCc50Preprocessing()
     preprocessor.download_and_preprocess()
-    # preprocessor.preprocess()
-    UcfCc50Check().display_statistics()

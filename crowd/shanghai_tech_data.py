@@ -298,4 +298,3 @@ if __name__ == '__main__':
     preprocessor.download()
     preprocessor.knn_preprocess()
     preprocessor.density_preprocess()
-    ShanghaiTechCheck().display_statistics()

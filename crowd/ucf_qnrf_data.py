@@ -272,4 +272,3 @@ if __name__ == '__main__':
     preprocessor = UcfQnrfPreprocessing()
     preprocessor.download()
     preprocessor.knn_preprocess()
-    UcfQnrfCheck().display_statistics()
