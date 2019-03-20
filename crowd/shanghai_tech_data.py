@@ -107,7 +107,7 @@ class ShanghaiTechTransformedDataset(Dataset):
         if self.middle_transform:
             example = self.middle_transform(example)
         example = preprocess_transform(example)
-        return example.image, example.label, example.map_
+        return example.image, example.label, example.map
 
     def __len__(self):
         return self.length
