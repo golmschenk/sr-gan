@@ -2,11 +2,20 @@
 Code for the crowd data dataset.
 """
 import random
+from enum import Enum
 import scipy.misc
 import torch
 import numpy as np
 import torchvision
 from torch.utils.data import Dataset
+
+
+class CrowdDataset(Enum):
+    """An enum to select the crowd dataset."""
+    ucf_cc_50 = 'UCF CC 50'
+    ucf_qnrf = 'UCF QNRF'
+    shanghai_tech = 'ShanghaiTech'
+    world_expo = 'World Expo'
 
 
 class CrowdExample:

@@ -8,12 +8,15 @@ from age.srgan import AgeExperiment
 from coefficient.dggan import CoefficientDgganExperiment
 from coefficient.sgan import CoefficientSganExperiment
 from coefficient.srgan import CoefficientExperiment
+from crowd.data import CrowdDataset
+from crowd.dggan import CrowdDgganExperiment
 from crowd.dnn import CrowdDnnExperiment
 from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from driving.srgan import DrivingExperiment
 from settings import Settings, convert_to_settings_list, ApplicationName, MethodName
-from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg, square_mean
+from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg, square_mean, abs_mean_neg, \
+    abs_plus_one_log_neg, abs_plus_one_log_mean_neg, norm_mean
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
@@ -50,13 +53,13 @@ elif application_name == ApplicationName.coefficient:
     settings_.gradient_penalty_multiplier = 1e1
 elif application_name == ApplicationName.crowd:
     Experiment = {MethodName.srgan: CrowdExperiment, MethodName.sgan: CrowdSganExperiment,
-                  MethodName.dnn: CrowdDnnExperiment}[method_name]
+                  MethodName.dnn: CrowdDnnExperiment, MethodName.dggan: CrowdDgganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e3]
     settings_.fake_loss_multiplier = [1e2]
     settings_.batch_size = 40
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
-    settings_.crowd_dataset = 'ShanghaiTech'
+    settings_.crowd_dataset = CrowdDataset.ucf_qnrf
     settings_.labeled_loss_order = 2
     settings_.unlabeled_dataset_size = None
     settings_.labeled_dataset_size = None
@@ -69,7 +72,6 @@ settings_.summary_step_period = 1000
 settings_.labeled_dataset_seed = 0
 settings_.steps_to_run = 200000
 settings_.learning_rate = [1e-4]
-settings_.mean_offset = [0]
 settings_.map_multiplier = 1
 settings_.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
 settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
@@ -82,11 +84,11 @@ previous_trial_directory = None
 for settings_ in settings_list:
     trial_name = 'k comparison'
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
-    trial_name += f' {settings_.crowd_dataset}' if application_name == ApplicationName.crowd else ''
+    trial_name += f' {settings_.crowd_dataset.value}' if application_name == ApplicationName.crowd else ''
     trial_name += ' {}'.format(application_name.value)
     trial_name += ' {}'.format(method_name.value) if method_name != MethodName.srgan else ''
     if method_name != MethodName.dnn:
-        if application_name == ApplicationName.crowd and settings_.crowd_dataset == 'World Expo':
+        if application_name == ApplicationName.crowd and settings_.crowd_dataset == CrowdDataset.world_expo:
             trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
         else:
             trial_name += ' le{}'.format(settings_.labeled_dataset_size)

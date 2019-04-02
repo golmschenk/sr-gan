@@ -7,7 +7,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 from crowd import data
-from crowd.data import CrowdExample
+from crowd.data import CrowdExample, CrowdDataset
 from crowd.models import KnnDenseNetCat
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.srgan import CrowdExperiment
@@ -22,7 +22,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
     def dataset_setup(self):
         """Sets up the datasets for the application."""
         settings = self.settings
-        if settings.crowd_dataset == 'UCF QNRF':
+        if settings.crowd_dataset == CrowdDataset.ucf_qnrf:
             self.dataset_class = UcfQnrfFullImageDataset
             self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                            seed=settings.labeled_dataset_seed,
@@ -31,7 +31,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
-        elif settings.crowd_dataset == 'ShanghaiTech':
+        elif settings.crowd_dataset == CrowdDataset.shanghai_tech:
             self.dataset_class = ShanghaiTechFullImageDataset
             self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                                 seed=settings.labeled_dataset_seed,
@@ -46,7 +46,7 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
                                                                      map_directory_name=settings.map_directory_name,
                                                                      image_patch_size=self.settings.image_patch_size,
                                                                      label_patch_size=self.settings.label_patch_size)
-        elif settings.crowd_dataset == 'UCF 50':
+        elif settings.crowd_dataset == CrowdDataset.ucf_cc_50:
             seed = 0
             self.dataset_class = UcfCc50FullImageDataset
             self.train_dataset = UcfCc50TransformedDataset(middle_transform=data.RandomHorizontalFlip(),

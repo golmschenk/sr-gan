@@ -225,7 +225,7 @@ def abs_mean_neg(tensor):
 
 def abs_mean(tensor):
     """Takes the absolute value, then mean."""
-    return tensor.abs().mean().neg()
+    return tensor.abs().mean()
 
 
 def norm_squared(tensor, axis=1):
