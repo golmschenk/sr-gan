@@ -31,7 +31,7 @@ class Settings:
         self.dggan_loss_multiplier = 1e1
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
-        self.mean_offset = 1e0
+        self.mean_offset = 0
         self.labeled_loss_order = 2
         self.generator_training_step_period = 1
         self.labeled_dataset_seed = 0

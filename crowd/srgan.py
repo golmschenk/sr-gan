@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset
-from crowd.models import DCGenerator, DenseNetDiscriminator
+from crowd.models import DCGenerator, DenseNetDiscriminator, KnnDenseNetCat
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from srgan import Experiment
 from utility import MixtureModel, gpu
@@ -29,17 +29,20 @@ class CrowdExperiment(Experiment):
         self.dataset_class = UcfQnrfFullImageDataset
         self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                        seed=settings.labeled_dataset_seed,
-                                                       number_of_examples=settings.labeled_dataset_size)
+                                                       number_of_examples=settings.labeled_dataset_size,
+                                                       map_directory_name=settings.map_directory_name)
         self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                pin_memory=self.settings.pin_memory,
                                                num_workers=settings.number_of_data_workers)
         self.unlabeled_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                            seed=100,
-                                                           number_of_examples=settings.unlabeled_dataset_size)
+                                                           number_of_examples=settings.unlabeled_dataset_size,
+                                                           map_directory_name=settings.map_directory_name)
         self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-        self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
+        self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101,
+                                                            map_directory_name=settings.map_directory_name)
 
         # self.dataset_class = ShanghaiTechFullImageDataset
         # self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
@@ -119,8 +122,8 @@ class CrowdExperiment(Experiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = DenseNetDiscriminator()
-        self.DNN = DenseNetDiscriminator()
+        self.D = KnnDenseNetCat()
+        self.DNN = KnnDenseNetCat()
 
     def validation_summaries(self, step):
         """Prepares the summaries that should be run for the given application."""

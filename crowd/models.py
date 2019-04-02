@@ -748,7 +748,9 @@ class MapModule(nn.Module):
         self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
         self.conv3 = Conv2d(in_channels=16, out_channels=32, kernel_size=2, stride=2)
         count_layer_kernel_size = label_size // (2 ** 3)
-        self.count_layer = Conv2d(in_channels=32, out_channels=1, kernel_size=count_layer_kernel_size)
+        self.linear1 = Conv2d(in_channels=32, out_channels=20, kernel_size=count_layer_kernel_size)
+        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
+
 
     def forward(self, x):
         """Forward pass."""
@@ -756,7 +758,8 @@ class MapModule(nn.Module):
         out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
-        count = leaky_relu(self.count_layer(out))
+        out = leaky_relu(self.linear1(out))
+        count = self.count_layer(out)
         return map_, count, out
 
 
@@ -874,6 +877,152 @@ class KnnDenseNet2(nn.Module):
         return density, count, map_
 
 
+class MapModuleDggan(nn.Module):
+    """A module to upscale to a map and produce a count."""
+    def __init__(self, in_features, input_size, label_size):
+        super().__init__()
+        kernel_size = label_size // input_size
+        self.map_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
+                                                         kernel_size=kernel_size, stride=kernel_size)
+        self.conv1 = Conv2d(in_channels=1, out_channels=8, kernel_size=2, stride=2)
+        self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
+        self.conv3 = Conv2d(in_channels=16, out_channels=32, kernel_size=2, stride=2)
+        count_layer_kernel_size = label_size // (2 ** 3)
+        self.linear1 = Conv2d(in_channels=32, out_channels=20, kernel_size=count_layer_kernel_size)
+        self.count_layer = Conv2d(in_channels=20, out_channels=2, kernel_size=1)
+
+
+    def forward(self, x):
+        """Forward pass."""
+        map_ = leaky_relu(self.map_transposed_conv_layer(x))
+        out = leaky_relu(self.conv1(map_))
+        out = leaky_relu(self.conv2(out))
+        out = leaky_relu(self.conv3(out))
+        out = leaky_relu(self.linear1(out))
+        count = self.count_layer(out)
+        return map_, count, out
+
+
+class KnnDenseNetCatDggan(nn.Module):
+    r"""A spatial pooling pyramid network based on DenseNet
+
+    Args:
+        growth_rate (int) - how many filters to add each layer (`k` in paper)
+        block_config (list of 4 ints) - how many layers in each pooling block
+        num_init_features (int) - the number of filters to learn in the first convolution layer
+        bn_size (int) - multiplicative factor for number of bottle neck layers
+          (i.e. bn_size * k features in the bottleneck layer)
+        drop_rate (float) - dropout rate after each dense layer
+    """
+    def __init__(self, growth_rate=32, block_config=(6, 12, 48, 32),
+                 num_init_features=64, bn_size=4, drop_rate=0, pretrained=True,
+                 label_patch_size=224):
+
+        super().__init__()
+        self.label_patch_size = label_patch_size
+
+        self.dense_blocks = nn.ModuleList()
+        self.transition_layers = nn.ModuleList()
+
+        # First convolution
+        self.conv_layer1 = nn.Sequential(OrderedDict([
+            ('conv0', nn.Conv2d(3, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
+            ('norm0', nn.BatchNorm2d(num_init_features)),
+            ('relu0', nn.ReLU(inplace=True)),
+            ('pool0', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
+        ]))
+
+        # Each denseblock
+        num_features = num_init_features
+        for i, num_layers in enumerate(block_config):
+            block = _DenseBlock(num_layers=num_layers, num_input_features=num_features,
+                                bn_size=bn_size, growth_rate=growth_rate, drop_rate=drop_rate)
+            self.dense_blocks.add_module('denseblock%d' % (i + 1), block)
+            num_features = num_features + num_layers * growth_rate
+            if i != len(block_config) - 1:
+                trans = _Transition(num_input_features=num_features, num_output_features=num_features // 2)
+                self.transition_layers.add_module('transition%d' % (i + 1), trans)
+                num_features = num_features // 2
+
+        # Final batch norm
+        self.norm5 = nn.BatchNorm2d(num_features)
+
+        # Official init from torch repo.
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight.data)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                m.bias.data.zero_()
+
+        if pretrained:
+            # '.'s are no longer allowed in module names, but previous _DenseLayer
+            # has keys 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
+            # They are also in the checkpoints in model_urls. This pattern is used
+            # to find such keys.
+            pattern = re.compile(
+                r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
+            state_dict = model_zoo.load_url(torchvision.models.densenet.model_urls['densenet201'])
+            for key in list(state_dict.keys()):
+                res = pattern.match(key)
+                if res:
+                    new_key = res.group(1) + res.group(2)
+                    state_dict[new_key] = state_dict[key]
+                    del state_dict[key]
+            new_name_state_dict = OrderedDict()
+            for key, value in state_dict.items():
+                new_key = key.replace('features.denseblock', 'dense_blocks.denseblock')
+                new_key = new_key.replace('features.transition', 'transition_layers.transition')
+                if 'norm5' in new_key:
+                    new_key = new_key.replace('features.', '')
+                else:
+                    new_key = new_key.replace('features.', 'conv_layer1.')
+                new_name_state_dict[new_key] = value
+            state_dict = new_name_state_dict
+            del state_dict['classifier.weight']
+            del state_dict['classifier.bias']
+            self.load_state_dict(state_dict, strict=True)
+
+        self.map_module1 = MapModule(in_features=128, input_size=28, label_size=label_patch_size)
+        self.map_module2 = MapModule(in_features=256, input_size=14, label_size=label_patch_size)
+        self.map_module3 = MapModule(in_features=896, input_size=7, label_size=label_patch_size)
+        self.final_count_feature_layer = Conv2d(in_channels=num_features, out_channels=20, kernel_size=1)
+        self.count_layer = Conv2d(in_channels=20, out_channels=2, kernel_size=1)
+        self.features = None
+        self.real_label = None
+
+    def forward(self, x):
+        """Forward pass."""
+        batch_size = x.shape[0]
+        out = self.conv_layer1(x)
+        db1_out = self.dense_blocks.denseblock1(out)
+        t1_out = self.transition_layers.transition1(db1_out)
+        db2_out = self.dense_blocks.denseblock2(t1_out)
+        t2_out = self.transition_layers.transition2(db2_out)
+        db3_out = self.dense_blocks.denseblock3(t2_out)
+        t3_out = self.transition_layers.transition3(db3_out)
+        db4_out = self.dense_blocks.denseblock4(t3_out)
+        n5_out = self.norm5(db4_out)
+        n5_relu_out = relu(n5_out, inplace=True)
+        final_pool = avg_pool2d(n5_relu_out, kernel_size=7, stride=1)
+
+        density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
+        final_count_features = leaky_relu(self.final_count_feature_layer(final_pool))
+        final_count = self.count_layer(final_count_features)
+        map1, count1, h1 = self.map_module1(t1_out)
+        map2, count2, h2 = self.map_module2(t2_out)
+        map3, count3, h3 = self.map_module3(t3_out)
+        count = count1 + count2 + count3 + final_count
+        count = count.view(batch_size, 2)
+        count, real_label = count[:, 0].squeeze(), count[:, 1].squeeze()
+        self.real_label = real_label
+        map_ = torch.cat([map1, map2, map3], dim=1)
+        map_ = map_.view(batch_size, 3, self.label_patch_size, self.label_patch_size)
+        return density, count, map_
+
+
 class KnnDenseNetCat(nn.Module):
     r"""A spatial pooling pyramid network based on DenseNet
 
@@ -956,10 +1105,11 @@ class KnnDenseNetCat(nn.Module):
             del state_dict['classifier.bias']
             self.load_state_dict(state_dict, strict=True)
 
-        self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
         self.map_module1 = MapModule(in_features=128, input_size=28, label_size=label_patch_size)
         self.map_module2 = MapModule(in_features=256, input_size=14, label_size=label_patch_size)
         self.map_module3 = MapModule(in_features=896, input_size=7, label_size=label_patch_size)
+        self.final_count_feature_layer = Conv2d(in_channels=num_features, out_channels=20, kernel_size=1)
+        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
         self.features = None
 
     def forward(self, x):
@@ -978,10 +1128,14 @@ class KnnDenseNetCat(nn.Module):
         final_pool = avg_pool2d(n5_relu_out, kernel_size=7, stride=1)
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
-        final_count = leaky_relu(self.count_layer(final_pool))
+        final_count_features = leaky_relu(self.final_count_feature_layer(final_pool))
+        final_count = self.count_layer(final_count_features)
         map1, count1, h1 = self.map_module1(t1_out)
         map2, count2, h2 = self.map_module2(t2_out)
         map3, count3, h3 = self.map_module3(t3_out)
+        self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1),
+                                   h3.view(batch_size, -1, 1, 1), final_count_features.view(batch_size, -1, 1, 1)],
+                                  dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         map_ = torch.cat([map1, map2, map3], dim=1)
