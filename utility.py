@@ -233,7 +233,7 @@ def norm_squared(tensor, axis=1):
     return tensor.pow(2).sum(dim=axis)
 
 
-def norm(tensor):
+def norm_mean(tensor):
     """Calculates the norm."""
     return tensor.pow(2).sum().pow(0.5)
 

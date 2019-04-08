@@ -47,6 +47,7 @@ class Settings:
         self.pin_memory = True
         self.continue_from_previous_trial = False
         self.continue_existing_experiments = False
+        self.save_step_period = None
 
         # Coefficient application only.
         self.hidden_size = 10
