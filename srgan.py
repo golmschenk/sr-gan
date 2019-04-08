@@ -121,7 +121,7 @@ class Experiment(ABC):
                 self.train_mode()
             self.handle_user_input(step)
             if self.settings.save_step_period and step % self.settings.save_step_period == 0 and step != 0:
-                self.save_models(step=self.settings.steps_to_run)
+                self.save_models(step=step)
 
     def prepare_optimizers(self):
         """Prepares the optimizers of the network."""
@@ -252,7 +252,7 @@ class Experiment(ABC):
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
-        # self.DNN.apply(disable_batch_norm_updates)  # No batch norm
+        self.DNN.apply(disable_batch_norm_updates)  # No batch norm
         self.dnn_summary_writer.step = step
         self.dnn_optimizer.zero_grad()
         dnn_loss = self.dnn_loss_calculation(examples, labels)
@@ -267,13 +267,13 @@ class Experiment(ABC):
     def gan_training_step(self, labeled_examples, labels, unlabeled_examples, step):
         """Runs an individual round of GAN training."""
         # Labeled.
-        # self.D.apply(disable_batch_norm_updates)  # No batch norm
+        self.D.apply(disable_batch_norm_updates)  # No batch norm
         self.gan_summary_writer.step = step
         self.d_optimizer.zero_grad()
         labeled_loss = self.labeled_loss_calculation(labeled_examples, labels)
         labeled_loss.backward()
         # Unlabeled.
-        self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
+        # self.D.apply(disable_batch_norm_updates)  # Make sure only labeled data is used for batch norm statistics
         unlabeled_loss = self.unlabeled_loss_calculation(labeled_examples, unlabeled_examples)
         unlabeled_loss.backward()
         # Fake.
@@ -311,7 +311,7 @@ class Experiment(ABC):
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
                                                    self.unlabeled_features.mean(0).norm().item())
-        self.D.apply(enable_batch_norm_updates)  # Only labeled data used for batch norm running statistics
+        # self.D.apply(enable_batch_norm_updates)  # Only labeled data used for batch norm running statistics
 
     def dnn_loss_calculation(self, labeled_examples, labels):
         """Calculates the DNN loss."""
