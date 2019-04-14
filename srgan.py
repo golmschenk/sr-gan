@@ -59,6 +59,11 @@ class Experiment(ABC):
             return
         if not self.settings.continue_existing_experiments:
             self.trial_directory = make_directory_name_unique(self.trial_directory)
+        else:
+            if os.path.exists(self.trial_directory) and self.settings.load_model_path is not None:
+                raise ValueError('Cannot load from path and continue existing at the same time.')
+            elif self.settings.load_model_path is None:
+                self.settings.load_model_path = self.trial_directory
         print(self.trial_directory)
         os.makedirs(os.path.join(self.trial_directory, self.settings.temporary_directory), exist_ok=True)
         self.prepare_summary_writers()
@@ -67,9 +72,6 @@ class Experiment(ABC):
         self.dataset_setup()
         self.model_setup()
         self.prepare_optimizers()
-        if self.settings.continue_existing_experiments:
-            assert self.settings.load_model_path is None
-            self.settings.load_model_path = self.trial_directory
         self.load_models()
         self.gpu_mode()
         self.train_mode()

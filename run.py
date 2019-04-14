@@ -100,7 +100,7 @@ for settings_ in settings_list:
     trial_name += ' mm{:e}'.format(settings_.map_multiplier) if application_name == ApplicationName.crowd else ''
     trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
     trial_name += ' bs{}'.format(settings_.batch_size)
-    trial_name += ' l' if settings_.load_model_path else ''
+    trial_name += ' l' if settings_.load_model_path and not settings_.continue_existing_experiments else ''
     settings_.trial_name = clean_scientific_notation(trial_name)
     if previous_trial_directory and settings_.continue_from_previous_trial:
         settings_.load_model_path = previous_trial_directory
