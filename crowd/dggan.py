@@ -2,7 +2,7 @@
 from torch.nn import BCEWithLogitsLoss
 import torch
 
-from crowd.models import KnnDenseNetCatDggan, DCGenerator
+from crowd.models import KnnDenseNetCatDggan, DCGenerator, DenseNetDiscriminatorDggan
 from crowd.srgan import CrowdExperiment
 
 
@@ -11,8 +11,8 @@ class CrowdDgganExperiment(CrowdExperiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = KnnDenseNetCatDggan()
-        self.DNN = KnnDenseNetCatDggan()
+        self.D = DenseNetDiscriminatorDggan()
+        self.DNN = DenseNetDiscriminatorDggan()
 
     def unlabeled_loss_calculation(self, labeled_examples, unlabeled_examples):
         """Calculates the unlabeled loss."""

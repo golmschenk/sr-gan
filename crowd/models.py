@@ -6,7 +6,8 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
-from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout
+from torch.nn import Module, Conv2d, MaxPool2d, ConvTranspose2d, Sequential, BatchNorm2d, Linear, Dropout, \
+    BatchNorm2d
 from torch.nn.functional import leaky_relu, max_pool2d, dropout, avg_pool2d, relu
 from torch import tanh
 from torch.utils import model_zoo
@@ -628,6 +629,28 @@ class DenseNetDiscriminator(Module):
         self.features = self.dense_net_module.features
         out = out.view(-1)
         return (torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu), out,
+                torch.zeros([batch_size, 3, self.label_patch_size, self.label_patch_size], device=gpu))
+
+
+class DenseNetDiscriminatorDggan(Module):
+    """The DenseNet as a discriminator."""
+
+    def __init__(self, label_patch_size=224):
+        seed_all(0)
+        super().__init__()
+        self.label_patch_size = label_patch_size
+        self.features = None
+        self.dense_net_module = densenet201(pretrained=True, num_classes=2)
+
+    def forward(self, x):
+        """The forward pass of the network."""
+        batch_size = x.shape[0]
+        out = self.dense_net_module(x)
+        self.features = self.dense_net_module.features
+        out = out.view(-1, 2)
+        count, real_label = out[:, 0].squeeze(), out[:, 1].squeeze()
+        self.real_label = real_label
+        return (torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu), count,
                 torch.zeros([batch_size, 3, self.label_patch_size, self.label_patch_size], device=gpu))
 
 

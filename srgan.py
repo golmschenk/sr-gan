@@ -308,7 +308,7 @@ class Experiment(ABC):
             self.gan_summary_writer.add_scalar('Discriminator/Fake Loss', fake_loss.item())
             self.gan_summary_writer.add_scalar('Discriminator/Gradient Penalty', gradient_penalty.item())
             self.gan_summary_writer.add_scalar('Discriminator/Gradient Norm', self.gradient_norm.mean().item())
-            if self.labeled_features is not None:
+            if self.labeled_features is not None and self.unlabeled_features is not None:
                 self.gan_summary_writer.add_scalar('Feature Norm/Labeled',
                                                    self.labeled_features.mean(0).norm().item())
                 self.gan_summary_writer.add_scalar('Feature Norm/Unlabeled',
