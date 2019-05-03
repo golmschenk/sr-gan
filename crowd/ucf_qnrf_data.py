@@ -28,11 +28,20 @@ class UcfQnrfFullImageDataset(Dataset):
     """
     A class for the UCF QNRF full image crowd dataset.
     """
-    def __init__(self, dataset='train', seed=None, number_of_examples=None, map_directory_name='maps'):
+    def __init__(self, dataset='train', seed=None, number_of_examples=None, map_directory_name='maps',
+                 examples_start=None):
+        seed_all(seed)
+        if examples_start is None:
+            examples_end = number_of_examples
+        elif number_of_examples is None:
+            examples_end = None
+        else:
+            examples_end = examples_start + number_of_examples
         seed_all(seed)
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
-        self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
-                           if name.endswith('.npy')][:number_of_examples]
+        file_names = os.listdir(os.path.join(self.dataset_directory, 'labels'))
+        random.shuffle(file_names)
+        self.file_names = [name for name in file_names if name.endswith('.npy')][examples_start:examples_end]
         self.length = len(self.file_names)
         self.map_directory_name = map_directory_name
 
@@ -58,11 +67,18 @@ class UcfQnrfTransformedDataset(Dataset):
     A class for the transformed UCF QNRF crowd dataset.
     """
     def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, number_of_examples=None,
-                 middle_transform=None, map_directory_name='maps'):
+                 middle_transform=None, map_directory_name='maps', examples_start=None):
         seed_all(seed)
+        if examples_start is None:
+            examples_end = number_of_examples
+        elif number_of_examples is None:
+            examples_end = None
+        else:
+            examples_end = examples_start + number_of_examples
         self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
-        self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'labels'))
-                           if name.endswith('.npy')][:number_of_examples]
+        file_names = os.listdir(os.path.join(self.dataset_directory, 'labels'))
+        random.shuffle(file_names)
+        self.file_names = [name for name in file_names if name.endswith('.npy')][examples_start:examples_end]
         self.image_patch_size = image_patch_size
         self.label_patch_size = label_patch_size
         half_patch_size = int(self.image_patch_size // 2)

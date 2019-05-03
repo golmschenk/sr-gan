@@ -40,9 +40,10 @@ class CrowdExperiment(Experiment):
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
             self.unlabeled_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
-                                                               seed=100,
+                                                               seed=settings.labeled_dataset_seed,
                                                                number_of_examples=settings.unlabeled_dataset_size,
-                                                               map_directory_name=settings.map_directory_name)
+                                                               map_directory_name=settings.map_directory_name,
+                                                               examples_start=settings.labeled_dataset_size)
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
                                                        pin_memory=self.settings.pin_memory,
                                                        num_workers=settings.number_of_data_workers)
@@ -363,7 +364,10 @@ class CrowdExperiment(Experiment):
                 x = batch[1][example_index]
                 y = batch[2][example_index]
                 predicted_label = predicted_labels[example_index].detach().numpy()
-                predicted_count = predicted_counts[example_index].detach().numpy()
+                try:
+                    predicted_count = predicted_counts[example_index].detach().numpy()
+                except IndexError:
+                    predicted_count = predicted_counts.detach().numpy()
                 predicted_label = scipy.misc.imresize(predicted_label, (patch_size, patch_size), mode='F')
                 predicted_label = predicted_label
                 predicted_count_array = np.full(predicted_label.shape,

@@ -11,8 +11,8 @@ class CrowdDgganExperiment(CrowdExperiment):
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
         self.G = DCGenerator()
-        self.D = DenseNetDiscriminatorDggan()
-        self.DNN = DenseNetDiscriminatorDggan()
+        self.D = KnnDenseNetCatDggan()
+        self.DNN = KnnDenseNetCatDggan()
 
     def unlabeled_loss_calculation(self, labeled_examples, unlabeled_examples):
         """Calculates the unlabeled loss."""

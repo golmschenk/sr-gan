@@ -22,7 +22,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
 application_name = ApplicationName.crowd
-method_name = MethodName.dnn
+method_name = MethodName.srgan
 
 settings_ = Settings()
 if application_name == ApplicationName.age:
@@ -56,33 +56,33 @@ elif application_name == ApplicationName.crowd:
                   MethodName.dnn: CrowdDnnExperiment, MethodName.dggan: CrowdDgganExperiment}[method_name]
     settings_.unlabeled_loss_multiplier = [1e3]
     settings_.fake_loss_multiplier = [1e2]
-    settings_.batch_size = 40
+    settings_.batch_size = 15
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
     settings_.crowd_dataset = CrowdDataset.ucf_qnrf
     settings_.labeled_loss_order = 2
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = None
+    settings_.labeled_dataset_size = 50
     settings_.gradient_penalty_multiplier = 1e2
-    settings_.map_directory_name = ['i1nn_maps', 'i2nn_maps', 'i3nn_maps', 'i4nn_maps', 'i5nn_maps', 'i6nn_maps']
-    settings_.map_multiplier = 1e-6
+    settings_.map_directory_name = ['density3e-1']
+    settings_.map_multiplier = 1e-3
 else:
     raise ValueError('{} is not an available application.'.format(application_name))
-settings_.summary_step_period = 1000
+settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = 0
-settings_.steps_to_run = 200000
+settings_.steps_to_run = 100000
 settings_.learning_rate = [1e-4]
-settings_.map_multiplier = 1
-# settings_.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
+# settings.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
 settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
 settings_.matching_distance_function = square_mean
-settings_.continue_existing_experiments = True
+settings_.continue_existing_experiments = False
+settings_.save_step_period = 20000
 settings_.local_setup()
-settings_list = convert_to_settings_list(settings_, shuffle=False)
+settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 previous_trial_directory = None
 for settings_ in settings_list:
-    trial_name = 'k comparison'
+    trial_name = f'base {settings_.matching_distance_function.__name__} {settings_.contrasting_distance_function.__name__}'
     trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
     trial_name += f' {settings_.crowd_dataset.value}' if application_name == ApplicationName.crowd else ''
     trial_name += ' {}'.format(application_name.value)

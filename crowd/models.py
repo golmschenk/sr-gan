@@ -1008,9 +1008,9 @@ class KnnDenseNetCatDggan(nn.Module):
             del state_dict['classifier.bias']
             self.load_state_dict(state_dict, strict=True)
 
-        self.map_module1 = MapModule(in_features=128, input_size=28, label_size=label_patch_size)
-        self.map_module2 = MapModule(in_features=256, input_size=14, label_size=label_patch_size)
-        self.map_module3 = MapModule(in_features=896, input_size=7, label_size=label_patch_size)
+        self.map_module1 = MapModuleDggan(in_features=128, input_size=28, label_size=label_patch_size)
+        self.map_module2 = MapModuleDggan(in_features=256, input_size=14, label_size=label_patch_size)
+        self.map_module3 = MapModuleDggan(in_features=896, input_size=7, label_size=label_patch_size)
         self.final_count_feature_layer = Conv2d(in_channels=num_features, out_channels=20, kernel_size=1)
         self.count_layer = Conv2d(in_channels=20, out_channels=2, kernel_size=1)
         self.features = None
