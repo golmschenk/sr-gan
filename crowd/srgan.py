@@ -6,6 +6,7 @@ import os
 import random
 from collections import defaultdict
 
+import imageio
 import scipy.misc
 import matplotlib
 import numpy as np
@@ -427,3 +428,32 @@ class CrowdExperiment(Experiment):
                     yield batch
                     batch = []
         yield batch
+
+    @property
+    def inference_network(self):
+        """The network to be used for inference."""
+        return self.D
+
+    def inference_setup(self):
+        """
+        Sets up the network for inference.
+        """
+        self.model_setup()
+        self.load_models(with_optimizers=False)
+        self.gpu_mode()
+        self.eval_mode()
+
+    def inference(self, image_path):
+        """
+        Run the inference for crowd detection.
+        """
+        image = imageio.imread(image_path)
+        label = np.zeros(image.shape[:2], dtype=np.float32)
+        example = CrowdExample(image=image, label=label)
+        import datetime
+        start = datetime.datetime.now()
+        with torch.no_grad():
+            predicted_count, predicted_label = self.predict_full_example(full_example=example,
+                                                                         network=self.inference_network)
+        print(datetime.datetime.now() - start)
+        return predicted_count, predicted_label

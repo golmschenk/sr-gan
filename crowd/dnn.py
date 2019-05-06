@@ -148,3 +148,8 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
         print('Count RMSE: {}'.format((totals['SE count'] / len(indexes)) ** 0.5))
         print('Density MAE: {}'.format(totals['Density sum error'] / len(indexes)))
         print('Density RMSE: {}'.format((totals['SE density'] / len(indexes)) ** 0.5))
+
+    @property
+    def inference_network(self):
+        """The network to be used for inference."""
+        return self.DNN

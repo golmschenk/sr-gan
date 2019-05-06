@@ -215,7 +215,7 @@ class Experiment(ABC):
         else:
             return model_path2
 
-    def load_models(self):
+    def load_models(self, with_optimizers=True):
         """Loads existing models if they exist at `self.settings.load_model_path`."""
         if self.settings.load_model_path:
             latest_model = None
@@ -233,14 +233,15 @@ class Experiment(ABC):
                 model_path = os.path.join(self.settings.load_model_path, latest_model)
                 loaded_model = torch.load(model_path, map_location)
                 self.DNN.load_state_dict(loaded_model['DNN'])
-                self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
-                self.optimizer_to_gpu(self.dnn_optimizer)
                 self.D.load_state_dict(loaded_model['D'])
-                self.d_optimizer.load_state_dict(loaded_model['d_optimizer'])
-                self.optimizer_to_gpu(self.d_optimizer)
                 self.G.load_state_dict(loaded_model['G'])
-                self.g_optimizer.load_state_dict(loaded_model['g_optimizer'])
-                self.optimizer_to_gpu(self.g_optimizer)
+                if with_optimizers:
+                    self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
+                    self.optimizer_to_gpu(self.dnn_optimizer)
+                    self.d_optimizer.load_state_dict(loaded_model['d_optimizer'])
+                    self.optimizer_to_gpu(self.d_optimizer)
+                    self.g_optimizer.load_state_dict(loaded_model['g_optimizer'])
+                    self.optimizer_to_gpu(self.g_optimizer)
                 print('Model loaded from `{}`.'.format(model_path))
                 if self.settings.continue_existing_experiments:
                     self.starting_step = loaded_model['step'] + 1
@@ -412,7 +413,7 @@ class Experiment(ABC):
         return (predicted_labels - labels).abs().pow(order).mean()
 
     def evaluate(self):
-        """Evaluates the model on the test dataset (needs to be overridden by subclass."""
+        """Evaluates the model on the test dataset (needs to be overridden by subclass)."""
         self.model_setup()
         self.load_models()
         self.eval_mode()
