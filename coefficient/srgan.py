@@ -98,4 +98,4 @@ class CoefficientExperiment(Experiment):
             summary_writer.add_scalar(f'{summary_name}/Ratio MAE GAN DNN', mae / comparison_values.mae)
             summary_writer.add_scalar(f'{summary_name}/Ratio MSE GAN DNN', mae / comparison_values.mse)
             summary_writer.add_scalar(f'{summary_name}/Ratio RMSE GAN DNN', rmse / comparison_values.rmse)
-        return self.ComparisonValues(mae=mae, mse=mse, rmse=rmse)
+        return self.ComparisonValues(mae=mae, mse=mse, rmse=rmse, predicted_labels=predicted_labels)
