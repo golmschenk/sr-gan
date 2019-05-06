@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from scipy.stats import norm, wasserstein_distance
 from torch.utils.data import DataLoader
+from recordclass import RecordClass
 
 from srgan import Experiment
 from coefficient.data import ToyDataset
@@ -15,6 +16,7 @@ from utility import gpu, MixtureModel, standard_image_format_to_tensorboard_imag
 
 class CoefficientExperiment(Experiment):
     """The coefficient application."""
+
     def dataset_setup(self):
         """Sets up the datasets for the application."""
         settings = self.settings
@@ -46,24 +48,11 @@ class CoefficientExperiment(Experiment):
         train_dataset = self.train_dataset
         validation_dataset = self.validation_dataset
         unlabeled_dataset = self.unlabeled_dataset
-        dnn_predicted_train_labels = DNN(torch.tensor(
-            train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
-        dnn_train_label_errors = np.mean(np.abs(dnn_predicted_train_labels - train_dataset.labels))
-        dnn_summary_writer.add_scalar('2 Train Error/MAE', dnn_train_label_errors, )
-        dnn_predicted_validation_labels = DNN(torch.tensor(
-            validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
-        dnn_validation_label_errors = np.mean(np.abs(dnn_predicted_validation_labels - validation_dataset.labels))
-        dnn_summary_writer.add_scalar('1 Validation Error/MAE', dnn_validation_label_errors, )
-        predicted_train_labels = D(torch.tensor(
-            train_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
-        gan_train_label_errors = np.mean(np.abs(predicted_train_labels - train_dataset.labels))
-        gan_summary_writer.add_scalar('2 Train Error/MAE', gan_train_label_errors, )
-        predicted_validation_labels = D(torch.tensor(
-            validation_dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
-        gan_validation_label_errors = np.mean(np.abs(predicted_validation_labels - validation_dataset.labels))
-        gan_summary_writer.add_scalar('1 Validation Error/MAE', gan_validation_label_errors, )
-        gan_summary_writer.add_scalar('1 Validation Error/Ratio MAE GAN DNN',
-                                      gan_validation_label_errors / dnn_validation_label_errors, )
+        dnn_train_values = self.evaluation_epoch(DNN, train_dataset, dnn_summary_writer, '2 Train Error')
+        dnn_validation_values = self.evaluation_epoch(DNN, validation_dataset, dnn_summary_writer, '2 Validation Error')
+        gan_train_values = self.evaluation_epoch(D, train_dataset, gan_summary_writer, '2 Train Error')
+        gan_validation_values = self.evaluation_epoch(D, validation_dataset, gan_summary_writer, '2 Validation Error',
+                              comparison_values=dnn_validation_values)
         z = torch.tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
             size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
         fake_examples = G(z, add_noise=False)
@@ -78,12 +67,35 @@ class CoefficientExperiment(Experiment):
         unlabeled_predictions = D(unlabeled_examples)
         if dnn_summary_writer.step % settings.summary_step_period == 0:
             unlabeled_predictions_array = unlabeled_predictions.to('cpu').detach().numpy()
-            validation_predictions_array = predicted_validation_labels
-            train_predictions_array = predicted_train_labels
-            dnn_validation_predictions_array = dnn_predicted_validation_labels
-            dnn_train_predictions_array = dnn_predicted_train_labels
+            validation_predictions_array = gan_validation_values.predicted_labels
+            train_predictions_array = gan_train_values.predicted_labels
+            dnn_validation_predictions_array = dnn_validation_values.predicted_labels
+            dnn_train_predictions_array = dnn_train_values.predicted_labels
             distribution_image = generate_display_frame(fake_examples_array, unlabeled_predictions_array,
                                                         validation_predictions_array, dnn_validation_predictions_array,
                                                         train_predictions_array, dnn_train_predictions_array, step)
             distribution_image = standard_image_format_to_tensorboard_image_format(distribution_image)
             gan_summary_writer.add_image('Distributions', distribution_image)
+
+    class ComparisonValues(RecordClass):
+        """A record class to hold the names of values which might be compared among methods."""
+        mae: float
+        mse: float
+        rmse: float
+        predicted_labels: np.ndarray
+
+    def evaluation_epoch(self, network, dataset: ToyDataset, summary_writer, summary_name: str,
+                         comparison_values: ComparisonValues = None):
+        """An evaluation of the dataset writing to TensorBoard."""
+        predicted_labels = network(torch.tensor(dataset.examples.astype(np.float32)).to(gpu)).to('cpu').detach().numpy()
+        mae = np.mean(np.abs(predicted_labels - dataset.labels))
+        summary_writer.add_scalar(f'{summary_name}/MAE', mae)
+        mse = np.mean(np.power(predicted_labels - dataset.labels, 2))
+        summary_writer.add_scalar(f'{summary_name}/MSE', mse)
+        rmse = np.power(mse, 0.5)
+        summary_writer.add_scalar(f'{summary_name}/RMSE', rmse)
+        if comparison_values:
+            summary_writer.add_scalar(f'{summary_name}/Ratio MAE GAN DNN', mae / comparison_values.mae)
+            summary_writer.add_scalar(f'{summary_name}/Ratio MSE GAN DNN', mae / comparison_values.mse)
+            summary_writer.add_scalar(f'{summary_name}/Ratio RMSE GAN DNN', rmse / comparison_values.rmse)
+        return self.ComparisonValues(mae=mae, mse=mse, rmse=rmse)
