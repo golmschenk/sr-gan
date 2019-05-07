@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from scipy.stats import norm, wasserstein_distance
 
-from presentation import generate_display_frame
+from coefficient.presentation import generate_display_frame
 from utility import standard_image_format_to_tensorboard_image_format, gpu, MixtureModel
 from coefficient.models import DgganMLP, Generator
 from coefficient.srgan import CoefficientExperiment

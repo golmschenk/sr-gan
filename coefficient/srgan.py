@@ -10,7 +10,7 @@ from recordclass import RecordClass
 from srgan import Experiment
 from coefficient.data import ToyDataset
 from coefficient.models import Generator, MLP, observation_count
-from presentation import generate_display_frame
+from coefficient.presentation import generate_display_frame
 from utility import gpu, MixtureModel, standard_image_format_to_tensorboard_image_format
 
 
