@@ -49,9 +49,9 @@ class CoefficientExperiment(Experiment):
         validation_dataset = self.validation_dataset
         unlabeled_dataset = self.unlabeled_dataset
         dnn_train_values = self.evaluation_epoch(DNN, train_dataset, dnn_summary_writer, '2 Train Error')
-        dnn_validation_values = self.evaluation_epoch(DNN, validation_dataset, dnn_summary_writer, '2 Validation Error')
+        dnn_validation_values = self.evaluation_epoch(DNN, validation_dataset, dnn_summary_writer, '1 Validation Error')
         gan_train_values = self.evaluation_epoch(D, train_dataset, gan_summary_writer, '2 Train Error')
-        gan_validation_values = self.evaluation_epoch(D, validation_dataset, gan_summary_writer, '2 Validation Error',
+        gan_validation_values = self.evaluation_epoch(D, validation_dataset, gan_summary_writer, '1 Validation Error',
                               comparison_values=dnn_validation_values)
         z = torch.tensor(MixtureModel([norm(-settings.mean_offset, 1), norm(settings.mean_offset, 1)]).rvs(
             size=[settings.batch_size, G.input_size]).astype(np.float32)).to(gpu)
