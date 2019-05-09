@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 
 from crowd import data
 from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindowDataset, CrowdDataset
-from crowd.models import DCGenerator, DenseNetDiscriminator, KnnDenseNetCat
+from crowd.models import DCGenerator, KnnDenseNetCat
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
 from crowd.world_expo_data import WorldExpoDataset
@@ -429,27 +429,12 @@ class CrowdExperiment(Experiment):
                     batch = []
         yield batch
 
-    @property
-    def inference_network(self):
-        """The network to be used for inference."""
-        return self.D
-
-    def inference_setup(self):
-        """
-        Sets up the network for inference.
-        """
-        self.model_setup()
-        self.load_models(with_optimizers=False)
-        self.gpu_mode()
-        self.eval_mode()
-
-    def inference(self, image_path):
+    def inference(self, input_):
         """
         Run the inference for crowd detection.
         """
-        image = imageio.imread(image_path)
-        label = np.zeros(image.shape[:2], dtype=np.float32)
-        example = CrowdExample(image=image, label=label)
+        label = np.zeros(input_.shape[:2], dtype=np.float32)
+        example = CrowdExample(image=input_, label=label)
         import datetime
         start = datetime.datetime.now()
         with torch.no_grad():

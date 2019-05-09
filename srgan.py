@@ -11,7 +11,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy.stats import norm
 from torch.nn import Module
-from torch.optim import Adam, Optimizer
+from torch.optim import Adam
+from torch.optim.optimizer import Optimizer
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch import Tensor
@@ -443,6 +444,27 @@ class Experiment(ABC):
             other_mean_features = other_features / (other_mean_features.norm() + epsilon)
         distance_vector = distance_function(base_mean_features - other_mean_features)
         return distance_vector
+
+    @property
+    def inference_network(self):
+        """The network to be used for inference."""
+        return self.D
+
+    def inference_setup(self):
+        """
+        Sets up the network for inference.
+        """
+        self.model_setup()
+        self.load_models(with_optimizers=False)
+        self.gpu_mode()
+        self.eval_mode()
+
+    @abstractmethod
+    def inference(self, input_):
+        """
+        Run the inference for the experiment.
+        """
+        pass
 
 
 def unit_vector(vector):
