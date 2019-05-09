@@ -50,7 +50,7 @@ class DnnExperiment(Experiment, ABC):
                  'step': step}
         torch.save(model, os.path.join(self.trial_directory, f'model_{step}.pth'))
 
-    def load_models(self):
+    def load_models(self, with_optimizers=True):
         """Loads existing models if they exist at `self.settings.load_model_path`."""
         if self.settings.load_model_path:
             latest_model = None
@@ -68,8 +68,9 @@ class DnnExperiment(Experiment, ABC):
                 model_path = os.path.join(self.settings.load_model_path, latest_model)
                 loaded_model = torch.load(model_path, map_location)
                 self.DNN.load_state_dict(loaded_model['DNN'])
-                self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
-                self.optimizer_to_gpu(self.dnn_optimizer)
+                if with_optimizers:
+                    self.dnn_optimizer.load_state_dict(loaded_model['dnn_optimizer'])
+                    self.optimizer_to_gpu(self.dnn_optimizer)
                 print('Model loaded from `{}`.'.format(model_path))
                 if self.settings.continue_existing_experiments:
                     self.starting_step = loaded_model['step'] + 1
