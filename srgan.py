@@ -459,12 +459,11 @@ class Experiment(ABC):
         self.gpu_mode()
         self.eval_mode()
 
-    @abstractmethod
     def inference(self, input_):
         """
         Run the inference for the experiment.
         """
-        pass
+        raise NotImplementedError
 
 
 def unit_vector(vector):
