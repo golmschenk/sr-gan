@@ -28,7 +28,7 @@ class Settings:
         self.matching_loss_multiplier = 1e0
         self.contrasting_loss_multiplier = 1e0
         self.srgan_loss_multiplier = 1e0
-        self.dggan_loss_multiplier = 1e1
+        self.dggan_loss_multiplier = 1e0
         self.gradient_penalty_on = True
         self.gradient_penalty_multiplier = 1e1
         self.mean_offset = 0

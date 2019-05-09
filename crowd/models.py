@@ -640,6 +640,7 @@ class DenseNetDiscriminatorDggan(Module):
         super().__init__()
         self.label_patch_size = label_patch_size
         self.features = None
+        self.real_label = None
         self.dense_net_module = densenet201(pretrained=True, num_classes=2)
 
     def forward(self, x):
@@ -904,6 +905,7 @@ class MapModuleDggan(nn.Module):
     """A module to upscale to a map and produce a count."""
     def __init__(self, in_features, input_size, label_size):
         super().__init__()
+        self.input_size = input_size
         kernel_size = label_size // input_size
         self.map_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
                                                          kernel_size=kernel_size, stride=kernel_size)
@@ -913,16 +915,21 @@ class MapModuleDggan(nn.Module):
         count_layer_kernel_size = label_size // (2 ** 3)
         self.linear1 = Conv2d(in_channels=32, out_channels=20, kernel_size=count_layer_kernel_size)
         self.count_layer = Conv2d(in_channels=20, out_channels=2, kernel_size=1)
+        self.input_features_real_layer = Conv2d(in_channels=in_features, out_channels=1, kernel_size=1)
 
 
     def forward(self, x):
         """Forward pass."""
+        average_input_feature_vector = avg_pool2d(x, self.input_size)
+        input_features_real = self.input_features_real_layer(average_input_feature_vector)
+        input_features_count = torch.cat([torch.zeros_like(input_features_real), input_features_real], dim=1)
         map_ = leaky_relu(self.map_transposed_conv_layer(x))
         out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
         out = leaky_relu(self.linear1(out))
         count = self.count_layer(out)
+        count += input_features_count
         return map_, count, out
 
 
@@ -1034,9 +1041,9 @@ class KnnDenseNetCatDggan(nn.Module):
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
         final_count_features = leaky_relu(self.final_count_feature_layer(final_pool))
         final_count = self.count_layer(final_count_features)
-        map1, count1, h1 = self.map_module1(t1_out)
-        map2, count2, h2 = self.map_module2(t2_out)
-        map3, count3, h3 = self.map_module3(t3_out)
+        map1, count1, _ = self.map_module1(t1_out)
+        map2, count2, _ = self.map_module2(t2_out)
+        map3, count3, _ = self.map_module3(t3_out)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size, 2)
         count, real_label = count[:, 0].squeeze(), count[:, 1].squeeze()

@@ -22,7 +22,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
 application_name = ApplicationName.crowd
-method_name = MethodName.srgan
+method_name = MethodName.dggan
 
 settings_ = Settings()
 if application_name == ApplicationName.age:
@@ -62,7 +62,7 @@ elif application_name == ApplicationName.crowd:
     settings_.crowd_dataset = CrowdDataset.ucf_qnrf
     settings_.labeled_loss_order = 2
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = 50
+    settings_.labeled_dataset_size = 30
     settings_.gradient_penalty_multiplier = 1e2
     settings_.map_directory_name = ['density3e-1']
     settings_.map_multiplier = 1e-3
@@ -70,9 +70,9 @@ else:
     raise ValueError(f'{application_name} is not an available application.')
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = 0
-settings_.steps_to_run = 100000
+settings_.steps_to_run = 500000
 settings_.learning_rate = [1e-4]
-# settings.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
+# settings_.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
 settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
 settings_.matching_distance_function = abs_mean
 settings_.continue_existing_experiments = False
@@ -82,7 +82,7 @@ settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 previous_trial_directory = None
 for settings_ in settings_list:
-    trial_name = f'base'
+    trial_name = f'dggan premap included'
     trial_name += f' {settings_.matching_distance_function.__name__} {settings_.contrasting_distance_function.__name__}'
     trial_name += f' {method_name.value}' if method_name != MethodName.srgan else ''
     trial_name += f' {application_name.value}'
