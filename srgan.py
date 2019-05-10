@@ -65,6 +65,8 @@ class Experiment(ABC):
                 raise ValueError('Cannot load from path and continue existing at the same time.')
             elif self.settings.load_model_path is None:
                 self.settings.load_model_path = self.trial_directory
+            elif not os.path.exists(self.trial_directory):
+                self.settings.continue_existing_experiments = False
         print(self.trial_directory)
         os.makedirs(os.path.join(self.trial_directory, self.settings.temporary_directory), exist_ok=True)
         self.prepare_summary_writers()
