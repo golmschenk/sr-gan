@@ -67,7 +67,7 @@ elif application_name == ApplicationName.crowd:
     settings_.map_directory_name = ['density3e-1']
     settings_.map_multiplier = 1e-3
 else:
-    raise ValueError('{} is not an available application.'.format(application_name))
+    raise ValueError(f'{application_name} is not an available application.')
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = 0
 settings_.steps_to_run = 100000
@@ -82,24 +82,25 @@ settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 previous_trial_directory = None
 for settings_ in settings_list:
-    trial_name = f'base {settings_.matching_distance_function.__name__} {settings_.contrasting_distance_function.__name__}'
-    trial_name += ' {}'.format(settings_.map_directory_name) if application_name == ApplicationName.crowd else ''
+    trial_name = f'base'
+    trial_name += f' {settings_.matching_distance_function.__name__} {settings_.contrasting_distance_function.__name__}'
+    trial_name += f' {method_name.value}' if method_name != MethodName.srgan else ''
+    trial_name += f' {application_name.value}'
+    trial_name += f' {settings_.map_directory_name}' if application_name == ApplicationName.crowd else ''
     trial_name += f' {settings_.crowd_dataset.value}' if application_name == ApplicationName.crowd else ''
-    trial_name += ' {}'.format(application_name.value)
-    trial_name += ' {}'.format(method_name.value) if method_name != MethodName.srgan else ''
     if method_name != MethodName.dnn:
         if application_name == ApplicationName.crowd and settings_.crowd_dataset == CrowdDataset.world_expo:
-            trial_name += ' c{}i{}'.format(settings_.number_of_cameras, settings_.number_of_images_per_camera)
+            trial_name += f' c{settings_.number_of_cameras}i{settings_.number_of_images_per_camera}'
         else:
-            trial_name += ' le{}'.format(settings_.labeled_dataset_size)
-            trial_name += ' ue{}'.format(settings_.unlabeled_dataset_size)
-    trial_name += ' ul{:e}'.format(settings_.unlabeled_loss_multiplier)
-    trial_name += ' fl{:e}'.format(settings_.fake_loss_multiplier)
-    trial_name += ' gp{:e}'.format(settings_.gradient_penalty_multiplier)
-    trial_name += ' lr{:e}'.format(settings_.learning_rate)
-    trial_name += ' mm{:e}'.format(settings_.map_multiplier) if application_name == ApplicationName.crowd else ''
-    trial_name += ' ls{}'.format(settings_.labeled_dataset_seed)
-    trial_name += ' bs{}'.format(settings_.batch_size)
+            trial_name += f' le{settings_.labeled_dataset_size}'
+            trial_name += f' ue{settings_.unlabeled_dataset_size}'
+    trial_name += f' ul{settings_.unlabeled_loss_multiplier:e}'
+    trial_name += f' fl{settings_.fake_loss_multiplier:e}'
+    trial_name += f' gp{settings_.gradient_penalty_multiplier:e}'
+    trial_name += f' lr{settings_.learning_rate:e}'
+    trial_name += f' mm{settings_.map_multiplier:e}' if application_name == ApplicationName.crowd else ''
+    trial_name += f' ls{settings_.labeled_dataset_seed}'
+    trial_name += f' bs{settings_.batch_size}'
     trial_name += ' l' if settings_.load_model_path and not settings_.continue_existing_experiments else ''
     settings_.trial_name = clean_scientific_notation(trial_name)
     if previous_trial_directory and settings_.continue_from_previous_trial:
