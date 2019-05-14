@@ -765,6 +765,7 @@ class MapModule(nn.Module):
     """A module to upscale to a map and produce a count."""
     def __init__(self, in_features, input_size, label_size):
         super().__init__()
+        self.input_size = input_size
         kernel_size = label_size // input_size
         self.map_transposed_conv_layer = ConvTranspose2d(in_channels=in_features, out_channels=1,
                                                          kernel_size=kernel_size, stride=kernel_size)
@@ -778,12 +779,14 @@ class MapModule(nn.Module):
 
     def forward(self, x):
         """Forward pass."""
+        premap_features = avg_pool2d(x, kernel_size=self.input_size)
         map_ = leaky_relu(self.map_transposed_conv_layer(x))
         out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
         out = leaky_relu(self.linear1(out))
         count = self.count_layer(out)
+        out = torch.cat([out, premap_features], dim=1)
         return map_, count, out
 
 
