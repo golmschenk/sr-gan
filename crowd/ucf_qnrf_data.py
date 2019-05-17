@@ -131,7 +131,7 @@ class UcfQnrfPreprocessor(DatabasePreprocessor):
         self.database_archived_directory_name = 'UCF-QNRF_ECCV18'
 
     def preprocess(self):
-        """Preprocesses the database to a format with each label and image being it's own file_."""
+        """Preprocesses the database generating the image and map labels."""
         for dataset_name_ in ['Train', 'Test']:
             dataset_directory = os.path.join(self.database_directory, dataset_name_)
             for mat_filename in os.listdir(os.path.join(self.database_directory, dataset_name_)):

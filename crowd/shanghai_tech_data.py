@@ -116,7 +116,7 @@ class ShanghaiTechPreprocessor(DatabasePreprocessor):
         self.database_archived_directory_name = 'ShanghaiTech'
 
     def preprocess(self):
-        """Preprocesses the database to a format with each label and image being it's own file_."""
+        """Preprocesses the database generating the image and map labels."""
         for part in ['part_A', 'part_B']:
             for dataset in ['test_data', 'train_data']:
                 dataset_directory = os.path.join(self.database_directory, part, dataset)
