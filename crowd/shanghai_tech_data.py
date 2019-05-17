@@ -11,7 +11,7 @@ import torchvision
 from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NumpyArraysToTorchTensors, NegativeOneToOneNormalizeImage
-from crowd.dataset_preprocessor import DatabasePreprocessor
+from crowd.database_preprocessor import DatabasePreprocessor
 from utility import seed_all
 
 
