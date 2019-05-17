@@ -3,25 +3,16 @@ Code from preprocessing the UCSD dataset.
 """
 import os
 import random
-import shutil
-from urllib.request import urlretrieve
 import imageio
 import numpy as np
-import patoolib
 import scipy.io
 import torchvision
 from torch.utils.data import Dataset
 
 from crowd.data import CrowdExample, ExtractPatchForPosition, NegativeOneToOneNormalizeImage, NumpyArraysToTorchTensors
-from crowd.label_generation import (generate_density_label, problematic_head_labels, generate_knn_map,
-                                    generate_point_density_map)
-from utility import seed_all
+from crowd.dataset_preprocessor import DatabasePreprocessor
 
-dataset_name = 'UCF QNRF'
-if os.path.basename(os.path.normpath(os.path.abspath('..'))) == 'srgan':
-    database_directory = '../../{}'.format(dataset_name)
-else:
-    database_directory = '../{}'.format(dataset_name)
+from utility import seed_all
 
 
 class UcfQnrfFullImageDataset(Dataset):
@@ -38,7 +29,7 @@ class UcfQnrfFullImageDataset(Dataset):
         else:
             examples_end = examples_start + number_of_examples
         seed_all(seed)
-        self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
+        self.dataset_directory = os.path.join(UcfQnrfPreprocessor().database_directory, dataset.capitalize())
         file_names = os.listdir(os.path.join(self.dataset_directory, 'labels'))
         random.shuffle(file_names)
         self.file_names = [name for name in file_names if name.endswith('.npy')][examples_start:examples_end]
@@ -75,7 +66,7 @@ class UcfQnrfTransformedDataset(Dataset):
             examples_end = None
         else:
             examples_end = examples_start + number_of_examples
-        self.dataset_directory = os.path.join(database_directory, dataset.capitalize())
+        self.dataset_directory = os.path.join(UcfQnrfPreprocessor().database_directory, dataset.capitalize())
         file_names = os.listdir(os.path.join(self.dataset_directory, 'labels'))
         random.shuffle(file_names)
         self.file_names = [name for name in file_names if name.endswith('.npy')][examples_start:examples_end]
@@ -131,97 +122,31 @@ class UcfQnrfTransformedDataset(Dataset):
         return self.length
 
 
-class UcfQnrfPreprocessing:
-    """A class for preparing the UCF QNRF dataset."""
-    def download_and_preprocess(self):
-        """Downloads and preprocesses the database."""
-        print('Preparing UCF QNRF database.')
-        print('Downloading...')
-        self.download()
-        print('Preprocessing...')
-        self.preprocess()
+class UcfQnrfPreprocessor(DatabasePreprocessor):
+    """The preprocessor for the ShanghaiTech dataset."""
+    def __init__(self):
+        super().__init__()
+        self.dataset_name = 'UCF QNRF'
+        self.dataset_url = 'http://crcv.ucf.edu/data/ucf-qnrf/UCF-QNRF_ECCV18.zip'
+        self.database_archived_directory_name = 'UCF-QNRF_ECCV18'
 
-    @staticmethod
-    def download():
-        """Downloads the database."""
-        if os.path.exists(database_directory):
-            shutil.rmtree(database_directory)
-        os.makedirs(database_directory)
-        urlretrieve('http://crcv.ucf.edu/data/ucf-qnrf/UCF-QNRF_ECCV18.zip',
-                    os.path.join(database_directory, 'temporary'))
-        patoolib.extract_archive(os.path.join(database_directory, 'temporary'), outdir=database_directory)
-        default_directory_name = 'UCF-QNRF_ECCV18'
-        files = os.listdir(os.path.join(database_directory, default_directory_name))
-        for file_ in files:
-            shutil.move(os.path.join(database_directory, default_directory_name, file_), database_directory)
-        shutil.rmtree(os.path.join(database_directory, default_directory_name))
-        os.remove(os.path.join(database_directory, 'temporary'))
-
-        print('Done downloading.')
-
-    @staticmethod
-    def preprocess():
+    def preprocess(self):
         """Preprocesses the database to a format with each label and image being it's own file_."""
         for dataset_name_ in ['Train', 'Test']:
-            images_directory = os.path.join(database_directory, dataset_name_, 'images')
-            labels_directory = os.path.join(database_directory, dataset_name_, 'labels')
-            os.makedirs(images_directory, exist_ok=True)
-            os.makedirs(labels_directory, exist_ok=True)
-            for mat_filename in os.listdir(os.path.join(database_directory, dataset_name_)):
+            dataset_directory = os.path.join(self.database_directory, dataset_name_)
+            for mat_filename in os.listdir(os.path.join(self.database_directory, dataset_name_)):
                 if not mat_filename.endswith('.mat'):
                     continue
                 file_name = mat_filename[:-8]  # 8 for `_ann.mat` characters
-                mat_path = os.path.join(database_directory, dataset_name_, mat_filename)
-                original_image_path = os.path.join(database_directory, dataset_name_, file_name + '.jpg')
-                image_path = os.path.join(images_directory, file_name + '.npy')
-                label_path = os.path.join(labels_directory, file_name + '.npy')
+                mat_path = os.path.join(self.database_directory, dataset_name_, mat_filename)
+                original_image_path = os.path.join(self.database_directory, dataset_name_, file_name + '.jpg')
                 image = imageio.imread(original_image_path)
-                if len(image.shape) == 2:
-                    image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
-                label_size = image.shape[:2]
-                mat = scipy.io.loadmat(mat_path)
-                head_positions = mat['annPoints']  # x, y ordering.
-                label = generate_density_label(head_positions, label_size)
-                np.save(image_path, image)
-                np.save(label_path, label)
-        print('Problematic head labels: {}'.format(problematic_head_labels))
-
-    def knn_preprocess(self):
-        """Generate the kNN map version of labels (along with count labels)."""
-        for dataset_name_ in ['Train', 'Test']:
-            images_directory = os.path.join(database_directory, dataset_name_, 'images')
-            maps_directory = os.path.join(database_directory, dataset_name_, 'maps')
-            labels_directory = os.path.join(database_directory, dataset_name_, 'labels')
-            os.makedirs(images_directory, exist_ok=True)
-            os.makedirs(maps_directory, exist_ok=True)
-            os.makedirs(labels_directory, exist_ok=True)
-            for mat_filename in os.listdir(os.path.join(database_directory, dataset_name_)):
-                if not mat_filename.endswith('.mat'):
-                    continue
-                file_name = mat_filename[:-8]  # 8 for `_ann.mat` characters
-                mat_path = os.path.join(database_directory, dataset_name_, mat_filename)
-                original_image_path = os.path.join(database_directory, dataset_name_, file_name + '.jpg')
-                image_path = os.path.join(images_directory, file_name + '.npy')
-                map_path = os.path.join(maps_directory, file_name + '.npy')
-                label_path = os.path.join(labels_directory, file_name + '.npy')
-                image = imageio.imread(original_image_path)
-                if len(image.shape) == 2:
-                    image = np.stack((image,) * 3, -1)  # Greyscale to RGB.
-                label_size = image.shape[:2]
                 mat = scipy.io.loadmat(mat_path)
                 original_head_positions = mat['annPoints']  # x, y ordering (mostly).
                 # Get y, x ordering.
-                head_positions = self.get_y_x_head_positions(original_head_positions, file_name, label_size)
-                map_ = generate_knn_map(head_positions, label_size, upper_bound=112)
-                map_ = 1 / (map_ + 1)
-                density_map, out_of_bounds_count = generate_point_density_map(head_positions, label_size)
-                if density_map.sum() > 1e6:
-                    print('{} is super huge.'.format(file_name))
-                if out_of_bounds_count > 0:
-                    print('{} has {} out of bounds.'.format(file_name, out_of_bounds_count))
-                np.save(image_path, image.astype(np.float16))
-                np.save(map_path, map_.astype(np.float16))
-                np.save(label_path, density_map.astype(np.float16))
+                head_positions = self.get_y_x_head_positions(original_head_positions, file_name,
+                                                             label_size=image.shape[:2])
+                self.generate_labels_for_example(dataset_directory, file_name, image, head_positions)
 
     @staticmethod
     def get_y_x_head_positions(original_head_positions, file_name, label_size):
@@ -244,47 +169,6 @@ class UcfQnrfPreprocessing:
             return original_head_positions[:, [1, 0]]
 
 
-class UcfQnrfCheck:
-    """A class for listing statistics about the UCF QNRF dataset."""
-    def display_statistics(self):
-        """
-        Displays the statistics of the database.
-        """
-        print('=' * 50)
-        print('UCF QNRF')
-        train_dataset = UcfQnrfFullImageDataset('train')
-        train_label_sums = []
-        for image, label, map_ in train_dataset:
-            train_label_sums.append(label.sum())
-        self.print_statistics(train_label_sums, 'train')
-        test_dataset = UcfQnrfFullImageDataset('test')
-        test_label_sums = []
-        for image, label, map_ in test_dataset:
-            test_label_sums.append(label.sum())
-        self.print_statistics(test_label_sums, 'test')
-        self.print_statistics(train_label_sums + test_label_sums, 'total')
-
-    @staticmethod
-    def print_statistics(label_sums, dataset_name_):
-        """
-        Prints the statistics for the given images and labels.
-
-        :param dataset_name_: The name of the data set being checked.
-        :type dataset_name_: str
-        :param label_sums: The sums of the labels of the dataset.
-        :type label_sums: list[float]
-        """
-        print('-' * 50)
-        print(dataset_name_)
-        label_sums = np.array(label_sums)
-        print('Person count: {}'.format(label_sums.sum()))
-        print('Average count: {}'.format(label_sums.mean(axis=0)))
-        print('Median count: {}'.format(np.median(label_sums, axis=0)))
-        print('Max single image count: {}'.format(label_sums.max(axis=0)))
-        print('Min single image count: {}'.format(label_sums.min(axis=0)))
-
-
 if __name__ == '__main__':
-    preprocessor = UcfQnrfPreprocessing()
-    preprocessor.download()
-    preprocessor.knn_preprocess()
+    preprocessor = UcfQnrfPreprocessor()
+    preprocessor.download_and_preprocess()
