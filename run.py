@@ -27,16 +27,16 @@ method_name = MethodName.srgan
 settings_ = Settings()
 if application_name == ApplicationName.age:
     Experiment = {MethodName.srgan: AgeExperiment, MethodName.sgan: AgeSganExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e2]
-    settings_.fake_loss_multiplier = [1e1]
+    settings_.matching_loss_multiplier = [1e2]
+    settings_.contrasting_loss_multiplier = [1e1]
     settings_.batch_size = 600
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [5000]
     settings_.gradient_penalty_multiplier = 1e2
 elif application_name == ApplicationName.driving:
     Experiment = DrivingExperiment
-    settings_.unlabeled_loss_multiplier = [1e2]
-    settings_.fake_loss_multiplier = [1e1]
+    settings_.matching_loss_multiplier = [1e2]
+    settings_.contrasting_loss_multiplier = [1e1]
     settings_.batch_size = 600
     settings_.unlabeled_dataset_size = None
     settings_.labeled_dataset_size = [7200, 4000]
@@ -45,8 +45,8 @@ elif application_name == ApplicationName.driving:
 elif application_name == ApplicationName.coefficient:
     Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
                   MethodName.dggan: CoefficientDgganExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e-1, 1e0, 1e1]
-    settings_.fake_loss_multiplier = [1e-1, 1e0, 1e1]
+    settings_.matching_loss_multiplier = [1e-1, 1e0, 1e1]
+    settings_.contrasting_loss_multiplier = [1e-1, 1e0, 1e1]
     settings_.batch_size = 5000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [500]
@@ -54,8 +54,8 @@ elif application_name == ApplicationName.coefficient:
 elif application_name == ApplicationName.crowd:
     Experiment = {MethodName.srgan: CrowdExperiment, MethodName.sgan: CrowdSganExperiment,
                   MethodName.dnn: CrowdDnnExperiment, MethodName.dggan: CrowdDgganExperiment}[method_name]
-    settings_.unlabeled_loss_multiplier = [1e3]
-    settings_.fake_loss_multiplier = [1e2]
+    settings_.matching_loss_multiplier = [1e3]
+    settings_.contrasting_loss_multiplier = [1e2]
     settings_.batch_size = 15
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
@@ -94,8 +94,8 @@ for settings_ in settings_list:
         else:
             trial_name += f' le{settings_.labeled_dataset_size}'
             trial_name += f' ue{settings_.unlabeled_dataset_size}'
-    trial_name += f' ul{settings_.unlabeled_loss_multiplier:e}'
-    trial_name += f' fl{settings_.fake_loss_multiplier:e}'
+    trial_name += f' ul{settings_.matching_loss_multiplier:e}'
+    trial_name += f' fl{settings_.contrasting_loss_multiplier:e}'
     trial_name += f' gp{settings_.gradient_penalty_multiplier:e}'
     trial_name += f' lr{settings_.learning_rate:e}'
     trial_name += f' mm{settings_.map_multiplier:e}' if application_name == ApplicationName.crowd else ''

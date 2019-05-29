@@ -341,7 +341,7 @@ class Experiment(ABC):
         _ = self.D(unlabeled_examples)
         self.unlabeled_features = self.D.features
         unlabeled_loss = self.feature_distance_loss(self.unlabeled_features, self.labeled_features)
-        unlabeled_loss *= self.settings.unlabeled_loss_multiplier
+        unlabeled_loss *= self.settings.matching_loss_multiplier
         unlabeled_loss *= self.settings.srgan_loss_multiplier
         return unlabeled_loss
 
@@ -353,7 +353,7 @@ class Experiment(ABC):
         self.fake_features = self.D.features
         fake_loss = self.feature_distance_loss(self.unlabeled_features, self.fake_features,
                                                distance_function=self.settings.contrasting_distance_function)
-        fake_loss *= self.settings.fake_loss_multiplier
+        fake_loss *= self.settings.contrasting_loss_multiplier
         fake_loss *= self.settings.srgan_loss_multiplier
         return fake_loss
 
@@ -387,6 +387,7 @@ class Experiment(ABC):
         _ = self.D(unlabeled_examples)
         detached_unlabeled_features = self.D.features.detach()
         generator_loss = self.feature_distance_loss(detached_unlabeled_features, self.fake_features)
+        generator_loss *= self.settings.matching_loss_multiplier
         return generator_loss
 
     @abstractmethod

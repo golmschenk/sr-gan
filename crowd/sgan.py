@@ -57,7 +57,7 @@ class CrowdSganExperiment(SganExperiment, CrowdExperiment):
         unlabeled_binary_logits = logsumexp(predicted_class_logits, dim=1)
         ones = torch.ones_like(unlabeled_binary_logits)
         unlabeled_loss = self.gan_criterion(unlabeled_binary_logits, ones)
-        unlabeled_loss *= self.settings.unlabeled_loss_multiplier
+        unlabeled_loss *= self.settings.matching_loss_multiplier
         return unlabeled_loss
 
     def fake_loss_calculation(self, labeled_examples, fake_examples):
@@ -66,7 +66,7 @@ class CrowdSganExperiment(SganExperiment, CrowdExperiment):
         fake_binary_logits = logsumexp(predicted_class_logits, dim=1)
         zeros = torch.zeros_like(fake_binary_logits)
         fake_loss = self.gan_criterion(fake_binary_logits, zeros)
-        fake_loss *= self.settings.unlabeled_loss_multiplier
+        fake_loss *= self.settings.matching_loss_multiplier
         return fake_loss
 
     def interpolate_loss_calculation(self, interpolates):

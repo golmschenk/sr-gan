@@ -25,8 +25,8 @@ class Settings:
         self.weight_decay = 0
 
         self.labeled_loss_multiplier = 1e0
-        self.unlabeled_loss_multiplier = 1e0
-        self.fake_loss_multiplier = 1e0
+        self.matching_loss_multiplier = 1e0
+        self.contrasting_loss_multiplier = 1e0
         self.srgan_loss_multiplier = 1e0
         self.dggan_loss_multiplier = 1e1
         self.gradient_penalty_on = True

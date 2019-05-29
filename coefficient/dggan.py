@@ -38,7 +38,7 @@ class CoefficientDgganExperiment(CoefficientExperiment):
         _, fake_scores = self.D(unlabeled_examples)
         criterion = BCEWithLogitsLoss()
         unlabeled_loss = criterion(fake_scores, torch.zeros_like(fake_scores))
-        unlabeled_loss *= self.settings.unlabeled_loss_multiplier
+        unlabeled_loss *= self.settings.matching_loss_multiplier
         unlabeled_loss *= self.settings.dggan_loss_multiplier
         return unlabeled_loss
 
@@ -47,7 +47,7 @@ class CoefficientDgganExperiment(CoefficientExperiment):
         _, fake_scores = self.D(fake_examples)
         criterion = BCEWithLogitsLoss()
         fake_loss = criterion(fake_scores, torch.ones_like(fake_scores))
-        fake_loss *= self.settings.fake_loss_multiplier
+        fake_loss *= self.settings.contrasting_loss_multiplier
         fake_loss *= self.settings.dggan_loss_multiplier
         return fake_loss
 
