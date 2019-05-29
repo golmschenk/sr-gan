@@ -74,7 +74,7 @@ settings_.steps_to_run = 100000
 settings_.learning_rate = [1e-4]
 # settings.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
 settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
-settings_.matching_distance_function = square_mean
+settings_.matching_distance_function = abs_mean
 settings_.continue_existing_experiments = False
 settings_.save_step_period = 20000
 settings_.local_setup()
