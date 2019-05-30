@@ -16,13 +16,16 @@ class DatabasePreprocessor(ABC):
         self.database_name: str = None
         self.database_url: str = None
         self.database_archived_directory_name: str = None
-        self.database_directory: str
-        if os.path.basename(os.path.normpath(os.path.abspath('..'))) == 'srgan':
-            self.database_directory = '../../{}'.format(self.database_name)
-        else:
-            self.database_directory = '../{}'.format(self.database_name)
         self.total_head_count = 0
         self.total_images = 0
+
+    @property
+    def database_directory(self):
+        """The location of the database directory."""
+        if os.path.basename(os.path.normpath(os.path.abspath('..'))) == 'srgan':
+            return '../../{}'.format(self.database_name)
+        else:
+            return '../{}'.format(self.database_name)
 
     def download_and_preprocess(self):
         """Both download and preprocess the dataset."""
