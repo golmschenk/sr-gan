@@ -111,8 +111,8 @@ class ShanghaiTechPreprocessor(DatabasePreprocessor):
     """The preprocessor for the ShanghaiTech dataset."""
     def __init__(self):
         super().__init__()
-        self.dataset_name = 'ShanghaiTech'
-        self.dataset_url = 'https://www.dropbox.com/s/fipgjqxl7uj8hd5/ShanghaiTech.zip?dl=1'
+        self.database_name = 'ShanghaiTech'
+        self.database_url = 'https://www.dropbox.com/s/fipgjqxl7uj8hd5/ShanghaiTech.zip?dl=1'
         self.database_archived_directory_name = 'ShanghaiTech'
 
     def preprocess(self):

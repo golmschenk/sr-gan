@@ -126,8 +126,8 @@ class UcfQnrfPreprocessor(DatabasePreprocessor):
     """The preprocessor for the ShanghaiTech dataset."""
     def __init__(self):
         super().__init__()
-        self.dataset_name = 'UCF QNRF'
-        self.dataset_url = 'http://crcv.ucf.edu/data/ucf-qnrf/UCF-QNRF_ECCV18.zip'
+        self.database_name = 'UCF QNRF'
+        self.database_url = 'http://crcv.ucf.edu/data/ucf-qnrf/UCF-QNRF_ECCV18.zip'
         self.database_archived_directory_name = 'UCF-QNRF_ECCV18'
 
     def preprocess(self):

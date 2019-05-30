@@ -128,8 +128,8 @@ class UcfCc50Preprocessor(DatabasePreprocessor):
     """The preprocessor for the ShanghaiTech dataset."""
     def __init__(self):
         super().__init__()
-        self.dataset_name = 'UCF CC 50'
-        self.dataset_url = 'http://crcv.ucf.edu/data/ucf-cc-50/UCFCrowdCountingDataset_CVPR13.rar'
+        self.database_name = 'UCF CC 50'
+        self.database_url = 'http://crcv.ucf.edu/data/ucf-cc-50/UCFCrowdCountingDataset_CVPR13.rar'
         self.database_archived_directory_name = 'UCF_CC_50'
 
     def preprocess(self):
