@@ -15,8 +15,8 @@ from crowd.sgan import CrowdSganExperiment
 from crowd.srgan import CrowdExperiment
 from driving.srgan import DrivingExperiment
 from settings import Settings, convert_to_settings_list, ApplicationName, MethodName
-from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg, square_mean, abs_mean_neg, \
-    abs_plus_one_log_neg, abs_plus_one_log_mean_neg, norm_mean
+from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg, square_mean, abs_mean_neg,\
+    abs_plus_one_log_mean_neg, norm_mean, abs_mean
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
@@ -45,8 +45,8 @@ elif application_name == ApplicationName.driving:
 elif application_name == ApplicationName.coefficient:
     Experiment = {MethodName.srgan: CoefficientExperiment, MethodName.sgan: CoefficientSganExperiment,
                   MethodName.dggan: CoefficientDgganExperiment}[method_name]
-    settings_.matching_loss_multiplier = [1e-1, 1e0, 1e1]
-    settings_.contrasting_loss_multiplier = [1e-1, 1e0, 1e1]
+    settings_.matching_loss_multiplier = [1e0]
+    settings_.contrasting_loss_multiplier = [1e0]
     settings_.batch_size = 5000
     settings_.unlabeled_dataset_size = 50000
     settings_.labeled_dataset_size = [500]
@@ -70,19 +70,19 @@ else:
     raise ValueError(f'{application_name} is not an available application.')
 settings_.summary_step_period = 5000
 settings_.labeled_dataset_seed = 0
-settings_.steps_to_run = 500000
+settings_.steps_to_run = 50000
 settings_.learning_rate = [1e-4]
-# settings_.load_model_path = 'logs/k comparison i1nn_maps ShanghaiTech crowd dnn ul1e3 fl1e2 gp1e2 lr1e-4 mm1e-6 ls0 bs40'
-settings_.contrasting_distance_function = abs_plus_one_sqrt_mean_neg
-settings_.matching_distance_function = abs_mean
+settings_.load_model_path = 'logs/srgan premap included square_mean abs_plus_one_sqrt_mean_neg density3e-1 UCF QNRF crowd le30 ueNone ul1e1 fl1e0 gp1e2 lr1e-4 mm1e0 ls0 bs15'
+settings_.contrasting_distance_function = [abs_plus_one_sqrt_mean_neg, abs_plus_one_log_mean_neg, abs_mean_neg]
+settings_.matching_distance_function = [abs_mean, norm_mean, square_mean]
 settings_.continue_existing_experiments = False
-settings_.save_step_period = 20000
+settings_.save_step_period = None
 settings_.local_setup()
 settings_list = convert_to_settings_list(settings_, shuffle=True)
 seed_all(0)
 previous_trial_directory = None
 for settings_ in settings_list:
-    trial_name = f'dggan premap included'
+    trial_name = f'premap lfa'
     trial_name += f' {settings_.matching_distance_function.__name__} {settings_.contrasting_distance_function.__name__}'
     trial_name += f' {method_name.value}' if method_name != MethodName.srgan else ''
     trial_name += f' {application_name.value}'
