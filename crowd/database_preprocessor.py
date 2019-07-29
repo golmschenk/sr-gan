@@ -135,7 +135,7 @@ def generate_density_label(head_positions, label_size, perspective=None, include
     """
     head_count = 0
     body_parts = 2 if include_body else 1
-    number_of_neighbors = min(11, len(head_positions))
+    number_of_neighbors = min(3, len(head_positions))
     nearest_neighbors = NearestNeighbors(n_neighbors=number_of_neighbors, algorithm='ball_tree').fit(head_positions)
     neighbor_distances, _ = nearest_neighbors.kneighbors(head_positions)
     average_neighbor_distances = neighbor_distances[0:].mean(axis=1)

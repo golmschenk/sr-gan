@@ -67,7 +67,7 @@ class UcfQnrfTransformedDataset(Dataset):
         else:
             examples_end = examples_start + number_of_examples
         self.dataset_directory = os.path.join(UcfQnrfPreprocessor().database_directory, dataset.capitalize())
-        file_names = os.listdir(os.path.join(UcfQnrfPreprocessor().database_directory, 'labels'))
+        file_names = os.listdir(os.path.join(self.dataset_directory, 'labels'))
         random.shuffle(file_names)
         self.file_names = [name for name in file_names if name.endswith('.npy')][examples_start:examples_end]
         self.image_patch_size = image_patch_size
