@@ -55,7 +55,7 @@ class WorldExpoDataset(Dataset):
         :rtype: torch.Tensor, torch.Tensor
         """
         example = CrowdExample(image=self.images[index], label=self.labels[index], roi=self.rois[index],
-                               perspective=self.perspectives[index])
+                               perspective=self.perspectives[index], map_=self.labels[index])
         if self.transform:
             example = self.transform(example)
         return example.image, example.label
