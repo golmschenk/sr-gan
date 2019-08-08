@@ -16,12 +16,12 @@ from crowd.srgan import CrowdExperiment
 from driving.srgan import DrivingExperiment
 from settings import Settings, convert_to_settings_list, ApplicationName, MethodName
 from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_neg, square_mean, abs_mean_neg, \
-    abs_plus_one_log_neg, abs_plus_one_log_mean_neg, norm_mean
+    abs_plus_one_log_neg, abs_plus_one_log_mean_neg, norm_mean, abs_mean
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = ApplicationName.crowd
+application_name = ApplicationName.driving
 method_name = MethodName.srgan
 
 settings_ = Settings()
@@ -39,7 +39,7 @@ elif application_name == ApplicationName.driving:
     settings_.contrasting_loss_multiplier = [1e1]
     settings_.batch_size = 600
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = [7200, 4000]
+    settings_.labeled_dataset_size = [100]
     settings_.validation_dataset_size = 9000
     settings_.gradient_penalty_multiplier = 1e2
 elif application_name == ApplicationName.coefficient:
