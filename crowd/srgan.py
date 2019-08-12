@@ -20,7 +20,7 @@ from crowd.data import ExtractPatchForPosition, CrowdExample, ImageSlidingWindow
 from crowd.models import DCGenerator, KnnDenseNetCat
 from crowd.shanghai_tech_data import ShanghaiTechFullImageDataset, ShanghaiTechTransformedDataset
 from crowd.ucf_qnrf_data import UcfQnrfFullImageDataset, UcfQnrfTransformedDataset
-from crowd.world_expo_data import WorldExpoDataset
+from crowd.world_expo_data import WorldExpoFullImageDataset, WorldExpoTransformedDataset
 from srgan import Experiment
 from utility import MixtureModel, gpu
 
@@ -70,32 +70,24 @@ class CrowdExperiment(Experiment):
                                                                      map_directory_name=settings.map_directory_name)
 
         elif settings.crowd_dataset == CrowdDataset.world_expo:
-            train_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
-                                                              data.RandomHorizontalFlip(),
-                                                              data.NegativeOneToOneNormalizeImage(),
-                                                              data.NumpyArraysToTorchTensors()])
-            validation_transform = torchvision.transforms.Compose([data.RandomlySelectPathWithNoPerspectiveRescale(),
-                                                                   data.NegativeOneToOneNormalizeImage(),
-                                                                   data.NumpyArraysToTorchTensors()])
-            dataset_path = '../World Expo/'
-            with open(os.path.join(dataset_path, 'viable_with_validation_and_random_test.json')) as json_file:
-                cameras_dict = json.load(json_file)
-            self.train_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
-                                                  number_of_cameras=settings.number_of_cameras,
-                                                  number_of_images_per_camera=settings.number_of_images_per_camera,
-                                                  transform=train_transform, seed=settings.labeled_dataset_seed)
-            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size, shuffle=True,
+            self.dataset_class = WorldExpoFullImageDataset
+            self.train_dataset = WorldExpoTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                             seed=settings.labeled_dataset_seed,
+                                                             number_of_cameras=settings.number_of_cameras,
+                                                             number_of_images_per_camera=settings.number_of_images_per_camera)
+            self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-            self.unlabeled_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['train'],
-                                                      number_of_cameras=settings.number_of_cameras,
-                                                      transform=train_transform, unlabeled=True,
-                                                      seed=settings.labeled_dataset_seed)
+            self.unlabeled_dataset = WorldExpoTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
+                                                                 seed=settings.labeled_dataset_seed,
+                                                                 number_of_cameras=settings.number_of_cameras,
+                                                                 number_of_images_per_camera=settings.number_of_images_per_camera)
             self.unlabeled_dataset_loader = DataLoader(self.unlabeled_dataset, batch_size=settings.batch_size,
-                                                       shuffle=True, pin_memory=self.settings.pin_memory,
+                                                       pin_memory=self.settings.pin_memory,
                                                        num_workers=settings.number_of_data_workers)
-            self.validation_dataset = WorldExpoDataset(dataset_path, camera_names=cameras_dict['validation'],
-                                                       transform=validation_transform, seed=101)
+            self.validation_dataset = WorldExpoTransformedDataset(dataset='validation', seed=101)
+            if self.settings.batch_size > self.train_dataset.length:
+                self.settings.batch_size = self.train_dataset.length
 
     def model_setup(self):
         """Prepares all the model architectures required for the application."""
