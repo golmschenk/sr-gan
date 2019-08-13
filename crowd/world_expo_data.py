@@ -2,9 +2,10 @@
 Code for the World Expo dataset.
 """
 import json
+import math
 import os
 import random
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import torchvision
@@ -38,9 +39,10 @@ class WorldExpoFullImageDataset(Dataset):
             cameras_dict = json.load(json_file)
         camera_names = cameras_dict[dataset]
         random.shuffle(camera_names)
-        self.camera_data_dict: Dict[str: CameraData] = {}
+        self.camera_data_list: List[CameraData] = []
         camera_names = camera_names[:number_of_cameras]
         self.length = 0
+        self.start_indexes = []
         for camera_name in camera_names:
             camera_directory = os.path.join(self.dataset_directory, camera_name)
             if dataset == 'unlabeled':
@@ -55,15 +57,19 @@ class WorldExpoFullImageDataset(Dataset):
             camera_images = camera_images[permutation_indexes][:number_of_images_per_camera]
             if dataset != 'unlabeled':
                 camera_labels = camera_labels[permutation_indexes][:number_of_images_per_camera]
-            self.camera_data_dict[camera_name] = CameraData(images=camera_images, labels=camera_labels, roi=camera_roi,
-                                                perspective=camera_perspective)
+            self.camera_data_list.append(CameraData(images=camera_images, labels=camera_labels, roi=camera_roi,
+                                                    perspective=camera_perspective))
+            self.start_indexes.append(self.length)
             self.length += camera_images.shape[0]
 
     def __getitem__(self, index):
-        camera_data = random.choice(list(self.camera_data_dict.values()))
-        random_index = random.randrange(camera_data.labels.shape[0])
-        image = camera_data.images[random_index]
-        label = camera_data.labels[random_index]
+        index_ = random.randrange(self.length)
+        camera_data_index = np.searchsorted(self.start_indexes, index_, side='right') - 1
+        start_index = self.start_indexes[camera_data_index]
+        camera_data = self.camera_data_list[camera_data_index]
+        position_index = index_ - start_index
+        image = camera_data.images[position_index]
+        label = camera_data.labels[position_index]
         map_ = label
         return image, label, map_
 
@@ -83,9 +89,13 @@ class WorldExpoTransformedDataset(Dataset):
             cameras_dict = json.load(json_file)
         camera_names = cameras_dict[dataset]
         random.shuffle(camera_names)
-        self.camera_data_dict: Dict[str: CameraData] = {}
+        self.camera_data_list: List[CameraData] = []
         camera_names = camera_names[:number_of_cameras]
+        self.image_patch_size = image_patch_size
+        self.label_patch_size = label_patch_size
+        half_patch_size = int(self.image_patch_size // 2)
         self.length = 0
+        self.start_indexes = []
         for camera_name in camera_names:
             camera_directory = os.path.join(self.dataset_directory, camera_name)
             if dataset == 'unlabeled':
@@ -100,9 +110,13 @@ class WorldExpoTransformedDataset(Dataset):
             camera_images = camera_images[permutation_indexes][:number_of_images_per_camera]
             if dataset != 'unlabeled':
                 camera_labels = camera_labels[permutation_indexes][:number_of_images_per_camera]
-            self.camera_data_dict[camera_name] = CameraData(images=camera_images, labels=camera_labels, roi=camera_roi,
-                                                            perspective=camera_perspective)
-            self.length += camera_images.shape[0]
+            self.camera_data_list.append(CameraData(images=camera_images, labels=camera_labels, roi=camera_roi,
+                                                    perspective=camera_perspective))
+            y_positions = range(half_patch_size, camera_images.shape[1] - half_patch_size + 1)
+            x_positions = range(half_patch_size, camera_images.shape[2] - half_patch_size + 1)
+            image_indexes_length = len(y_positions) * len(x_positions)
+            self.start_indexes.append(self.length)
+            self.length += camera_images.shape[0] * image_indexes_length
         self.image_patch_size = image_patch_size
         self.label_patch_size = label_patch_size
         self.middle_transform = middle_transform
@@ -114,20 +128,29 @@ class WorldExpoTransformedDataset(Dataset):
         :return: An example and label from the crowd dataset.
         :rtype: torch.Tensor, torch.Tensor
         """
-        camera_data = random.choice(list(self.camera_data_dict.values()))
-        random_index = random.randrange(camera_data.labels.shape[0])
-        image = camera_data.images[random_index]
-        label = camera_data.labels[random_index]
+        index_ = random.randrange(self.length)
+        camera_data_index = np.searchsorted(self.start_indexes, index_, side='right') - 1
+        start_index = self.start_indexes[camera_data_index]
+        camera_data = self.camera_data_list[camera_data_index]
+        camera_images = camera_data.images
+        array_index = index_ - start_index
+        half_patch_size = int(self.image_patch_size // 2)
+        y_positions = range(half_patch_size, camera_images.shape[1] - half_patch_size + 1)
+        x_positions = range(half_patch_size, camera_images.shape[2] - half_patch_size + 1)
+        image_indexes_length = len(y_positions) * len(x_positions)
+        image_index = math.floor(array_index / image_indexes_length)
+        position_index = array_index % image_indexes_length
+        image = camera_data.images[image_index]
+        label = camera_data.labels[image_index]
         map_ = label
         extract_patch_transform = ExtractPatchForPosition(self.image_patch_size, self.label_patch_size,
                                                           allow_padded=True)  # In case image is smaller than patch.
         preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                                NumpyArraysToTorchTensors()])
-        half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
         x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
         positions_shape = [len(y_positions), len(x_positions)]
-        y_index, x_index = np.unravel_index(random.randrange(np.product(positions_shape)), positions_shape)
+        y_index, x_index = np.unravel_index(position_index, positions_shape)
         y = y_positions[y_index]
         x = x_positions[x_index]
         example = CrowdExample(image=image, label=label, map_=map_)
