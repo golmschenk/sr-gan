@@ -21,7 +21,7 @@ from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = ApplicationName.driving
+application_name = ApplicationName.age
 method_name = MethodName.srgan
 
 settings_ = Settings()
