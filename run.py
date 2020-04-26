@@ -21,8 +21,8 @@ from utility import seed_all, clean_scientific_notation, abs_plus_one_sqrt_mean_
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.fastest = True
 
-application_name = ApplicationName.age
-method_name = MethodName.srgan
+application_name = ApplicationName.crowd
+method_name = MethodName.dnn
 
 settings_ = Settings()
 if application_name == ApplicationName.age:
