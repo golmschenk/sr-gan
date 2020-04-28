@@ -69,6 +69,10 @@ class DatabasePreprocessor(ABC):
         density_map, _ = generate_point_density_map(head_positions, label_size)
         self.total_head_count += np.sum(density_map)
         self.total_images += 1
+        # Images as numpy.
+        images_directory = os.path.join(dataset_directory, 'images', f'{file_name}.npy')
+        os.makedirs(images_directory, exist_ok=True)
+        np.save(os.path.join(images_directory, f'{file_name}.npy'), image)
         # Point labels.
         labels_directory = os.path.join(dataset_directory, 'labels', f'{file_name}.npy')
         os.makedirs(labels_directory, exist_ok=True)
