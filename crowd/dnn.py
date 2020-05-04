@@ -26,11 +26,13 @@ class CrowdDnnExperiment(DnnExperiment, CrowdExperiment):
             self.dataset_class = UcfQnrfFullImageDataset
             self.train_dataset = UcfQnrfTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
                                                            seed=settings.labeled_dataset_seed,
+                                                           map_directory_name=settings.map_directory_name,
                                                            number_of_examples=settings.labeled_dataset_size)
             self.train_dataset_loader = DataLoader(self.train_dataset, batch_size=settings.batch_size,
                                                    pin_memory=self.settings.pin_memory,
                                                    num_workers=settings.number_of_data_workers)
-            self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101)
+            self.validation_dataset = UcfQnrfTransformedDataset(dataset='test', seed=101,
+                                                                map_directory_name=settings.map_directory_name,)
         elif settings.crowd_dataset == CrowdDataset.shanghai_tech:
             self.dataset_class = ShanghaiTechFullImageDataset
             self.train_dataset = ShanghaiTechTransformedDataset(middle_transform=data.RandomHorizontalFlip(),
