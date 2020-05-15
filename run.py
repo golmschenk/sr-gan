@@ -56,16 +56,18 @@ elif application_name == ApplicationName.crowd:
                   MethodName.dnn: CrowdDnnExperiment, MethodName.dggan: CrowdDgganExperiment}[method_name]
     settings_.matching_loss_multiplier = [1e3]
     settings_.contrasting_loss_multiplier = [1e2]
-    settings_.batch_size = 15
+    settings_.batch_size = 25
     settings_.number_of_cameras = [5]
     settings_.number_of_images_per_camera = [5]
-    settings_.crowd_dataset = CrowdDataset.ucf_qnrf
+    settings_.crowd_dataset = CrowdDataset.shanghai_tech
     settings_.labeled_loss_order = 2
     settings_.unlabeled_dataset_size = None
-    settings_.labeled_dataset_size = 50
+    settings_.labeled_dataset_size = None
     settings_.gradient_penalty_multiplier = 1e2
-    settings_.map_directory_name = ['density3e-1']
-    settings_.map_multiplier = 1e-3
+    settings_.map_directory_name = ['i1nn_maps']
+    settings_.map_multiplier = 1
+    settings_.label_patch_size = 224
+    settings_.image_patch_size = 224
 else:
     raise ValueError(f'{application_name} is not an available application.')
 settings_.summary_step_period = 5000

@@ -771,9 +771,7 @@ class MapModule(nn.Module):
         self.conv2 = Conv2d(in_channels=8, out_channels=16, kernel_size=2, stride=2)
         self.conv3 = Conv2d(in_channels=16, out_channels=32, kernel_size=2, stride=2)
         count_layer_kernel_size = label_size // (2 ** 3)
-        self.linear1 = Conv2d(in_channels=32, out_channels=20, kernel_size=count_layer_kernel_size)
-        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
-
+        self.count_layer = Conv2d(in_channels=32, out_channels=1, kernel_size=count_layer_kernel_size)
 
     def forward(self, x):
         """Forward pass."""
@@ -781,8 +779,7 @@ class MapModule(nn.Module):
         out = leaky_relu(self.conv1(map_))
         out = leaky_relu(self.conv2(out))
         out = leaky_relu(self.conv3(out))
-        out = leaky_relu(self.linear1(out))
-        count = self.count_layer(out)
+        count = leaky_relu(self.count_layer(out))
         return map_, count, out
 
 
@@ -1131,8 +1128,7 @@ class KnnDenseNetCat(nn.Module):
         self.map_module1 = MapModule(in_features=128, input_size=28, label_size=label_patch_size)
         self.map_module2 = MapModule(in_features=256, input_size=14, label_size=label_patch_size)
         self.map_module3 = MapModule(in_features=896, input_size=7, label_size=label_patch_size)
-        self.final_count_feature_layer = Conv2d(in_channels=num_features, out_channels=20, kernel_size=1)
-        self.count_layer = Conv2d(in_channels=20, out_channels=1, kernel_size=1)
+        self.count_layer = Conv2d(in_channels=num_features, out_channels=1, kernel_size=1)
         self.features = None
 
     def forward(self, x):
@@ -1151,14 +1147,10 @@ class KnnDenseNetCat(nn.Module):
         final_pool = avg_pool2d(n5_relu_out, kernel_size=7, stride=1)
 
         density = torch.zeros([batch_size, self.label_patch_size, self.label_patch_size], device=gpu)
-        final_count_features = leaky_relu(self.final_count_feature_layer(final_pool))
-        final_count = self.count_layer(final_count_features)
+        final_count = leaky_relu(self.count_layer(final_pool))
         map1, count1, h1 = self.map_module1(t1_out)
         map2, count2, h2 = self.map_module2(t2_out)
         map3, count3, h3 = self.map_module3(t3_out)
-        self.features = torch.cat([h1.view(batch_size, -1, 1, 1), h2.view(batch_size, -1, 1, 1),
-                                   h3.view(batch_size, -1, 1, 1), final_count_features.view(batch_size, -1, 1, 1)],
-                                  dim=1)
         count = count1 + count2 + count3 + final_count
         count = count.view(batch_size)
         map_ = torch.cat([map1, map2, map3], dim=1)
