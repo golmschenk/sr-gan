@@ -17,7 +17,7 @@ from utility import seed_all
 
 class ShanghaiTechFullImageDataset(Dataset):
     """A class for the full image examples of the ShanghaiTech crowd dataset."""
-    def __init__(self, dataset='train', seed=None, part='part_A', number_of_examples=None,
+    def __init__(self, dataset='train', seed=None, part='part_B_final', number_of_examples=None,
                  map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(ShanghaiTechPreprocessor().database_directory,
@@ -35,8 +35,8 @@ class ShanghaiTechFullImageDataset(Dataset):
         :rtype: torch.Tensor, torch.Tensor
         """
         file_name = self.file_names[index]
-        image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
+        image = np.load(os.path.join(self.dataset_directory, 'images/'+file_name, file_name))
+        label = np.load(os.path.join(self.dataset_directory, 'labels/'+file_name, file_name))
         map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
         return image, label, map_
 
@@ -48,7 +48,7 @@ class ShanghaiTechTransformedDataset(Dataset):
     """
     A class for the transformed ShanghaiTech crowd dataset.
     """
-    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, part='part_A',
+    def __init__(self, dataset='train', image_patch_size=224, label_patch_size=224, seed=None, part='part_B_final',
                  number_of_examples=None, middle_transform=None, map_directory_name='knn_maps'):
         seed_all(seed)
         self.dataset_directory = os.path.join(ShanghaiTechPreprocessor().database_directory,
@@ -62,7 +62,7 @@ class ShanghaiTechTransformedDataset(Dataset):
         self.start_indexes = []
         for file_name in self.file_names:
             self.start_indexes.append(self.length)
-            image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
+            image = np.load(os.path.join(self.dataset_directory, 'images/'+file_name, file_name), mmap_mode='r')
             y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
             x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
             image_indexes_length = len(y_positions) * len(x_positions)
@@ -86,8 +86,8 @@ class ShanghaiTechTransformedDataset(Dataset):
                                                           allow_padded=True)  # In case image is smaller than patch.
         preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                                NumpyArraysToTorchTensors()])
-        image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
+        image = np.load(os.path.join(self.dataset_directory, 'images/'+file_name, file_name), mmap_mode='r')
+        label = np.load(os.path.join(self.dataset_directory, 'labels/'+file_name, file_name), mmap_mode='r')
         map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
@@ -112,15 +112,15 @@ class ShanghaiTechPreprocessor(DatabasePreprocessor):
     def __init__(self):
         super().__init__()
         self.database_name = 'ShanghaiTech'
-        self.database_url = 'https://www.dropbox.com/s/fipgjqxl7uj8hd5/ShanghaiTech.zip?dl=1'
+        self.database_url = 'https://uc7e8b294fb23c9397665c21b1bf.dl.dropboxusercontent.com/cd/0/get/A3bPxvcP-NLCCq8Co3B4nOolAnKKA6JwzgjfK8H_veHCWy9FRlQFZmDSpejmRTBgH8aas9a4mUfTqS3uKhDJJ63IGTnDjwpToAg1mYfEghSyxIp-un0LuLRAPAiss3_bX_8/file?dl=1#'
         self.database_archived_directory_name = 'ShanghaiTech'
 
     def preprocess(self):
         """Preprocesses the database generating the image and map labels."""
-        for part in ['part_A', 'part_B']:
+        for part in ['part_A_final', 'part_B_final']:
             for dataset in ['test_data', 'train_data']:
                 dataset_directory = os.path.join(self.database_directory, part, dataset)
-                ground_truth_directory = os.path.join(dataset_directory, 'ground-truth')
+                ground_truth_directory = os.path.join(dataset_directory, 'ground_truth')
                 original_images_directory = os.path.join(dataset_directory, 'images')
                 for mat_filename in os.listdir(ground_truth_directory):
                     file_name = mat_filename[3:-3]

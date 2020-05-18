@@ -44,8 +44,8 @@ class UcfQnrfFullImageDataset(Dataset):
         :rtype: torch.Tensor, torch.Tensor
         """
         file_name = self.file_names[index]
-        image = np.load(os.path.join(self.dataset_directory, 'images', file_name))
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name))
+        image = np.load(os.path.join(self.dataset_directory, 'images/'+file_name, file_name))
+        label = np.load(os.path.join(self.dataset_directory, 'labels/'+file_name, file_name))
         map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name))
         return image, label, map_
 
@@ -77,7 +77,7 @@ class UcfQnrfTransformedDataset(Dataset):
         self.start_indexes = []
         for file_name in self.file_names:
             self.start_indexes.append(self.length)
-            image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
+            image = np.load(os.path.join(self.dataset_directory, 'images/'+file_name, file_name), mmap_mode='r')
             y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
             x_positions = range(half_patch_size, image.shape[1] - half_patch_size + 1)
             image_indexes_length = len(y_positions) * len(x_positions)
@@ -101,8 +101,8 @@ class UcfQnrfTransformedDataset(Dataset):
                                                           allow_padded=True)  # In case image is smaller than patch.
         preprocess_transform = torchvision.transforms.Compose([NegativeOneToOneNormalizeImage(),
                                                                NumpyArraysToTorchTensors()])
-        image = np.load(os.path.join(self.dataset_directory, 'images', file_name), mmap_mode='r')
-        label = np.load(os.path.join(self.dataset_directory, 'labels', file_name), mmap_mode='r')
+        image = np.load(os.path.join(self.dataset_directory, 'images/'+file_name, file_name), mmap_mode='r')
+        label = np.load(os.path.join(self.dataset_directory, 'labels/'+file_name, file_name), mmap_mode='r')
         map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, file_name), mmap_mode='r')
         half_patch_size = int(self.image_patch_size // 2)
         y_positions = range(half_patch_size, image.shape[0] - half_patch_size + 1)
@@ -126,7 +126,7 @@ class UcfQnrfPreprocessor(DatabasePreprocessor):
     """The preprocessor for the ShanghaiTech dataset."""
     def __init__(self):
         super().__init__()
-        self.database_name = 'UCF QNRF'
+        self.database_name = 'UCFQNRF'
         self.database_url = 'http://crcv.ucf.edu/data/ucf-qnrf/UCF-QNRF_ECCV18.zip'
         self.database_archived_directory_name = 'UCF-QNRF_ECCV18'
 
