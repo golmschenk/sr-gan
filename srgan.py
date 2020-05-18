@@ -258,7 +258,7 @@ class Experiment(ABC):
 
     def dnn_training_step(self, examples, labels, step):
         """Runs an individual round of DNN training."""
-        self.DNN.apply(disable_batch_norm_updates)  # No batch norm
+        # self.DNN.apply(disable_batch_norm_updates)  # No batch norm
         self.dnn_summary_writer.step = step
         self.dnn_optimizer.zero_grad()
         dnn_loss = self.dnn_loss_calculation(examples, labels)
