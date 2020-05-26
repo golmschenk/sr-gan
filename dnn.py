@@ -98,3 +98,5 @@ class DnnExperiment(Experiment, ABC):
                     self.validation_summaries(step)
                 self.train_mode()
             self.handle_user_input(step)
+            if self.settings.save_step_period and step % self.settings.save_step_period == 0 and step != 0:
+                self.save_models(step=step)
