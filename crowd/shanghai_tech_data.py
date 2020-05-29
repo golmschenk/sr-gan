@@ -44,6 +44,36 @@ class ShanghaiTechFullImageDataset(Dataset):
         return self.length
 
 
+# class ShanghaiTechImagefrontDataset(Dataset):
+#     """A class for the full image examples of the ShanghaiTech crowd dataset."""
+#
+#     def __init__(self, dataset='train', seed=None, part='part_A_final', number_of_examples=None,
+#                  map_directory_name='i1nn_maps'):
+#         seed_all(seed)
+#         self.dataset_directory = os.path.join(ShanghaiTechPreprocessor().database_directory,
+#                                               part, '{}_data'.format(dataset))
+#         self.file_names = [name for name in os.listdir(os.path.join(self.dataset_directory, 'ground_truth_front'))
+#                            if name.endswith('.npy')][:number_of_examples]
+#         self.length = len(self.file_names)
+#         self.map_directory_name = map_directory_name
+#
+#     def __getitem__(self, index):
+#         """
+#         :param index: The index within the entire dataset.
+#         :type index: int
+#         :return: An example and label from the crowd dataset.
+#         :rtype: torch.Tensor, torch.Tensor
+#         """
+#         file_name = self.file_names[index]
+#         image = np.load(os.path.join(self.dataset_directory, 'images_front', file_name))
+#         label = np.load(os.path.join(self.dataset_directory, 'ground_truth_front', file_name))
+#         map_ = np.load(os.path.join(self.dataset_directory, self.map_directory_name, os.path.splitext(file_name)[0]+'..npy'))
+#         return image, label, map_[int(map_.shape[0]/2):, :]
+#
+#     def __len__(self):
+#         return self.length
+
+
 class ShanghaiTechTransformedDataset(Dataset):
     """
     A class for the transformed ShanghaiTech crowd dataset.
@@ -112,7 +142,7 @@ class ShanghaiTechPreprocessor(DatabasePreprocessor):
     def __init__(self):
         super().__init__()
         self.database_name = 'ShanghaiTech'
-        self.database_url = 'https://uc7e8b294fb23c9397665c21b1bf.dl.dropboxusercontent.com/cd/0/get/A3bPxvcP-NLCCq8Co3B4nOolAnKKA6JwzgjfK8H_veHCWy9FRlQFZmDSpejmRTBgH8aas9a4mUfTqS3uKhDJJ63IGTnDjwpToAg1mYfEghSyxIp-un0LuLRAPAiss3_bX_8/file?dl=1#'
+        self.database_url = 'https://ucce090884ed145400f1f95f922a.dl.dropboxusercontent.com/cd/0/get/A3-q8Oy9s8YBhU4bcHDqdU70lgn3CxecyM52Bx3dezmUuVp8Wyt7oiUPFrj44wcmynBFPqmsri1i4fVgG2hpueeWrZFJW8jAoON1MR7UpZtFRxsKD7AeCZICibow5vGdnX4/file?dl=1#'
         self.database_archived_directory_name = 'ShanghaiTech'
 
     def preprocess(self):
